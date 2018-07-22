@@ -1,5 +1,8 @@
 #[macro_use]
 extern crate nom;
+#[macro_use]
+extern crate log;
+extern crate pretty_env_logger;
 
 use nom::types::CompleteStr;
 
@@ -56,6 +59,7 @@ enum Command {
 fn parse(input: &str) {
     let raw_lines = lines(CompleteStr(input)).unwrap().1;
     println!("{:?}", raw_lines);
+    let mut commands: Vec<Command> = Vec::new();
     for line in raw_lines {
         let mut symbols: Vec<SymbolType> = Vec::new();
         let mut words = String::new();
@@ -76,11 +80,22 @@ fn parse(input: &str) {
             symbols.push(SymbolType::Words(words.trim().to_string()));
         }
         println!("{:?}", symbols);
+
+        match symbols.as_slice() {
+            [SymbolType::Words(target), SymbolType::Is, SymbolType::Words(value)] => {
+                commands.push(Command::Assignment { target: target.to_string(), value: value.to_string()});
+            }
+            _ => {
+                error!("Don't recognise command sequence {:?}", symbols);
+            }
+        }
     }
+    println!("{:?}", commands);
 }
 
 #[test]
 fn test_counting() {
+    pretty_env_logger::init();
     let program = "Limit is 100
 Counter is 0
 Fizz is 3

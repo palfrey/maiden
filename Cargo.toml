@@ -5,3 +5,5 @@ authors = ["Tom Parker <palfrey@tevp.net>"]
 
 [dependencies]
 nom = "4"
+log = "0.4"
+pretty_env_logger = "*"
