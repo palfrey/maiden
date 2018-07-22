@@ -50,6 +50,8 @@ enum SymbolType {
     Is,
     Build,
     Up,
+    Until,
+    End,
     Words(String)
 }
 
@@ -57,6 +59,18 @@ enum SymbolType {
 enum Command {
     Assignment { target: String, value: String },
     Increment { target: String }
+}
+
+macro_rules! push_symbol {
+    ($symbol:ident, $words:ident, $symbols:ident) => {
+        {
+            if !$words.is_empty() {
+                $symbols.push(SymbolType::Words($words.trim().to_string()));
+            }
+            $symbols.push(SymbolType::$symbol);
+            $words = String::new();
+        }
+    }
 }
 
 fn parse(input: &str) {
@@ -68,27 +82,11 @@ fn parse(input: &str) {
         let mut words = String::new();
         for word in line {
             match word.to_lowercase().as_str() {
-                "is" => {
-                    if !words.is_empty() {
-                        symbols.push(SymbolType::Words(words.trim().to_string()));
-                    }
-                    symbols.push(SymbolType::Is);
-                    words = String::new();
-                },
-                "build" => {
-                    if !words.trim().is_empty() {
-                        symbols.push(SymbolType::Words(words.trim().to_string()));
-                    }
-                    symbols.push(SymbolType::Build);
-                    words = String::new();
-                },
-                "up" => {
-                    if !words.is_empty() {
-                        symbols.push(SymbolType::Words(words.trim().to_string()));
-                    }
-                    symbols.push(SymbolType::Up);
-                    words = String::new();
-                },
+                "is" => push_symbol!(Is, words, symbols),
+                "build" => push_symbol!(Build, words, symbols),
+                "up" => push_symbol!(Up, words, symbols),
+                "until" => push_symbol!(Until, words, symbols),
+                "end" => push_symbol!(End, words, symbols),
                 other => {
                     words += " ";
                     words += &other;
