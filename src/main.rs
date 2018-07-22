@@ -27,30 +27,56 @@ pub fn is_alphanumeric(chr: char) -> bool {
   is_alphabetic(chr) || is_digit(chr)
 }
 
-named!(line<CompleteStr, Vec<&str> >, many0!(
+named!(word<CompleteStr, &str>,
     do_parse!(
         word: take_while!(is_alphanumeric) >>
         take_while!(is_space) >>
         (*word)
-    )));
+    ));
 
-named!(lines<CompleteStr, Vec<Vec<&str> > >, many0!(
+named!(line<CompleteStr, Vec<&str>>, many0!(word));
+named!(lines<CompleteStr, Vec<Vec<&str>>>, many0!(
     do_parse!(
         a_line: line >>
         take_while!(is_newline) >>
         (a_line)
     )));
 
-// enum Command {
-//     Assignment { target: String, value: String }
-// }
+#[derive(Debug)]
+enum SymbolType {
+    Is,
+    Words(String)
+}
 
-// named!(command<Vec<&str>, Command>,
-//     alt!()
+#[derive(Debug)]
+enum Command {
+    Assignment { target: String, value: String }
+}
 
 fn parse(input: &str) {
     let raw_lines = lines(CompleteStr(input)).unwrap().1;
     println!("{:?}", raw_lines);
+    for line in raw_lines {
+        let mut symbols: Vec<SymbolType> = Vec::new();
+        let mut words = String::new();
+        for word in line {
+            match word {
+                "is" => {
+                    symbols.push(SymbolType::Words(words.trim().to_string()));
+                    symbols.push(SymbolType::Is);
+                    words = String::new();
+                },
+                other => {
+                    words += " ";
+                    words += other;
+                }
+            }
+        }
+        if !words.is_empty() {
+            symbols.push(SymbolType::Words(words.trim().to_string()));
+        }
+        println!("{:?}", symbols);
+    }
 }
 
 #[test]
