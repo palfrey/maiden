@@ -58,13 +58,15 @@ enum SymbolType {
 #[derive(Debug)]
 enum Command {
     Assignment { target: String, value: String },
-    Increment { target: String }
+    UntilIs { target: String, value: String },
+    Increment { target: String },
+    End
 }
 
 macro_rules! push_symbol {
     ($symbol:ident, $words:ident, $symbols:ident) => {
         {
-            if !$words.is_empty() {
+            if !$words.trim().is_empty() {
                 $symbols.push(SymbolType::Words($words.trim().to_string()));
             }
             $symbols.push(SymbolType::$symbol);
@@ -104,6 +106,12 @@ fn parse(input: &str) {
             }
             [SymbolType::Build, SymbolType::Words(target), SymbolType::Up] => {
                 commands.push(Command::Increment { target: target.to_string()});
+            }
+            [SymbolType::End] => {
+                commands.push(Command::End);
+            }
+            [SymbolType::Until, SymbolType::Words(target), SymbolType::Is, SymbolType::Words(value)] => {
+                commands.push(Command::UntilIs { target: target.to_string(), value: value.to_string()});
             }
             _ => {
                 error!("Don't recognise command sequence {:?}", symbols);
