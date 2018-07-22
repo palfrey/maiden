@@ -48,12 +48,15 @@ named!(lines<CompleteStr, Vec<Vec<&str>>>, many0!(
 #[derive(Debug)]
 enum SymbolType {
     Is,
+    Build,
+    Up,
     Words(String)
 }
 
 #[derive(Debug)]
 enum Command {
-    Assignment { target: String, value: String }
+    Assignment { target: String, value: String },
+    Increment { target: String }
 }
 
 fn parse(input: &str) {
@@ -64,15 +67,31 @@ fn parse(input: &str) {
         let mut symbols: Vec<SymbolType> = Vec::new();
         let mut words = String::new();
         for word in line {
-            match word {
+            match word.to_lowercase().as_str() {
                 "is" => {
-                    symbols.push(SymbolType::Words(words.trim().to_string()));
+                    if !words.is_empty() {
+                        symbols.push(SymbolType::Words(words.trim().to_string()));
+                    }
                     symbols.push(SymbolType::Is);
+                    words = String::new();
+                },
+                "build" => {
+                    if !words.trim().is_empty() {
+                        symbols.push(SymbolType::Words(words.trim().to_string()));
+                    }
+                    symbols.push(SymbolType::Build);
+                    words = String::new();
+                },
+                "up" => {
+                    if !words.is_empty() {
+                        symbols.push(SymbolType::Words(words.trim().to_string()));
+                    }
+                    symbols.push(SymbolType::Up);
                     words = String::new();
                 },
                 other => {
                     words += " ";
-                    words += other;
+                    words += &other;
                 }
             }
         }
@@ -84,6 +103,9 @@ fn parse(input: &str) {
         match symbols.as_slice() {
             [SymbolType::Words(target), SymbolType::Is, SymbolType::Words(value)] => {
                 commands.push(Command::Assignment { target: target.to_string(), value: value.to_string()});
+            }
+            [SymbolType::Build, SymbolType::Words(target), SymbolType::Up] => {
+                commands.push(Command::Increment { target: target.to_string()});
             }
             _ => {
                 error!("Don't recognise command sequence {:?}", symbols);
