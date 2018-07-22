@@ -11,7 +11,7 @@ fn main() {
 }
 
 pub fn is_space(chr: char) -> bool {
-  chr == ' ' || chr == '\t'
+  chr == ' ' || chr == '\t' || chr == ','
 }
 
 pub fn is_newline(chr: char) -> bool {
@@ -30,15 +30,15 @@ pub fn is_alphanumeric(chr: char) -> bool {
   is_alphabetic(chr) || is_digit(chr)
 }
 
-named!(word<CompleteStr, &str>,
+named!(word<CompleteStr, String>,
     do_parse!(
         word: take_while!(is_alphanumeric) >>
         take_while!(is_space) >>
-        (*word)
+        (word.to_lowercase())
     ));
 
-named!(line<CompleteStr, Vec<&str>>, many0!(word));
-named!(lines<CompleteStr, Vec<Vec<&str>>>, many0!(
+named!(line<CompleteStr, Vec<String>>, many0!(word));
+named!(lines<CompleteStr, Vec<Vec<String>>>, many0!(
     do_parse!(
         a_line: line >>
         take_while!(is_newline) >>
@@ -51,7 +51,7 @@ enum SymbolType {
     Build,
     Up,
     Until,
-    End,
+    Next,
     Words(String)
 }
 
@@ -60,7 +60,7 @@ enum Command {
     Assignment { target: String, value: String },
     UntilIs { target: String, value: String },
     Increment { target: String },
-    End
+    Next
 }
 
 macro_rules! push_symbol {
@@ -82,19 +82,26 @@ fn parse(input: &str) {
     for line in raw_lines {
         let mut symbols: Vec<SymbolType> = Vec::new();
         let mut words = String::new();
-        for word in line {
-            match word.to_lowercase().as_str() {
-                "is" => push_symbol!(Is, words, symbols),
-                "build" => push_symbol!(Build, words, symbols),
-                "up" => push_symbol!(Up, words, symbols),
-                "until" => push_symbol!(Until, words, symbols),
-                "end" => push_symbol!(End, words, symbols),
-                other => {
-                    words += " ";
-                    words += &other;
+        match line.iter().map(|x| x.as_str()).collect::<Vec<&str>>().as_slice() {
+            ["and", "around", "we", "go"] => {
+                push_symbol!(Next, words, symbols)
+            },
+            _ => {
+                for word in line {
+                    match word.as_str() {
+                        "is" => push_symbol!(Is, words, symbols),
+                        "build" => push_symbol!(Build, words, symbols),
+                        "up" => push_symbol!(Up, words, symbols),
+                        "until" => push_symbol!(Until, words, symbols),
+                        "end" => push_symbol!(Next, words, symbols),
+                        other => {
+                            words += " ";
+                            words += &other;
+                        }
+                    }
                 }
             }
-        }
+        };
         if !words.is_empty() {
             symbols.push(SymbolType::Words(words.trim().to_string()));
         }
@@ -107,8 +114,8 @@ fn parse(input: &str) {
             [SymbolType::Build, SymbolType::Words(target), SymbolType::Up] => {
                 commands.push(Command::Increment { target: target.to_string()});
             }
-            [SymbolType::End] => {
-                commands.push(Command::End);
+            [SymbolType::Next] => {
+                commands.push(Command::Next);
             }
             [SymbolType::Until, SymbolType::Words(target), SymbolType::Is, SymbolType::Words(value)] => {
                 commands.push(Command::UntilIs { target: target.to_string(), value: value.to_string()});
@@ -131,5 +138,17 @@ Buzz is 5
 Until Counter is Limit
 	Build Counter up
 End";
+    parse(program);
+}
+
+#[test]
+fn test_rocking_counting() {
+    let program = "Desire is a lovestruck ladykiller
+My world is nothing
+Fire is ice
+Hate is water
+Until my world is Desire,
+Build my world up
+And around we go";
     parse(program);
 }
