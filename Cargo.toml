@@ -1,0 +1,7 @@
+[package]
+name = "rockstar"
+version = "0.1.0"
+authors = ["Tom Parker <palfrey@tevp.net>"]
+
+[dependencies]
+nom = "4"
