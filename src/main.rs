@@ -5,6 +5,7 @@ extern crate log;
 extern crate pretty_env_logger;
 
 use nom::types::CompleteStr;
+use std::io::{Cursor, Write, self};
 
 fn main() {
     println!("Hello, world!");
@@ -75,9 +76,9 @@ macro_rules! push_symbol {
     }
 }
 
-fn parse(input: &str) {
+fn parse(input: &str) -> Vec<Command> {
     let raw_lines = lines(CompleteStr(input)).unwrap().1;
-    println!("{:?}", raw_lines);
+    debug!("{:?}", raw_lines);
     let mut commands: Vec<Command> = Vec::new();
     for line in raw_lines {
         let mut symbols: Vec<SymbolType> = Vec::new();
@@ -105,7 +106,7 @@ fn parse(input: &str) {
         if !words.is_empty() {
             symbols.push(SymbolType::Words(words.trim().to_string()));
         }
-        println!("{:?}", symbols);
+        debug!("{:?}", symbols);
 
         match symbols.as_slice() {
             [SymbolType::Words(target), SymbolType::Is, SymbolType::Words(value)] => {
@@ -125,7 +126,12 @@ fn parse(input: &str) {
             }
         }
     }
-    println!("{:?}", commands);
+    return commands;
+}
+
+fn run(commands: Vec<Command>, writer: &mut Write) -> Result<(), io::Error> {
+    writeln!(writer, "{:?}", commands)?;
+    return Ok(());
 }
 
 #[test]
@@ -138,7 +144,11 @@ Buzz is 5
 Until Counter is Limit
 	Build Counter up
 End";
-    parse(program);
+    let commands = parse(program);
+    let mut writer = Cursor::new(Vec::new());
+    run(commands, &mut writer).unwrap();
+    writer.set_position(0);
+    println!("{}", std::str::from_utf8(writer.get_ref()).unwrap());
 }
 
 #[test]
