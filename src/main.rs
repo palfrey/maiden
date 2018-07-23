@@ -134,9 +134,17 @@ fn run(commands: Vec<Command>, writer: &mut Write) -> Result<(), io::Error> {
     return Ok(());
 }
 
+fn test_program(program: &str) {
+    pretty_env_logger::try_init().unwrap_or(());
+    let commands = parse(program);
+    let mut writer = Cursor::new(Vec::new());
+    run(commands, &mut writer).unwrap();
+    writer.set_position(0);
+    println!("{}", std::str::from_utf8(writer.get_ref()).unwrap());
+}
+
 #[test]
 fn test_counting() {
-    pretty_env_logger::init();
     let program = "Limit is 100
 Counter is 0
 Fizz is 3
@@ -144,11 +152,7 @@ Buzz is 5
 Until Counter is Limit
 	Build Counter up
 End";
-    let commands = parse(program);
-    let mut writer = Cursor::new(Vec::new());
-    run(commands, &mut writer).unwrap();
-    writer.set_position(0);
-    println!("{}", std::str::from_utf8(writer.get_ref()).unwrap());
+    test_program(program);
 }
 
 #[test]
@@ -160,5 +164,5 @@ Hate is water
 Until my world is Desire,
 Build my world up
 And around we go";
-    parse(program);
+    test_program(program);
 }
