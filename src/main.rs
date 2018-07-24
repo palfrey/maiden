@@ -14,13 +14,13 @@ mod runner;
 
 use std::io::Cursor;
 use std::collections::HashMap;
-use runner::Variable;
+use common::Expression;
 
 fn main() {
     println!("Hello, world!");
 }
 
-fn test_program(program: &str, end_variables: HashMap<String, Variable>) {
+fn test_program(program: &str, end_variables: HashMap<String, Expression>) {
     pretty_env_logger::try_init().unwrap_or(());
     let commands = parser::parse(program).unwrap();
     let mut writer = Cursor::new(Vec::new());
@@ -56,10 +56,10 @@ Until Counter is Limit
 	Build Counter up
 End";
     let end_variables = hashmap! {
-        "buzz" => Variable::Integer(5),
-        "limit" => Variable::Integer(100),
-        "counter" => Variable::Integer(100),
-        "fizz" => Variable::Integer(3),
+        "buzz" => Expression::Integer(5),
+        "limit" => Expression::Integer(100),
+        "counter" => Expression::Integer(100),
+        "fizz" => Expression::Integer(3),
     };
     test_program(program, end_variables);
 }
@@ -74,10 +74,10 @@ Until my world is Desire,
 Build my world up
 And around we go";
     let end_variables = hashmap! {
-        "my world" => Variable::Integer(100),
-        "fire" => Variable::Integer(3),
-        "hate" => Variable::Integer(5),
-        "desire" => Variable::Integer(100),
+        "my world" => Expression::Integer(100),
+        "fire" => Expression::Integer(3),
+        "hate" => Expression::Integer(5),
+        "desire" => Expression::Integer(100),
     };
     test_program(program, end_variables);
 }

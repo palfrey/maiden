@@ -15,76 +15,73 @@ fn is_word_character(chr: char) -> bool {
   !is_space(chr) && !is_newline(chr)
 }
 
-named!(word<CompleteStr, String>,
-    do_parse!(
-        word: take_while!(is_word_character) >>
-        take_while!(is_space) >>
-        (word.to_lowercase())
+fn is_quote(chr: char) -> bool {
+    chr == '\"' || chr == '\''
+}
+
+fn string_character(chr: char) -> bool {
+  !is_newline(chr) && !is_quote(chr)
+}
+
+named!(word<CompleteStr, SymbolType>,
+    alt_complete!(
+        tag_no_case!("is") => {|_| SymbolType::Is} |
+        tag_no_case!("if") => {|_| SymbolType::If} |
+        tag_no_case!("build") => {|_| SymbolType::Build} |
+        tag_no_case!("up") => {|_| SymbolType::Up} |
+        tag_no_case!("say") => {|_| SymbolType::Say} |
+        tag_no_case!("shout") => {|_| SymbolType::Say} |
+        tag_no_case!("whisper") => {|_| SymbolType::Say} |
+        tag_no_case!("and") => {|_| SymbolType::And} |
+        tag_no_case!("while") => {|_| SymbolType::While} |
+        tag_no_case!("until") => {|_| SymbolType::Until} |
+        tag_no_case!("end") => {|_| SymbolType::Next} |
+        tag_no_case!("around we go") => {|_| SymbolType::Next} |
+        tag_no_case!("take it to the top") => {|_| SymbolType::Next} |
+        tag_no_case!("taking") => {|_| SymbolType::Taking} |
+        tag_no_case!("give back") => {|_| SymbolType::Return} |
+        tag_no_case!("takes") => {|_| SymbolType::Takes} |
+        do_parse!(
+            tag!("\"") >> 
+            phrase: take_while!(string_character) >>
+            tag!("\"") >>
+            (phrase)
+        ) => {|p: CompleteStr| SymbolType::String(p.to_string())} |
+        take_while!(is_word_character) => {|word: CompleteStr| SymbolType::Words(word.to_lowercase())}
     ));
 
-named!(pub line<CompleteStr, Vec<String>>, many0!(word));
-named!(lines<CompleteStr, Vec<Vec<String>>>, many0!(
+named!(pub line<CompleteStr, Vec<SymbolType>>, many0!(
+    do_parse!(
+        word: word >>
+        take_while!(is_space) >>
+        (word)
+    )));
+
+named!(lines<CompleteStr, Vec<Vec<SymbolType>>>, many0!(
     do_parse!(
         a_line: line >>
         take_while!(is_newline) >>
         (a_line)
     )));
 
-#[derive(Debug)]
-enum SymbolType {
-    Is,
-    Build,
-    Up,
-    Until,
-    Next,
-    Return,
-    Say,
-    And,
-    If,
-    Call,
-    Words(String)
-}
-
-macro_rules! push_symbol {
-    ($symbol:ident, $words:ident, $symbols:ident) => {
-        {
-            if !$words.trim().is_empty() {
-                $symbols.push(SymbolType::Words($words.trim().to_string()));
-            }
-            $symbols.push(SymbolType::$symbol);
-            $words = String::new();
-        }
-    }
-}
-
-fn line_to_symbols(line: Vec<String>) -> Vec<SymbolType> {
+fn compact_words(line: Vec<SymbolType>) -> Vec<SymbolType> {
     let mut symbols: Vec<SymbolType> = Vec::new();
     let mut words = String::new();
-    match line.iter().map(|x| x.as_str()).collect::<Vec<&str>>().as_slice() {
-        ["and", "around", "we", "go"] | ["and", "take", "it", "to", "the", "top"] => {
-            push_symbol!(Next, words, symbols)
-        },
-        _ => {
-            for word in line {
-                match word.as_str() {
-                    "is" => push_symbol!(Is, words, symbols),
-                    "build" => push_symbol!(Build, words, symbols),
-                    "up" => push_symbol!(Up, words, symbols),
-                    "while" | "until" => push_symbol!(Until, words, symbols),
-                    "end" => push_symbol!(Next, words, symbols),
-                    "give back" => push_symbol!(Return, words, symbols),
-                    "say" | "whisper" | "shout" => push_symbol!(Say, words, symbols),
-                    "and" => push_symbol!(And, words, symbols),
-                    "if" => push_symbol!(If, words, symbols),
-                    "taking" => push_symbol!(Call, words, symbols),
-                    other => {
-                        words += " ";
-                        words += &other;
-                    }
+    for word in line {
+        match word {
+            SymbolType::Words(other) => {
+                words += " ";
+                words += &other;
+            }
+            symbol => {
+                if !words.trim().is_empty() {
+                    symbols.push(SymbolType::Words(words.trim().to_string()));
+                    words = String::new();
                 }
+                symbols.push(symbol);
             }
         }
-    };
+    }
     if !words.is_empty() {
         symbols.push(SymbolType::Words(words.trim().to_string()));
     }
@@ -100,17 +97,17 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
     debug!("{:?}", raw_lines);
     let mut commands: Vec<Command> = Vec::new();
     let mut loop_starts: Vec<usize> = Vec::new();
-    for line in raw_lines.1 {
-        let mut symbols = line_to_symbols(line);
+    for raw_symbols in raw_lines.1 {
+        let mut symbols = compact_words(raw_symbols);
 
         match symbols.as_slice() {
             [SymbolType::Words(target), SymbolType::Is, SymbolType::Words(value)] => {
-                commands.push(Command::Assignment { target: target.to_string(), value: value.to_string()});
+                commands.push(Command::Assignment { target: target.to_string(), value: SymbolType::Words(value.to_string())});
             }
             [SymbolType::Build, SymbolType::Words(target), SymbolType::Up] => {
                 commands.push(Command::Increment { target: target.to_string()});
             }
-            [SymbolType::Next] => {
+            [SymbolType::And, SymbolType::Next] | [SymbolType::Next] => {
                 let loop_start = loop_starts.pop().unwrap();
                 let loop_len = commands.len();
                 match commands.index_mut(loop_start) {
@@ -125,10 +122,10 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
             }
             [SymbolType::Until, SymbolType::Words(target), SymbolType::Is, SymbolType::Words(value)] => {
                 loop_starts.push(commands.len());
-                commands.push(Command::UntilIs { target: target.to_string(), value: value.to_string(), loop_end: None});
+                commands.push(Command::UntilIs { target: target.to_string(), value: SymbolType::Words(value.to_string()), loop_end: None});
             }
-            [SymbolType::Say, SymbolType::Words(value)] => {
-                commands.push(Command::Say{value: value.to_string()});
+            [SymbolType::Say, SymbolType::String(value)] => {
+                commands.push(Command::Say{value: SymbolType::String(value.to_string())});
             }
             _ => {
                 error!("Don't recognise command sequence {:?}", symbols);
@@ -141,6 +138,6 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
 #[test]
 fn multi_word_quote_parse() {
     assert_eq!(
-        (CompleteStr(""), vec!["say".to_string(), "\"shout let it all out\"".to_string()]),
+        (CompleteStr(""), vec![SymbolType::Say, SymbolType::String("shout let it all out".to_string())]),
         line(CompleteStr("say \"shout let it all out\"")).unwrap());
 }

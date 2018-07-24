@@ -5,52 +5,66 @@ use std::collections::HashMap;
 use pretty_env_logger;
 use parser;
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Variable {
-    Integer(i32),
-    String(String)
-}
-
 pub fn is_alphabetic(chr: char) -> bool {
   (chr >= 'A' && chr <= 'Z') || (chr >= 'a' && chr <= 'z')
 }
 
-fn evaluate(variables: &HashMap<String, Variable>, value: &str) -> Result<Variable> {
-    if value == "nothing" {
-        return Ok(Variable::Integer(0));
-    }
-    let as_int = value.parse::<i32>();
-    if let Ok(int) = as_int {
-        return Ok(Variable::Integer(int));
-    }
-    if let Some(val) = variables.get(value) {
-        return Ok(val.clone());
-    }
-    let words = parser::line(CompleteStr(value)).unwrap().1;
-    if words.len() == 1 {
-        let word = &words[0];
-        if word.chars().next().unwrap() == '\"' && word.chars().last().unwrap() == '\"' {
-            return Ok(Variable::String(word[1..word.len()-1].to_string()));
+fn evaluate(variables: &HashMap<String, Expression>, value: &SymbolType) -> Result<Expression> {
+    match value {
+        SymbolType::Words(words) => {
+            if words == "nothing" {
+                return Ok(Expression::Integer(0));
+            }
+            let as_int = words.parse::<i32>();
+            if let Ok(int) = as_int {
+                return Ok(Expression::Integer(int));
+            }
+            if let Some(val) = variables.get(words) {
+                return Ok(val.clone());
+            }
+            let symbols = parser::line(CompleteStr(words)).unwrap().1;
+            if symbols.len() == 1 {
+                if let SymbolType::Words(word) = &symbols[0] {
+                    if word.chars().next().unwrap() == '\"' && word.chars().last().unwrap() == '\"' {
+                        return Ok(Expression::String(word[1..word.len()-1].to_string()));
+                    }
+                }
+                else {
+                    unimplemented!();
+                }
+            }
+            let mut number = 0i32;
+            for sym in symbols.iter() {
+                if let SymbolType::Words(word) = sym {
+                    word.chars().try_for_each(|c| if !is_alphabetic(c) {
+                            Err(ErrorKind::NonAlphabeticWord(word.to_string()))
+                        }
+                        else {
+                            Ok(())
+                        })?;
+                    number *= 10;
+                    let len: i32 = (word.len() % 10) as i32;
+                    number += len;
+                }
+                else {
+                    panic!("Need to cope with '{:?}'", sym);
+                }
+            }
+            return Ok(Expression::Integer(number));
+        }
+        SymbolType::String(phrase) => {
+            return Ok(Expression::String(phrase.to_string()));
+        }
+        _ => {
+            warn!("Evaluate: '{:?}'", value);
+            unimplemented!();
         }
     }
-    let mut number = 0i32;
-    for word in words.iter() {
-        word.chars().try_for_each(|c| if !is_alphabetic(c) {
-                Err(ErrorKind::NonAlphabeticWord(word.to_string()))
-            }
-            else {
-                Ok(())
-            })?;
-        number *= 10;
-        let len: i32 = (word.len() % 10) as i32;
-        number += len;
-    }
-    return Ok(Variable::Integer(number));
 }
 
-pub fn run(commands: Vec<Command>, writer: &mut Write) -> Result<HashMap<String, Variable>> {
+pub fn run(commands: Vec<Command>, writer: &mut Write) -> Result<HashMap<String, Expression>> {
     let mut pc = 0;
-    let mut variables: HashMap<String, Variable> = HashMap::new();
+    let mut variables: HashMap<String, Expression> = HashMap::new();
     let mut total_instr = 0;
     loop {
         total_instr +=1;
@@ -71,8 +85,8 @@ pub fn run(commands: Vec<Command>, writer: &mut Write) -> Result<HashMap<String,
                 let val = variables.get(target.as_str()).expect(&format!("Can't find '{}'", target)).clone();
                 info!("Value of {} is {:?}", target, val);
                 match val {
-                    Variable::Integer(x) => {
-                        variables.insert(target.to_string(), Variable::Integer(x+1));
+                    Expression::Integer(x) => {
+                        variables.insert(target.to_string(), Expression::Integer(x+1));
                     }
                     _ => {
                         error!("Attempt to increment non-integer '{}'", target);
@@ -92,8 +106,8 @@ pub fn run(commands: Vec<Command>, writer: &mut Write) -> Result<HashMap<String,
             Command::Say {value} => {
                 let value = evaluate(&variables, value)?;
                 match value {
-                    Variable::Integer(x) => writeln!(writer, "{}", x)?,
-                    Variable::String(s) => writeln!(writer, "{}", s)?
+                    Expression::Integer(x) => writeln!(writer, "{}", x)?,
+                    Expression::String(s) => writeln!(writer, "{}", s)?
                 };
             }
         }
@@ -105,7 +119,7 @@ pub fn run(commands: Vec<Command>, writer: &mut Write) -> Result<HashMap<String,
 #[test]
 fn check_evaluate() {
     pretty_env_logger::try_init().unwrap_or(());
-    let variables: HashMap<String, Variable> = HashMap::new();
-    assert_eq!(evaluate(&variables, "a lovestruck ladykiller").unwrap(), Variable::Integer(100));
-    assert_eq!(evaluate(&variables, "nothing").unwrap(), Variable::Integer(0));
+    let variables: HashMap<String, Expression> = HashMap::new();
+    assert_eq!(evaluate(&variables, &SymbolType::Words("a lovestruck ladykiller".to_string())).unwrap(), Expression::Integer(100));
+    assert_eq!(evaluate(&variables, &SymbolType::Words("nothing".to_string())).unwrap(), Expression::Integer(0));
 }

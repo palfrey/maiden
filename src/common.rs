@@ -1,10 +1,34 @@
+#[derive(Debug, PartialEq, Clone)]
+pub enum Expression {
+    Integer(i32),
+    String(String)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum SymbolType {
+    Is,
+    Build,
+    Up,
+    Until,
+    While,
+    Next,
+    Return,
+    Say,
+    And,
+    If,
+    Taking,
+    Takes,
+    String(String),
+    Words(String)
+}
+
 #[derive(Debug)]
 pub enum Command {
-    Assignment { target: String, value: String },
-    UntilIs { target: String, value: String, loop_end: Option<usize> },
+    Assignment { target: String, value: SymbolType },
+    UntilIs { target: String, value: SymbolType, loop_end: Option<usize> },
     Increment { target: String },
     Next { loop_start: usize},
-    Say { value: String }
+    Say { value: SymbolType }
 }
 
 error_chain!{
