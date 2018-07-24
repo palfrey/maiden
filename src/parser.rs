@@ -4,7 +4,7 @@ use std::ops::Deref;
 use common::*;
 
 fn is_space(chr: char) -> bool {
-  chr == ' ' || chr == '\t' || chr == ','
+  chr == ' ' || chr == '\t'
 }
 
 fn is_newline(chr: char) -> bool {
@@ -12,7 +12,7 @@ fn is_newline(chr: char) -> bool {
 }
 
 fn is_word_character(chr: char) -> bool {
-  !is_space(chr) && !is_newline(chr)
+  !is_space(chr) && !is_newline(chr) && chr != ','
 }
 
 fn is_quote(chr: char) -> bool {
@@ -41,6 +41,7 @@ named!(word<CompleteStr, SymbolType>,
         tag_no_case!("taking") => {|_| SymbolType::Taking} |
         tag_no_case!("give back") => {|_| SymbolType::Return} |
         tag_no_case!("takes") => {|_| SymbolType::Takes} |
+        tag!(",") => {|_| SymbolType::Comma} |
         do_parse!(
             tag!("\"") >> 
             phrase: take_while!(string_character) >>
@@ -99,16 +100,27 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
     let mut loop_starts: Vec<usize> = Vec::new();
     for raw_symbols in raw_lines.1 {
         let mut symbols = compact_words(raw_symbols);
-
-        match symbols.as_slice() {
+        let section = {
+            let mut first = 0;
+            if symbols[first] == SymbolType::And {
+                first = 1;
+            }
+            if symbols[symbols.len()-1] == SymbolType::Comma {
+                &symbols[first..symbols.len()-1]
+            }
+            else {
+                &symbols[first..]
+            }
+        };
+        match section {
             [SymbolType::Words(target), SymbolType::Is, SymbolType::Words(value)] => {
                 commands.push(Command::Assignment { target: target.to_string(), value: SymbolType::Words(value.to_string())});
             }
             [SymbolType::Build, SymbolType::Words(target), SymbolType::Up] => {
                 commands.push(Command::Increment { target: target.to_string()});
             }
-            [SymbolType::And, SymbolType::Next] | [SymbolType::Next] => {
-                let loop_start = loop_starts.pop().unwrap();
+            [SymbolType::Next] => {
+                let loop_start = loop_starts.pop().expect("loop_starts");
                 let loop_len = commands.len();
                 match commands.index_mut(loop_start) {
                     Command::UntilIs {loop_end: ref mut loop_end, target: _, value: _ } => {
@@ -128,7 +140,7 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
                 commands.push(Command::Say{value: SymbolType::String(value.to_string())});
             }
             _ => {
-                error!("Don't recognise command sequence {:?}", symbols);
+                error!("Don't recognise command sequence {:?}", section);
             }
         }
     }

@@ -18,6 +18,7 @@ pub enum SymbolType {
     If,
     Taking,
     Takes,
+    Comma,
     String(String),
     Words(String)
 }
