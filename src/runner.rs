@@ -1,6 +1,6 @@
 use nom::types::CompleteStr;
-use common::Command;
-use std::io::{Write, self};
+use common::*;
+use std::io::Write;
 use std::collections::HashMap;
 use pretty_env_logger;
 use parser;
@@ -11,28 +11,44 @@ pub enum Variable {
     String(String)
 }
 
-fn evaluate(variables: &HashMap<String, Variable>, value: &str) -> Variable {
+pub fn is_alphabetic(chr: char) -> bool {
+  (chr >= 'A' && chr <= 'Z') || (chr >= 'a' && chr <= 'z')
+}
+
+fn evaluate(variables: &HashMap<String, Variable>, value: &str) -> Result<Variable> {
     if value == "nothing" {
-        return Variable::Integer(0);
+        return Ok(Variable::Integer(0));
     }
     let as_int = value.parse::<i32>();
     if let Ok(int) = as_int {
-        return Variable::Integer(int);
+        return Ok(Variable::Integer(int));
     }
     if let Some(val) = variables.get(value) {
-        return val.clone();
+        return Ok(val.clone());
     }
     let words = parser::line(CompleteStr(value)).unwrap().1;
+    if words.len() == 1 {
+        let word = &words[0];
+        if word.chars().next().unwrap() == '\"' && word.chars().last().unwrap() == '\"' {
+            return Ok(Variable::String(word[1..word.len()-1].to_string()));
+        }
+    }
     let mut number = 0i32;
     for word in words.iter() {
+        word.chars().try_for_each(|c| if !is_alphabetic(c) {
+                Err(ErrorKind::NonAlphabeticWord(word.to_string()))
+            }
+            else {
+                Ok(())
+            })?;
         number *= 10;
         let len: i32 = (word.len() % 10) as i32;
         number += len;
     }
-    return Variable::Integer(number);
+    return Ok(Variable::Integer(number));
 }
 
-pub fn run(commands: Vec<Command>, writer: &mut Write) -> Result<HashMap<String, Variable>, io::Error> {
+pub fn run(commands: Vec<Command>, writer: &mut Write) -> Result<HashMap<String, Variable>> {
     let mut pc = 0;
     let mut variables: HashMap<String, Variable> = HashMap::new();
     let mut total_instr = 0;
@@ -48,11 +64,11 @@ pub fn run(commands: Vec<Command>, writer: &mut Write) -> Result<HashMap<String,
         info!("command: {:?}", command);
         match command {
             Command::Assignment {target, value} => {
-                let val = evaluate(&variables, value);
+                let val = evaluate(&variables, value)?;
                 variables.insert(target.to_string(), val);
             }
             Command::Increment {target} => {
-                let val = variables[target.as_str()].clone();
+                let val = variables.get(target.as_str()).expect(&format!("Can't find '{}'", target)).clone();
                 info!("Value of {} is {:?}", target, val);
                 match val {
                     Variable::Integer(x) => {
@@ -64,14 +80,21 @@ pub fn run(commands: Vec<Command>, writer: &mut Write) -> Result<HashMap<String,
                 };
             }
             Command::UntilIs {target, value, loop_end} => {
-                let target = variables[target.as_str()].clone();
-                let value = evaluate(&variables, value);
+                let target = variables.get(target.as_str()).expect(&format!("Can't find '{}'", target)).clone();
+                let value = evaluate(&variables, value)?;
                 if target == value {
                     pc = loop_end.expect("loop_end");
                 }
             }
             Command::Next {loop_start} => {
                 pc = loop_start-1;
+            }
+            Command::Say {value} => {
+                let value = evaluate(&variables, value)?;
+                match value {
+                    Variable::Integer(x) => writeln!(writer, "{}", x)?,
+                    Variable::String(s) => writeln!(writer, "{}", s)?
+                };
             }
         }
         pc +=1;
@@ -83,6 +106,6 @@ pub fn run(commands: Vec<Command>, writer: &mut Write) -> Result<HashMap<String,
 fn check_evaluate() {
     pretty_env_logger::try_init().unwrap_or(());
     let variables: HashMap<String, Variable> = HashMap::new();
-    assert_eq!(evaluate(&variables, "a lovestruck ladykiller"), Variable::Integer(100));
-    assert_eq!(evaluate(&variables, "nothing"), Variable::Integer(0));
+    assert_eq!(evaluate(&variables, "a lovestruck ladykiller").unwrap(), Variable::Integer(100));
+    assert_eq!(evaluate(&variables, "nothing").unwrap(), Variable::Integer(0));
 }
