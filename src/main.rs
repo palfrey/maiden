@@ -23,6 +23,7 @@ fn main() {
 fn test_program(program: &str, end_variables: HashMap<String, Expression>) {
     pretty_env_logger::try_init().unwrap_or(());
     let commands = parser::parse(program).unwrap();
+    debug!("Commands: {:?}", commands);
     let mut writer = Cursor::new(Vec::new());
     let variables = runner::run(commands, &mut writer).unwrap();
     writer.set_position(0);
@@ -85,8 +86,8 @@ And around we go";
 #[test]
 fn rocking_fizzbuzz() {
     let program = "Midnight takes your heart and your soul
-While your heart is higher than your soul
-Take your soul from your heart
+While your heart is as high as your soul
+Put your heart without your soul into your heart
 Give back your heart
 
 Desire is a lovestruck ladykiller

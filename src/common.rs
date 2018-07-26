@@ -1,7 +1,12 @@
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Integer(i32),
-    String(String)
+    String(String),
+    Variable(String),
+    And(Box<Expression>, Box<Expression>),
+    Is(Box<Expression>, Box<Expression>),
+    True,
+    False,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -19,17 +24,23 @@ pub enum SymbolType {
     Taking,
     Takes,
     Comma,
+    Subtract,
+    Put,
+    Where,
+    GreaterThanOrEqual,
+    Variable(String),
     String(String),
-    Words(String)
+    Words(Vec<String>),
+    Integer(u32)
 }
 
 #[derive(Debug)]
 pub enum Command {
-    Assignment { target: String, value: SymbolType },
-    UntilIs { target: String, value: SymbolType, loop_end: Option<usize> },
+    Assignment { target: String, value: Expression },
+    Until { expression: Expression, loop_end: Option<usize> },
     Increment { target: String },
     Next { loop_start: usize},
-    Say { value: SymbolType }
+    Say { value: Expression }
 }
 
 error_chain!{
@@ -42,5 +53,7 @@ error_chain!{
             display("extra unparsed text: '{}'", t)
         }
         NonAlphabeticWord(w: String)
+        UnbalancedExpression(problem: String)
+        MissingVariable(name: String)
     }
 }
