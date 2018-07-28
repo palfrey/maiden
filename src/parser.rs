@@ -25,16 +25,51 @@ fn is_alphabetic(chr: char) -> bool {
   (chr >= 'A' && chr <= 'Z') || (chr >= 'a' && chr <= 'z')
 }
 
-named!(proper_variable<CompleteStr, SymbolType>,
+named!(proper_variable<CompleteStr, String>,
     do_parse!( // FIXME: Expand to multi-word Proper variables
         first: take_while_m_n!(1, 1, char::is_uppercase) >>
         rest: take_while1!(char::is_lowercase) >>
-        (SymbolType::Variable(format!("{}{}", first, rest)))
+        (format!("{}{}", first, rest))
     )
 );
 
+named!(variable<CompleteStr, String>, alt_complete!(
+    do_parse!(
+        keyword: alt_complete!(
+            tag_no_case!("a") |
+            tag_no_case!("an") |
+            tag_no_case!("the") |
+            tag_no_case!("my") |
+            tag_no_case!("your")
+        ) >>
+        take_while1!(is_space) >>
+        word: take_while1!(char::is_lowercase) >>
+        (format!("{} {}", keyword, word))
+    ) => {|s| s } |
+    proper_variable => {|s| s }
+));
+
 named!(word<CompleteStr, SymbolType>,
     alt_complete!(
+        do_parse!(
+            target: variable >>
+            take_while1!(is_space) >>
+            tag_no_case!("taking") >>
+            take_while1!(is_space) >>
+            first_arg: variable >>
+            other_args: many0!(
+                do_parse!(
+                    take_while!(is_space) >>
+                    tag!(",") >>
+                    take_while1!(is_space) >>
+                    var: variable >>
+                    (var)
+                )) >>
+            (target, first_arg, other_args)
+        ) => {|(target, first_arg, mut other_args): (String, String, Vec<String>)| {
+            other_args.insert(0, first_arg);
+            SymbolType::Taking{target, args: other_args}
+        }} |
         tag_no_case!("is as high as") => {|_| SymbolType::GreaterThanOrEqual} |
         tag_no_case!("is") => {|_| SymbolType::Is} |
         tag_no_case!("if") => {|_| SymbolType::If} |
@@ -50,7 +85,6 @@ named!(word<CompleteStr, SymbolType>,
             tag_no_case!("end") | tag_no_case!("around we go")
         ) => {|_| SymbolType::Next} |
         tag_no_case!("take it to the top") => {|_| SymbolType::Continue} |
-        tag_no_case!("taking") => {|_| SymbolType::Taking} |
         tag_no_case!("give back") => {|_| SymbolType::Return} |
         tag_no_case!("takes") => {|_| SymbolType::Takes} |
         tag_no_case!("without") => {|_| SymbolType::Subtract} |
@@ -58,19 +92,7 @@ named!(word<CompleteStr, SymbolType>,
         tag_no_case!("put") => {|_| SymbolType::Put} |
         tag!("nothing") => {|_| SymbolType::Integer(0) } |
         take_while1!(char::is_numeric) => {|n: CompleteStr| SymbolType::Integer(n.parse::<u32>().unwrap())} |
-        do_parse!(
-            keyword: alt_complete!(
-                tag_no_case!("a") |
-                tag_no_case!("an") |
-                tag_no_case!("the") |
-                tag_no_case!("my") |
-                tag_no_case!("your")
-            ) >>
-            take_while1!(is_space) >>
-            word: take_while1!(char::is_lowercase) >>
-            (SymbolType::Variable(format!("{} {}", keyword, word)))
-        ) => {|s| s } |
-        proper_variable => {|s| s } |
+        variable => {|s| SymbolType::Variable(s) } |
         tag!(",") => {|_| SymbolType::Comma} |
         do_parse!(
             tag!("\"") >> 
@@ -81,7 +103,7 @@ named!(word<CompleteStr, SymbolType>,
         take_while1!(is_alphabetic) => {|word: CompleteStr| SymbolType::Words(vec![word.to_string()])}
     ));
 
-named!(poetic_number_literal_core<CompleteStr, (SymbolType, Vec<CompleteStr>)>,
+named!(poetic_number_literal_core<CompleteStr, (String, Vec<CompleteStr>)>,
     do_parse!(
         pv: proper_variable >>
         take_while1!(is_space) >>
@@ -100,7 +122,7 @@ named!(poetic_number_literal_core<CompleteStr, (SymbolType, Vec<CompleteStr>)>,
 fn poetic_number_literal(input: CompleteStr) -> nom::IResult<CompleteStr, Vec<SymbolType>> {
     let (rest, (target, words)) = poetic_number_literal_core(input)?;
     let literal = SymbolType::Words(words.iter().map(|s| s.to_string()).collect());
-    return Ok((rest, vec![target, SymbolType::Is, literal]));
+    return Ok((rest, vec![SymbolType::Variable(target), SymbolType::Is, literal]));
 }
 
 named!(pub line<CompleteStr, Vec<SymbolType>>, alt_complete!(
@@ -196,7 +218,7 @@ fn parse_expression(items: Vec<&SymbolType>) -> Result<Expression> {
             &SymbolType::Words(_) => {
                  output.push(evaluate(item)?);
             },
-            &SymbolType::Is | &SymbolType::GreaterThanOrEqual | &SymbolType::Subtract => {
+            &SymbolType::Is | &SymbolType::GreaterThanOrEqual | &SymbolType::Subtract | &SymbolType::And => {
                 operators.push(item);
             }
             &SymbolType::Variable(ref name) => {
@@ -208,8 +230,11 @@ fn parse_expression(items: Vec<&SymbolType>) -> Result<Expression> {
             &SymbolType::Integer(ref val) => {
                 output.push(Expression::Integer(*val as i32));
             }
+            &SymbolType::Taking{ref target, ref args} => {
+                output.push(Expression::Call(target.to_string(), args.iter().map(|s| Expression::Variable(s.to_string())).collect()));
+            }
             _ => {
-                warn!("No parse for {:?}", item);
+                error!("No parse for {:?}", item);
             }
         }
     }
@@ -230,8 +255,12 @@ fn parse_expression(items: Vec<&SymbolType>) -> Result<Expression> {
                 let (first, second) = build_binop(&mut output, &describe)?;
                 output.push(Expression::Subtract(first, second));
             }
+            &SymbolType::And => {
+                let (first, second) = build_binop(&mut output, &describe)?;
+                output.push(Expression::And(first, second));
+            }
             _ => {
-                warn!("No operation for {:?}", op);
+                error!("No operation for {:?}", op);
             }
         }
     }
@@ -286,6 +315,7 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
     let mut commands: Vec<Command> = Vec::new();
     let mut loop_starts: Vec<usize> = Vec::new();
     let mut func_starts: Vec<usize> = Vec::new();
+    let mut if_starts: Vec<usize> = Vec::new();
     for raw_symbols in raw_lines.1 {
         let mut symbols = compact_words(raw_symbols);
         let section = {
@@ -312,7 +342,19 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
                 commands.push(Command::Next {loop_start: *loop_start});
             }
             [SymbolType::Newline] => {
-                if !loop_starts.is_empty() {
+                if !if_starts.is_empty() {
+                    let if_start = if_starts.pop().expect("if_starts");
+                    let if_len = commands.len();
+                    match commands.index_mut(if_start) {
+                        Command::If {expression: _, if_end: ref mut if_end} => {
+                            if_end.get_or_insert(if_len);
+                        }
+                        _ => {
+                            panic!("return to non-if command");
+                        }
+                    }
+                }
+                else if !loop_starts.is_empty() {
                     build_next(&mut commands, &mut loop_starts);
                 }
                 else if !func_starts.is_empty() {
@@ -360,6 +402,12 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
                     let expression_seq: Vec<&SymbolType> = section.iter().skip(1).collect();
                     let expression = parse_expression(expression_seq)?;
                     commands.push(Command::While { expression: expression, loop_end: None});
+                }
+                else if section[0] == SymbolType::If && section.len() > 1 {
+                    if_starts.push(commands.len());
+                    let expression_seq: Vec<&SymbolType> = section.iter().skip(1).collect();
+                    let expression = parse_expression(expression_seq)?;
+                    commands.push(Command::If { expression: expression, if_end: None});
                 }
                 else if section.len() > 3 && section[0] == SymbolType::Put && section[section.len()-2] == SymbolType::Where {
                     if let SymbolType::Variable(ref target) = section[section.len()-1] {

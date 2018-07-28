@@ -34,7 +34,7 @@ fn run_expression(variables: &HashMap<String, Expression>, expression: &Expressi
             }
         }
         _ => {
-            warn!("No runner for {:?}", expression);
+            error!("No runner for {:?}", expression);
             unimplemented!();
         }
     }
@@ -110,13 +110,23 @@ pub fn run(commands: Vec<Command>, writer: &mut Write) -> Result<HashMap<String,
                 };
             }
             Command::FunctionDeclaration {name, args, func_end} => {
-                //warn!("Command: {:?}", command);
-                //unimplemented!();
                 pc = func_end.expect("func_end");
             }
-            Command::EndFunction => {
+            Command::EndFunction  => {
                 warn!("Command: {:?}", command);
                 unimplemented!();
+            }
+            Command::If {expression, if_end} => {
+                let resolve = run_expression(&variables, expression);
+                if let Ok(Expression::False) = resolve {
+                    pc = if_end.expect("if_end");
+                }
+                else if let Ok(Expression::True) = resolve {
+                    // all fine
+                }
+                else {
+                    panic!("Bad expression resolve: {:?}", resolve);
+                }
             }
         }
         pc +=1;
