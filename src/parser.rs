@@ -177,6 +177,15 @@ fn evaluate(value: &SymbolType) -> Result<Expression> {
     }
 }
 
+fn build_binop(output: &mut Vec<Expression>, describe: &str) -> Result<(Box<Expression>, Box<Expression>)> {
+    if output.len() < 2 {
+        bail!(ErrorKind::UnbalancedExpression(describe.to_string()));
+    }
+    let second = output.pop().expect("second");
+    let first = output.pop().expect("first");
+    return Ok((Box::new(first), Box::new(second)));
+}
+
 fn parse_expression(items: Vec<&SymbolType>) -> Result<Expression> {
     // based off of https://en.wikipedia.org/wiki/Shunting-yard_algorithm
     let mut output: Vec<Expression> = Vec::new();
@@ -187,7 +196,7 @@ fn parse_expression(items: Vec<&SymbolType>) -> Result<Expression> {
             &SymbolType::Words(_) => {
                  output.push(evaluate(item)?);
             },
-            &SymbolType::Is | &SymbolType::GreaterThanOrEqual => {
+            &SymbolType::Is | &SymbolType::GreaterThanOrEqual | &SymbolType::Subtract => {
                 operators.push(item);
             }
             &SymbolType::Variable(ref name) => {
@@ -210,20 +219,16 @@ fn parse_expression(items: Vec<&SymbolType>) -> Result<Expression> {
     for op in operators {
         match op {
             &SymbolType::Is => {
-                if output.len() < 2 {
-                    bail!(ErrorKind::UnbalancedExpression(describe));
-                }
-                let second = output.pop().expect("second");
-                let first = output.pop().expect("first");
-                output.push(Expression::Is(Box::new(first), Box::new(second)));
+                let (first, second) = build_binop(&mut output, &describe)?;
+                output.push(Expression::Is(first, second));
             }
             &SymbolType::GreaterThanOrEqual => {
-                if output.len() < 2 {
-                    bail!(ErrorKind::UnbalancedExpression(describe));
-                }
-                let second = output.pop().expect("second");
-                let first = output.pop().expect("first");
-                output.push(Expression::GreaterThanOrEqual(Box::new(first), Box::new(second)));
+                let (first, second) = build_binop(&mut output, &describe)?;
+                output.push(Expression::GreaterThanOrEqual(first, second));
+            }
+            &SymbolType::Subtract => {
+                let (first, second) = build_binop(&mut output, &describe)?;
+                output.push(Expression::Subtract(first, second));
             }
             _ => {
                 warn!("No operation for {:?}", op);
@@ -285,17 +290,20 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
                 commands.push(Command::Next {loop_start: *loop_start});
             }
             _ => {
+                // Better done with slice patterns once they stablise (see https://github.com/rust-lang/rust/issues/23121)
                 if section[0] == SymbolType::Say && section.len() > 1 {
                     let expression_seq: Vec<&SymbolType> = section.iter().skip(1).collect();
                     let expression = parse_expression(expression_seq)?;
                     commands.push(Command::Say{value: expression});
                 }
-                // Better done with slice patterns once they stablise (see https://github.com/rust-lang/rust/issues/23121)
                 else if section.len() > 1 && section[1] == SymbolType::Is {
                     if let SymbolType::Variable(ref target) = section[0] {
                         let expression_seq: Vec<&SymbolType> = section.iter().skip(2).collect();
                         let expression = parse_expression(expression_seq)?;
                         commands.push(Command::Assignment { target: target.to_string(), value: expression});
+                    }
+                    else {
+                        error!("Bad 'is' section: {:?}", section);
                     }
                 }
                 else if section[0] == SymbolType::Until && section.len() > 1 {
@@ -309,6 +317,16 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
                     let expression_seq: Vec<&SymbolType> = section.iter().skip(1).collect();
                     let expression = parse_expression(expression_seq)?;
                     commands.push(Command::While { expression: expression, loop_end: None});
+                }
+                else if section.len() > 3 && section[0] == SymbolType::Put && section[section.len()-2] == SymbolType::Where {
+                    if let SymbolType::Variable(ref target) = section[section.len()-1] {
+                        let expression_seq: Vec<&SymbolType> = section.iter().skip(1).take(section.len()-3).collect();
+                        let expression = parse_expression(expression_seq)?;
+                        commands.push(Command::Assignment { target: target.to_string(), value: expression});
+                    }
+                    else {
+                        error!("Bad 'put' section: {:?}", section);
+                    }
                 }
                 else {
                     error!("Don't recognise command sequence {:?}", section);

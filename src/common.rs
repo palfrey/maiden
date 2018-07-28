@@ -3,7 +3,7 @@ pub enum Expression {
     Integer(i32),
     String(String),
     Variable(String),
-    And(Box<Expression>, Box<Expression>),
+    Subtract(Box<Expression>, Box<Expression>),
     Is(Box<Expression>, Box<Expression>),
     GreaterThanOrEqual(Box<Expression>, Box<Expression>),
     True,
