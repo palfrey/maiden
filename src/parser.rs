@@ -243,6 +243,40 @@ fn parse_expression(items: Vec<&SymbolType>) -> Result<Expression> {
     }
 }
 
+fn build_next(commands: &mut Vec<Command>, loop_starts: &mut Vec<usize>) {
+    let loop_start = loop_starts.pop().expect("loop_starts");
+    let loop_len = commands.len();
+    match commands.index_mut(loop_start) {
+        Command::Until {loop_end: ref mut loop_end, expression: _} => {
+            loop_end.get_or_insert(loop_len);
+        }
+        Command::While {loop_end: ref mut loop_end, expression: _} => {
+            loop_end.get_or_insert(loop_len);
+        }
+        _ => {
+            panic!("loop to non-loop command");
+        }
+    }
+    commands.push(Command::Next {loop_start: loop_start});
+}
+
+fn build_return(commands: &mut Vec<Command>, loop_starts: &mut Vec<usize>) {
+    let loop_start = loop_starts.pop().expect("loop_starts");
+    let loop_len = commands.len();
+    match commands.index_mut(loop_start) {
+        Command::Until {loop_end: ref mut loop_end, expression: _} => {
+            loop_end.get_or_insert(loop_len);
+        }
+        Command::While {loop_end: ref mut loop_end, expression: _} => {
+            loop_end.get_or_insert(loop_len);
+        }
+        _ => {
+            panic!("loop to non-loop command");
+        }
+    }
+    commands.push(Command::Next {loop_start: loop_start});
+}
+
 pub fn parse(input: &str) -> Result<Vec<Command>> {
     let raw_lines = lines(CompleteStr(input)).unwrap();
     if raw_lines.0.len() > 0 {
@@ -251,6 +285,7 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
     debug!("{:?}", raw_lines);
     let mut commands: Vec<Command> = Vec::new();
     let mut loop_starts: Vec<usize> = Vec::new();
+    let mut func_starts: Vec<usize> = Vec::new();
     for raw_symbols in raw_lines.1 {
         let mut symbols = compact_words(raw_symbols);
         let section = {
@@ -270,24 +305,32 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
                 commands.push(Command::Increment { target: target.to_string()});
             }
             [SymbolType::Next] => {
-                let loop_start = loop_starts.pop().expect("loop_starts");
-                let loop_len = commands.len();
-                match commands.index_mut(loop_start) {
-                    Command::Until {loop_end: ref mut loop_end, expression: _} => {
-                        loop_end.get_or_insert(loop_len);
-                    }
-                    Command::While {loop_end: ref mut loop_end, expression: _} => {
-                        loop_end.get_or_insert(loop_len);
-                    }
-                    _ => {
-                        panic!("loop to non-loop command");
-                    }
-                }
-                commands.push(Command::Next {loop_start: loop_start});
+                build_next(&mut commands, &mut loop_starts);
             },
             [SymbolType::Continue] => {
                 let loop_start = loop_starts.last().expect("loop_starts");
                 commands.push(Command::Next {loop_start: *loop_start});
+            }
+            [SymbolType::Newline] => {
+                if !loop_starts.is_empty() {
+                    build_next(&mut commands, &mut loop_starts);
+                }
+                else if !func_starts.is_empty() {
+                    let func_start = func_starts.pop().expect("func_starts");
+                    let func_len = commands.len();
+                    match commands.index_mut(func_start) {
+                        Command::FunctionDeclaration {name: _, args: _, func_end: ref mut func_end} => {
+                            func_end.get_or_insert(func_len);
+                        }
+                        _ => {
+                            panic!("return to non-func command");
+                        }
+                    }
+                    commands.push(Command::EndFunction);
+                }
+                else {
+                    error!("Bad double-newline");
+                }
             }
             _ => {
                 // Better done with slice patterns once they stablise (see https://github.com/rust-lang/rust/issues/23121)
@@ -326,6 +369,35 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
                     }
                     else {
                         error!("Bad 'put' section: {:?}", section);
+                    }
+                }
+                else if section.len() > 2 && section[1] == SymbolType::Takes {
+                    if let SymbolType::Variable(ref name) = section[0] {
+                        let mut var_seq = section.iter().skip(2);
+                        let mut args = vec![];
+                        loop {
+                            if let Some(SymbolType::Variable(ref arg)) = var_seq.next() {
+                                args.push(Expression::Variable(arg.to_string()));
+                                match var_seq.next() {
+                                    Some(sym) => {
+                                        if sym != &SymbolType::And {
+                                            error!("Bad 'function declaration' section: {:?} {:?}", sym, section);
+                                        }
+                                    }
+                                    None => {
+                                        break;
+                                    }
+                                }
+                            }
+                            else {
+                                error!("Bad 'function declaration' section: {:?}", section);
+                            }
+                        }
+                        func_starts.push(commands.len());
+                        commands.push(Command::FunctionDeclaration{name:name.to_string(), args, func_end: None});
+                    }
+                    else {
+                        error!("Bad 'function declaration' section: {:?}", section);
                     }
                 }
                 else {

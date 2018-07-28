@@ -109,6 +109,15 @@ pub fn run(commands: Vec<Command>, writer: &mut Write) -> Result<HashMap<String,
                     }
                 };
             }
+            Command::FunctionDeclaration {name, args, func_end} => {
+                //warn!("Command: {:?}", command);
+                //unimplemented!();
+                pc = func_end.expect("func_end");
+            }
+            Command::EndFunction => {
+                warn!("Command: {:?}", command);
+                unimplemented!();
+            }
         }
         pc +=1;
     }

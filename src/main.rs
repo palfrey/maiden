@@ -20,7 +20,7 @@ fn main() {
     println!("Hello, world!");
 }
 
-fn test_program(program: &str, end_variables: HashMap<String, Expression>) {
+fn test_program(program: &str, end_variables: HashMap<String, Expression>, expected_output: &str) {
     pretty_env_logger::try_init().unwrap_or(());
     let commands = parser::parse(program).unwrap();
     debug!("Commands: {:?}", commands);
@@ -31,6 +31,7 @@ fn test_program(program: &str, end_variables: HashMap<String, Expression>) {
     if res != "" {
         debug!("{}", res);
     }
+    assert_eq!(expected_output, res);
     assert_eq!(end_variables, variables);
 }
 
@@ -62,7 +63,7 @@ End";
         "counter" => Expression::Integer(100),
         "fizz" => Expression::Integer(3),
     };
-    test_program(program, end_variables);
+    test_program(program, end_variables, "");
 }
 
 #[test]
@@ -80,7 +81,7 @@ And around we go";
         "hate" => Expression::Integer(5),
         "desire" => Expression::Integer(100),
     };
-    test_program(program, end_variables);
+    test_program(program, end_variables, "");
 }
 
 #[test]
@@ -97,23 +98,31 @@ Fire is ice
 Hate is water
 Until my world is Desire,
 Build my world up
-If Midnight taking Desire, Fire is nothing and Midnight taking Desire, Hate is nothing
+If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing
 Shout \"FizzBuzz!\"
-And take it to the top
-If Midnight taking Desire, Fire is nothing
+Take it to the top
+
+If Midnight taking my world, Fire is nothing
 Shout \"Fizz!\"
-And take it to the top
-If Midnight taking Desire, Hate is nothing
+Take it to the top
+
+If Midnight taking my world, Hate is nothing
 Say \"Buzz!\"
-And take it to the top
+Take it to the top
+
 Whisper my world
 And around we go";
-    let end_variables = HashMap::new();
-    test_program(program, end_variables);
+    let end_variables = hashmap! {
+        "my world" => Expression::Integer(100),
+        "fire" => Expression::Integer(3),
+        "hate" => Expression::Integer(5),
+        "desire" => Expression::Integer(100),
+    };
+    test_program(program, end_variables, "");
 }
 
 #[test]
 fn multi_word_say() {
     let end_variables = HashMap::new();
-    test_program("say \"shout let it all out\"", end_variables);
+    test_program("say \"shout let it all out\"", end_variables, "shout let it all out\n");
 }

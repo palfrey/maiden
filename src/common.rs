@@ -43,8 +43,10 @@ pub enum Command {
     Until { expression: Expression, loop_end: Option<usize> },
     While { expression: Expression, loop_end: Option<usize> },
     Increment { target: String },
-    Next { loop_start: usize},
-    Say { value: Expression }
+    Next { loop_start: usize },
+    Say { value: Expression },
+    FunctionDeclaration { name: String, args: Vec<Expression>, func_end: Option<usize> },
+    EndFunction,
 }
 
 error_chain!{
