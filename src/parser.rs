@@ -113,11 +113,14 @@ named!(pub line<CompleteStr, Vec<SymbolType>>, alt_complete!(
 ));
 
 named!(lines<CompleteStr, Vec<Vec<SymbolType>>>, many0!(
-    do_parse!(
-        a_line: line >>
-        take_while!(is_newline) >>
-        take_while!(is_space) >>
-        (a_line)
+    alt!(
+        take_while1!(is_newline) => {|_| vec![SymbolType::Newline]} |
+        do_parse!(
+            a_line: line >>
+            take_while_m_n!(0, 1, is_newline) >>
+            take_while!(is_space) >>
+            (a_line)
+        ) => {|l| l }
     )));
 
 fn compact_words(line: Vec<SymbolType>) -> Vec<SymbolType> {

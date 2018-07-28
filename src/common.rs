@@ -29,6 +29,7 @@ pub enum SymbolType {
     Subtract,
     Put,
     Where,
+    Newline,
     GreaterThanOrEqual,
     Variable(String),
     String(String),
