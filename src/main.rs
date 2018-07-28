@@ -88,6 +88,7 @@ fn rocking_fizzbuzz() {
     let program = "Midnight takes your heart and your soul
 While your heart is as high as your soul
 Put your heart without your soul into your heart
+
 Give back your heart
 
 Desire is a lovestruck ladykiller

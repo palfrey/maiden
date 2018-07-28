@@ -3,17 +3,24 @@ use std::io::Write;
 use std::collections::HashMap;
 use std::ops::Deref;
 
+fn run_binop(variables: &HashMap<String, Expression>, first: &Expression, second: &Expression, f: fn(&Expression, &Expression) -> bool) -> Result<Expression> {
+    let res_first = run_expression(variables, first.deref())?;
+    let res_second = run_expression(variables, second.deref())?;
+    debug!("first: {:?} second: {:?}", res_first, res_second);
+    if f(&res_first, &res_second) {
+        Ok(Expression::True)
+    } else {
+        Ok(Expression::False)
+    }
+}
+
 fn run_expression(variables: &HashMap<String, Expression>, expression: &Expression) -> Result<Expression> {
     return match expression {
         &Expression::Is(ref first, ref second) => {
-            let res_first = run_expression(variables, first.deref())?;
-            let res_second = run_expression(variables, second.deref())?;
-            debug!("first: {:?} second: {:?}", res_first, res_second);
-            if res_first == res_second {
-                Ok(Expression::True)
-            } else {
-                Ok(Expression::False)
-            }
+            return run_binop(variables, first, second, |f, s| {f == s});
+        }
+        &Expression::GreaterThanOrEqual(ref first, ref second) => {
+            return run_binop(variables, first, second, |f, s| {f >= s});
         }
         &Expression::String(_) | &Expression::Integer(_) => {
             Ok(expression.clone())
@@ -73,7 +80,20 @@ pub fn run(commands: Vec<Command>, writer: &mut Write) -> Result<HashMap<String,
                     // all fine
                 }
                 else {
-                    warn!("Bad expression resolve: {:?}", resolve);
+                    //warn!("Bad expression resolve: {:?}", resolve);
+                    panic!("Bad expression resolve: {:?}", resolve);
+                }
+            }
+            Command::While {expression, loop_end} => {
+                let resolve = run_expression(&variables, expression);
+                if let Ok(Expression::False) = resolve {
+                    pc = loop_end.expect("loop_end");
+                }
+                else if let Ok(Expression::True) = resolve {
+                    // all fine
+                }
+                else {
+                    panic!("Bad expression resolve: {:?}", resolve);
                 }
             }
             Command::Next {loop_start} => {

@@ -35,6 +35,7 @@ named!(proper_variable<CompleteStr, SymbolType>,
 
 named!(word<CompleteStr, SymbolType>,
     alt_complete!(
+        tag_no_case!("is as high as") => {|_| SymbolType::GreaterThanOrEqual} |
         tag_no_case!("is") => {|_| SymbolType::Is} |
         tag_no_case!("if") => {|_| SymbolType::If} |
         tag_no_case!("build") => {|_| SymbolType::Build} |
@@ -46,15 +47,15 @@ named!(word<CompleteStr, SymbolType>,
         tag_no_case!("while") => {|_| SymbolType::While} |
         tag_no_case!("until") => {|_| SymbolType::Until} |
         alt_complete!(
-            tag_no_case!("end") | tag_no_case!("around we go") | tag_no_case!("take it to the top")
+            tag_no_case!("end") | tag_no_case!("around we go")
         ) => {|_| SymbolType::Next} |
+        tag_no_case!("take it to the top") => {|_| SymbolType::Continue} |
         tag_no_case!("taking") => {|_| SymbolType::Taking} |
         tag_no_case!("give back") => {|_| SymbolType::Return} |
         tag_no_case!("takes") => {|_| SymbolType::Takes} |
         tag_no_case!("without") => {|_| SymbolType::Subtract} |
         tag_no_case!("into") => {|_| SymbolType::Where} |
         tag_no_case!("put") => {|_| SymbolType::Put} |
-        tag_no_case!("as high as") => {|_| SymbolType::GreaterThanOrEqual} |
         tag!("nothing") => {|_| SymbolType::Integer(0) } |
         take_while1!(char::is_numeric) => {|n: CompleteStr| SymbolType::Integer(n.parse::<u32>().unwrap())} |
         do_parse!(
@@ -104,7 +105,7 @@ fn poetic_number_literal(input: CompleteStr) -> nom::IResult<CompleteStr, Vec<Sy
 
 named!(pub line<CompleteStr, Vec<SymbolType>>, alt_complete!(
     poetic_number_literal => {|s| s } |
-    many0!(do_parse!(
+    many1!(do_parse!(
         word: word >>
         take_while!(is_space) >>
         (word)
@@ -180,14 +181,17 @@ fn parse_expression(items: Vec<&SymbolType>) -> Result<Expression> {
     let describe = format!("{:?}", items);
     for item in items {
         match item {
-            &SymbolType::Words(ref phrase) => {
+            &SymbolType::Words(_) => {
                  output.push(evaluate(item)?);
             },
-            &SymbolType::Is => {
+            &SymbolType::Is | &SymbolType::GreaterThanOrEqual => {
                 operators.push(item);
             }
             &SymbolType::Variable(ref name) => {
                 output.push(Expression::Variable(name.clone()));
+            }
+            &SymbolType::String(ref phrase) => {
+                output.push(Expression::String(phrase.clone()));
             }
             &SymbolType::Integer(ref val) => {
                 output.push(Expression::Integer(*val as i32));
@@ -203,9 +207,20 @@ fn parse_expression(items: Vec<&SymbolType>) -> Result<Expression> {
     for op in operators {
         match op {
             &SymbolType::Is => {
+                if output.len() < 2 {
+                    bail!(ErrorKind::UnbalancedExpression(describe));
+                }
                 let second = output.pop().expect("second");
                 let first = output.pop().expect("first");
                 output.push(Expression::Is(Box::new(first), Box::new(second)));
+            }
+            &SymbolType::GreaterThanOrEqual => {
+                if output.len() < 2 {
+                    bail!(ErrorKind::UnbalancedExpression(describe));
+                }
+                let second = output.pop().expect("second");
+                let first = output.pop().expect("first");
+                output.push(Expression::GreaterThanOrEqual(Box::new(first), Box::new(second)));
             }
             _ => {
                 warn!("No operation for {:?}", op);
@@ -253,18 +268,27 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
                     Command::Until {loop_end: ref mut loop_end, expression: _} => {
                         loop_end.get_or_insert(loop_len);
                     }
+                    Command::While {loop_end: ref mut loop_end, expression: _} => {
+                        loop_end.get_or_insert(loop_len);
+                    }
                     _ => {
                         panic!("loop to non-loop command");
                     }
                 }
                 commands.push(Command::Next {loop_start: loop_start});
-            }
-            [SymbolType::Say, SymbolType::String(value)] => {
-                commands.push(Command::Say{value: Expression::String(value.to_string())});
+            },
+            [SymbolType::Continue] => {
+                let loop_start = loop_starts.last().expect("loop_starts");
+                commands.push(Command::Next {loop_start: *loop_start});
             }
             _ => {
+                if section[0] == SymbolType::Say && section.len() > 1 {
+                    let expression_seq: Vec<&SymbolType> = section.iter().skip(1).collect();
+                    let expression = parse_expression(expression_seq)?;
+                    commands.push(Command::Say{value: expression});
+                }
                 // Better done with slice patterns once they stablise (see https://github.com/rust-lang/rust/issues/23121)
-                if section[1] == SymbolType::Is {
+                else if section.len() > 1 && section[1] == SymbolType::Is {
                     if let SymbolType::Variable(ref target) = section[0] {
                         let expression_seq: Vec<&SymbolType> = section.iter().skip(2).collect();
                         let expression = parse_expression(expression_seq)?;
@@ -276,6 +300,12 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
                     let expression_seq: Vec<&SymbolType> = section.iter().skip(1).collect();
                     let expression = parse_expression(expression_seq)?;
                     commands.push(Command::Until { expression: expression, loop_end: None});
+                }
+                else if section[0] == SymbolType::While && section.len() > 1 {
+                    loop_starts.push(commands.len());
+                    let expression_seq: Vec<&SymbolType> = section.iter().skip(1).collect();
+                    let expression = parse_expression(expression_seq)?;
+                    commands.push(Command::While { expression: expression, loop_end: None});
                 }
                 else {
                     error!("Don't recognise command sequence {:?}", section);

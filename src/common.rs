@@ -1,10 +1,11 @@
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, PartialOrd)]
 pub enum Expression {
     Integer(i32),
     String(String),
     Variable(String),
     And(Box<Expression>, Box<Expression>),
     Is(Box<Expression>, Box<Expression>),
+    GreaterThanOrEqual(Box<Expression>, Box<Expression>),
     True,
     False,
 }
@@ -17,6 +18,7 @@ pub enum SymbolType {
     Until,
     While,
     Next,
+    Continue,
     Return,
     Say,
     And,
@@ -38,6 +40,7 @@ pub enum SymbolType {
 pub enum Command {
     Assignment { target: String, value: Expression },
     Until { expression: Expression, loop_end: Option<usize> },
+    While { expression: Expression, loop_end: Option<usize> },
     Increment { target: String },
     Next { loop_start: usize},
     Say { value: Expression }
@@ -52,7 +55,6 @@ error_chain!{
             description("extra text we couldn't parse")
             display("extra unparsed text: '{}'", t)
         }
-        NonAlphabeticWord(w: String)
         UnbalancedExpression(problem: String)
         MissingVariable(name: String)
     }
