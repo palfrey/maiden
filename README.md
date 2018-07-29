@@ -1,5 +1,6 @@
 Maiden
 ======
+[![Build Status](https://travis-ci.org/palfrey/maiden.svg?branch=master)](https://travis-ci.org/palfrey/maiden)
 
 Maiden is a [Rockstar](https://github.com/dylanbeattie/rockstar) interpreter written in Rust. 
 
