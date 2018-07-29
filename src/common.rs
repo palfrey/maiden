@@ -32,7 +32,7 @@ pub enum SymbolType {
     Return,
     Say,
     If,
-    Taking{target: String, args: Vec<String>},
+    Taking { target: String, args: Vec<String> },
     Takes,
     Comma,
     Subtract,
@@ -43,7 +43,7 @@ pub enum SymbolType {
     Variable(String),
     String(String),
     Words(Vec<String>),
-    Integer(u32)
+    Integer(u32),
 }
 
 pub static LOWEST_PRECDENCE: SymbolType = SymbolType::Dummy;
@@ -51,20 +51,33 @@ pub static LOWEST_PRECDENCE: SymbolType = SymbolType::Dummy;
 #[derive(Debug, PartialEq)]
 pub enum Command {
     Assignment { target: String, value: Expression },
-    Until { expression: Expression, loop_end: Option<usize> },
-    While { expression: Expression, loop_end: Option<usize> },
-    If { expression: Expression, if_end: Option<usize> },
+    Until {
+        expression: Expression,
+        loop_end: Option<usize>,
+    },
+    While {
+        expression: Expression,
+        loop_end: Option<usize>,
+    },
+    If {
+        expression: Expression,
+        if_end: Option<usize>,
+    },
     Increment { target: String },
     Next { loop_start: usize },
     Say { value: Expression },
-    FunctionDeclaration { name: String, args: Vec<String>, func_end: Option<usize> },
-    EndFunction { return_value: Expression }
+    FunctionDeclaration {
+        name: String,
+        args: Vec<String>,
+        func_end: Option<usize>,
+    },
+    EndFunction { return_value: Expression },
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Function {
     pub location: usize,
-    pub args: Vec<String>
+    pub args: Vec<String>,
 }
 
 #[derive(Debug, PartialEq)]

@@ -5,10 +5,16 @@ use std::ops::Deref;
 
 struct State<'a> {
     writer: &'a mut Write,
-    variables: &'a mut HashMap<String, Expression>
+    variables: &'a mut HashMap<String, Expression>,
 }
 
-fn run_binop(state: &mut State, program: &Program, first: &Expression, second: &Expression, f: fn(&Expression, &Expression) -> bool) -> Result<Expression> {
+fn run_binop(
+    state: &mut State,
+    program: &Program,
+    first: &Expression,
+    second: &Expression,
+    f: fn(&Expression, &Expression) -> bool,
+) -> Result<Expression> {
     let res_first = run_expression(state, program, first.deref())?;
     let res_second = run_expression(state, program, second.deref())?;
     debug!("first: {:?} second: {:?}", res_first, res_second);
@@ -19,7 +25,13 @@ fn run_binop(state: &mut State, program: &Program, first: &Expression, second: &
     }
 }
 
-fn run_mathbinop(state: &mut State, program: &Program, first: &Expression, second: &Expression, f: fn(i32, i32) -> i32) -> Result<Expression> {
+fn run_mathbinop(
+    state: &mut State,
+    program: &Program,
+    first: &Expression,
+    second: &Expression,
+    f: fn(i32, i32) -> i32,
+) -> Result<Expression> {
     let res_first = run_expression(state, program, first.deref())?;
     let res_second = run_expression(state, program, second.deref())?;
     debug!("first: {:?} second: {:?}", res_first, res_second);
@@ -29,17 +41,19 @@ fn run_mathbinop(state: &mut State, program: &Program, first: &Expression, secon
             return Ok(Expression::Integer(f(f_i, s_i)));
         }
     }
-    unimplemented!("Math op between non integers: {:?} {:?}", res_first, res_second);
+    unimplemented!(
+        "Math op between non integers: {:?} {:?}",
+        res_first,
+        res_second
+    );
 }
 
 fn to_boolean(expression: &Expression) -> bool {
     if let &Expression::False = expression {
         false
-    }
-    else if let &Expression::True = expression {
+    } else if let &Expression::True = expression {
         true
-    }
-    else {
+    } else {
         panic!("Bad boolean resolve: {:?}", expression);
     }
 }
@@ -48,7 +62,7 @@ fn run_expression(state: &mut State, program: &Program, expression: &Expression)
     debug!("Expression: {:?}", expression);
     return match expression {
         &Expression::Is(ref first, ref second) => {
-            return run_binop(state, program, first, second, |f, s| {f == s});
+            return run_binop(state, program, first, second, |f, s| f == s);
         }
         &Expression::And(ref first, ref second) => {
             return run_binop(state, program, first, second, |f, s| {
@@ -56,14 +70,13 @@ fn run_expression(state: &mut State, program: &Program, expression: &Expression)
             });
         }
         &Expression::GreaterThanOrEqual(ref first, ref second) => {
-            return run_binop(state, program, first, second, |f, s| {f >= s});
+            return run_binop(state, program, first, second, |f, s| f >= s);
         }
         &Expression::Subtract(ref first, ref second) => {
-            return run_mathbinop(state, program, first, second, |f, s| { f - s });
+            return run_mathbinop(state, program, first, second, |f, s| f - s);
         }
-        &Expression::String(_) | &Expression::Integer(_) => {
-            Ok(expression.clone())
-        }
+        &Expression::String(_) |
+        &Expression::Integer(_) => Ok(expression.clone()),
         &Expression::Variable(ref name) => {
             match state.variables.get(&name.to_lowercase()) {
                 Some(exp) => {
@@ -88,7 +101,7 @@ fn run_expression(state: &mut State, program: &Program, expression: &Expression)
                 let value = run_expression(state, program, &args[i])?;
                 state.variables.insert(func.args[i].to_lowercase(), value);
             }
-            let ret = run_core(state, program, func.location+1);
+            let ret = run_core(state, program, func.location + 1);
             for i in 0..func.args.len() {
                 state.variables.remove(&func.args[i].to_lowercase());
             }
@@ -97,7 +110,7 @@ fn run_expression(state: &mut State, program: &Program, expression: &Expression)
         _ => {
             unimplemented!("No runner for {:?}", expression);
         }
-    }
+    };
 }
 
 pub fn run(program: Program, writer: &mut Write) -> Result<HashMap<String, Expression>> {
@@ -106,7 +119,7 @@ pub fn run(program: Program, writer: &mut Write) -> Result<HashMap<String, Expre
     {
         let mut state = State {
             variables: &mut variables,
-            writer: writer
+            writer: writer,
         };
         run_core(&mut state, &program, pc)?;
     } // FIXME: Drop once NLL is merged
@@ -118,7 +131,11 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
         Expression::Integer(x) => Ok(format!("{}", x)),
         Expression::String(s) => Ok(s.to_string()),
         Expression::Variable(x) => {
-            let v = state.variables.get(&x.to_lowercase()).expect(&format!("Can't find '{}'", x)).clone();
+            let v = state
+                .variables
+                .get(&x.to_lowercase())
+                .expect(&format!("Can't find '{}'", x))
+                .clone();
             get_printable(&v, state)
         }
         _ => {
@@ -130,48 +147,61 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
 fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expression)> {
     let mut total_instr = 0;
     loop {
-        total_instr +=1;
+        total_instr += 1;
         if total_instr > 1000 {
             panic!("Ran out of instr");
         }
         let command = match program.commands.get(pc) {
             Some(c) => c,
-            None => break
+            None => break,
         };
         debug!("command: {:?}", command);
         match command {
-            Command::Assignment {target, value} => {
+            Command::Assignment { target, value } => {
                 let val = run_expression(state, program, value)?;
                 state.variables.insert(target.to_lowercase(), val);
             }
-            Command::Increment {target} => {
-                let val = state.variables.get(&target.to_lowercase()).expect(&format!("Can't find '{}'", target)).clone();
+            Command::Increment { target } => {
+                let val = state
+                    .variables
+                    .get(&target.to_lowercase())
+                    .expect(&format!("Can't find '{}'", target))
+                    .clone();
                 info!("Value of {} is {:?}", target, val);
                 match val {
                     Expression::Integer(x) => {
-                        state.variables.insert(target.to_lowercase(), Expression::Integer(x+1));
+                        state.variables.insert(
+                            target.to_lowercase(),
+                            Expression::Integer(x + 1),
+                        );
                     }
                     _ => {
                         error!("Attempt to increment non-integer '{}'", target);
                     }
                 };
             }
-            Command::Until {expression, loop_end} => {
+            Command::Until {
+                expression,
+                loop_end,
+            } => {
                 let resolve = run_expression(state, program, expression)?;
                 if to_boolean(&resolve) {
                     pc = loop_end.expect("loop_end");
                 }
             }
-            Command::While {expression, loop_end} => {
+            Command::While {
+                expression,
+                loop_end,
+            } => {
                 let resolve = run_expression(state, program, expression)?;
                 if !to_boolean(&resolve) {
                     pc = loop_end.expect("loop_end");
                 }
             }
-            Command::Next {loop_start} => {
-                pc = loop_start-1;
+            Command::Next { loop_start } => {
+                pc = loop_start - 1;
             }
-            Command::Say {value} => {
+            Command::Say { value } => {
                 match get_printable(value, state) {
                     Ok(x) => writeln!(state.writer, "{}", x)?,
                     Err(_) => {
@@ -179,13 +209,17 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                     }
                 };
             }
-            Command::FunctionDeclaration {name: _, args: _, func_end} => {
+            Command::FunctionDeclaration {
+                name: _,
+                args: _,
+                func_end,
+            } => {
                 pc = func_end.expect("func_end");
             }
-            Command::EndFunction{return_value} => {
+            Command::EndFunction { return_value } => {
                 return run_expression(state, program, return_value);
             }
-            Command::If {expression, if_end} => {
+            Command::If { expression, if_end } => {
                 let resolve = run_expression(state, program, expression)?;
                 debug!("if: {:?} {:?}", &resolve, expression);
                 if !to_boolean(&resolve) {
@@ -193,7 +227,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 }
             }
         }
-        pc +=1;
+        pc += 1;
     }
     return Ok(Expression::Nothing);
 }

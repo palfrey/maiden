@@ -20,14 +20,16 @@ use clap::{Arg, App};
 fn main() -> common::Result<()> {
     pretty_env_logger::try_init().unwrap_or(());
     let matches = App::new("Maiden")
-                          .version("1.0")
-                          .author("Tom Parker <palfrey@tevp.net>")
-                          .about("Rockstar interpreter")
-                          .arg(Arg::with_name("INPUT")
-                               .help("Sets the input file to use")
-                               .required(true)
-                               .index(1))
-                          .get_matches();
+        .version("1.0")
+        .author("Tom Parker <palfrey@tevp.net>")
+        .about("Rockstar interpreter")
+        .arg(
+            Arg::with_name("INPUT")
+                .help("Sets the input file to use")
+                .required(true)
+                .index(1),
+        )
+        .get_matches();
     let mut f = File::open(matches.value_of("INPUT").unwrap())?;
     let mut buffer = String::new();
     f.read_to_string(&mut buffer)?;
@@ -81,7 +83,8 @@ mod tests {
     Until Counter is Limit
         Build Counter up
     End";
-        let end_variables = hashmap! {
+        let end_variables =
+            hashmap! {
             "buzz" => Expression::Integer(5),
             "limit" => Expression::Integer(100),
             "counter" => Expression::Integer(100),
@@ -99,7 +102,8 @@ mod tests {
     Until my world is Desire,
     Build my world up
     And around we go";
-        let end_variables = hashmap! {
+        let end_variables =
+            hashmap! {
             "my world" => Expression::Integer(100),
             "fire" => Expression::Integer(3),
             "hate" => Expression::Integer(5),
@@ -136,18 +140,34 @@ mod tests {
 
     Whisper my world
     And around we go";
-        let end_variables = hashmap! {
+        let end_variables =
+            hashmap! {
             "my world" => Expression::Integer(100),
             "fire" => Expression::Integer(3),
             "hate" => Expression::Integer(5),
             "desire" => Expression::Integer(100),
         };
-        test_program(program, end_variables, "1\n2\nFizz!\n4\nBuzz!\nFizz!\n7\n8\nFizz!\nBuzz!\n11\nFizz!\n13\n14\nFizzBuzz!\n16\n17\nFizz!\n19\nBuzz!\nFizz!\n22\n23\nFizz!\nBuzz!\n26\nFizz!\n28\n29\nFizzBuzz!\n31\n32\nFizz!\n34\nBuzz!\nFizz!\n37\n38\nFizz!\nBuzz!\n41\nFizz!\n43\n44\nFizzBuzz!\n46\n47\nFizz!\n49\nBuzz!\nFizz!\n52\n53\nFizz!\nBuzz!\n56\nFizz!\n58\n59\nFizzBuzz!\n61\n62\nFizz!\n64\nBuzz!\nFizz!\n67\n68\nFizz!\nBuzz!\n71\nFizz!\n73\n74\nFizzBuzz!\n76\n77\nFizz!\n79\nBuzz!\nFizz!\n82\n83\nFizz!\nBuzz!\n86\nFizz!\n88\n89\nFizzBuzz!\n91\n92\nFizz!\n94\nBuzz!\nFizz!\n97\n98\nFizz!\nBuzz!\n");
+        test_program(
+            program,
+            end_variables,
+            concat!(
+                "1\n2\nFizz!\n4\nBuzz!\nFizz!\n7\n8\nFizz!\nBuzz!\n11\nFizz!\n13\n14\nFizzBuzz!\n16\n17\nFizz!\n",
+                "19\nBuzz!\nFizz!\n22\n23\nFizz!\nBuzz!\n26\nFizz!\n28\n29\nFizzBuzz!\n31\n32\nFizz!\n34\nBuzz!\n",
+                "Fizz!\n37\n38\nFizz!\nBuzz!\n41\nFizz!\n43\n44\nFizzBuzz!\n46\n47\nFizz!\n49\nBuzz!\nFizz!\n52\n",
+                "53\nFizz!\nBuzz!\n56\nFizz!\n58\n59\nFizzBuzz!\n61\n62\nFizz!\n64\nBuzz!\nFizz!\n67\n68\nFizz!\n",
+                "Buzz!\n71\nFizz!\n73\n74\nFizzBuzz!\n76\n77\nFizz!\n79\nBuzz!\nFizz!\n82\n83\nFizz!\nBuzz!\n86\n",
+                "Fizz!\n88\n89\nFizzBuzz!\n91\n92\nFizz!\n94\nBuzz!\nFizz!\n97\n98\nFizz!\nBuzz!\n"
+            ),
+        );
     }
 
     #[test]
     fn multi_word_say() {
         let end_variables = HashMap::new();
-        test_program("say \"shout let it all out\"", end_variables, "shout let it all out\n");
+        test_program(
+            "say \"shout let it all out\"",
+            end_variables,
+            "shout let it all out\n",
+        );
     }
 }

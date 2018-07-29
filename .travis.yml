@@ -10,6 +10,9 @@ matrix:
   allow_failures:
     - rust: nightly
   fast_finish: true
+before_script:
+  - cargo install rustfmt
 script:
+  - cargo fmt --all -- --write-mode diff --force
   - cargo build --all
   - cargo test --all
