@@ -10,3 +10,7 @@ matrix:
   allow_failures:
     - rust: nightly
   fast_finish: true
+script:
+  - cargo build --all
+  - cargo test --all
+  - cargo run ./tests/fizzbuzz.rock
