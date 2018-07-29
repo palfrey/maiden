@@ -20,12 +20,12 @@ fn main() {
     println!("Hello, world!");
 }
 
-fn test_program(program: &str, end_variables: HashMap<String, Expression>, expected_output: &str) {
+fn test_program(code: &str, end_variables: HashMap<String, Expression>, expected_output: &str) {
     pretty_env_logger::try_init().unwrap_or(());
-    let commands = parser::parse(program).unwrap();
-    debug!("Commands: {:?}", commands);
+    let program = parser::parse(code).unwrap();
+    info!("Commands: {:?}", program.commands);
     let mut writer = Cursor::new(Vec::new());
-    let variables = runner::run(commands, &mut writer).unwrap();
+    let variables = runner::run(program, &mut writer).unwrap();
     writer.set_position(0);
     let res = std::str::from_utf8(writer.get_ref()).unwrap();
     if res != "" {

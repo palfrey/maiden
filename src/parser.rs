@@ -4,6 +4,7 @@ use std::ops::Deref;
 use common::*;
 use pretty_env_logger;
 use nom;
+use std::collections::HashMap;
 
 fn is_space(chr: char) -> bool {
   chr == ' ' || chr == '\t'
@@ -289,29 +290,13 @@ fn build_next(commands: &mut Vec<Command>, loop_starts: &mut Vec<usize>) {
     commands.push(Command::Next {loop_start: loop_start});
 }
 
-fn build_return(commands: &mut Vec<Command>, loop_starts: &mut Vec<usize>) {
-    let loop_start = loop_starts.pop().expect("loop_starts");
-    let loop_len = commands.len();
-    match commands.index_mut(loop_start) {
-        Command::Until {loop_end: ref mut loop_end, expression: _} => {
-            loop_end.get_or_insert(loop_len);
-        }
-        Command::While {loop_end: ref mut loop_end, expression: _} => {
-            loop_end.get_or_insert(loop_len);
-        }
-        _ => {
-            panic!("loop to non-loop command");
-        }
-    }
-    commands.push(Command::Next {loop_start: loop_start});
-}
-
-pub fn parse(input: &str) -> Result<Vec<Command>> {
+pub fn parse(input: &str) -> Result<Program> {
     let raw_lines = lines(CompleteStr(input)).unwrap();
     if raw_lines.0.len() > 0 {
         bail!(ErrorKind::UnparsedText(raw_lines.0.deref().to_string()));
     }
     debug!("{:?}", raw_lines);
+    let mut functions: HashMap<String, Function> = HashMap::new();
     let mut commands: Vec<Command> = Vec::new();
     let mut loop_starts: Vec<usize> = Vec::new();
     let mut func_starts: Vec<usize> = Vec::new();
@@ -368,7 +353,7 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
                             panic!("return to non-func command");
                         }
                     }
-                    commands.push(Command::EndFunction);
+                    commands.push(Command::EndFunction{return_value: Expression::Nothing});
                 }
                 else {
                     error!("Bad double-newline");
@@ -425,7 +410,7 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
                         let mut args = vec![];
                         loop {
                             if let Some(SymbolType::Variable(ref arg)) = var_seq.next() {
-                                args.push(Expression::Variable(arg.to_string()));
+                                args.push(arg.to_string());
                                 match var_seq.next() {
                                     Some(sym) => {
                                         if sym != &SymbolType::And {
@@ -442,11 +427,17 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
                             }
                         }
                         func_starts.push(commands.len());
+                        functions.insert(name.to_string(), Function {location: commands.len(), args: args.clone()});
                         commands.push(Command::FunctionDeclaration{name:name.to_string(), args, func_end: None});
                     }
                     else {
                         error!("Bad 'function declaration' section: {:?}", section);
                     }
+                }
+                else if section[0] == SymbolType::Return && section.len() > 1 {
+                    let expression_seq: Vec<&SymbolType> = section.iter().skip(1).collect();
+                    let expression = parse_expression(expression_seq)?;
+                    commands.push(Command::EndFunction { return_value: expression});
                 }
                 else {
                     error!("Don't recognise command sequence {:?}", section);
@@ -454,7 +445,7 @@ pub fn parse(input: &str) -> Result<Vec<Command>> {
             }
         }
     }
-    return Ok(commands);
+    return Ok(Program{commands, functions});
 }
 
 #[test]
@@ -469,4 +460,32 @@ fn check_evaluate() {
     pretty_env_logger::try_init().unwrap_or(());
     assert_eq!(evaluate(&SymbolType::Words(vec!["a".to_string(), "lovestruck".to_string(), "ladykiller".to_string()])).unwrap(), Expression::Integer(100));
     assert_eq!(evaluate(&SymbolType::Words(vec!["nothing".to_string()])).unwrap(), Expression::Integer(0));
-} 
+}
+
+#[test]
+fn check_full_expression_parse() {
+    pretty_env_logger::try_init().unwrap_or(());
+    let expression = Expression::And(
+        Box::new(Expression::Is(
+            Box::new(Expression::Call("Midnight".to_string(), vec![Expression::Variable("my world".to_string()), Expression::Variable("Fire".to_string())])),
+            Box::new(Expression::Integer(0)),
+        )),
+        Box::new(Expression::Is(
+            Box::new(Expression::Call("Midnight".to_string(), vec![Expression::Variable("my world".to_string()), Expression::Variable("Hate".to_string())])),
+            Box::new(Expression::Integer(0))
+        ))
+    );
+    let commands = vec![Command::If{expression: expression, if_end: None}];
+    let functions = HashMap::new();
+    assert_eq!(parse("If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing").unwrap(), Program{commands, functions});
+}
+
+#[test]
+fn check_expression_parse() {
+    pretty_env_logger::try_init().unwrap_or(());
+    let raw_lines = lines(CompleteStr("If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing")).unwrap();
+    assert_eq!(raw_lines, (CompleteStr(""), vec![vec![
+        SymbolType::If, SymbolType::Taking { target: "Midnight".to_string(), args: vec!["my world".to_string(), "Fire".to_string()] }, SymbolType::Is, SymbolType::Integer(0), 
+        SymbolType::And,
+        SymbolType::Taking { target: "Midnight".to_string(), args: vec!["my world".to_string(), "Hate".to_string()] }, SymbolType::Is, SymbolType::Integer(0)]]));
+}
