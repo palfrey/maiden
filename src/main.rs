@@ -7,22 +7,43 @@ extern crate log;
 extern crate pretty_env_logger;
 #[macro_use]
 extern crate error_chain;
+extern crate clap;
 
 mod common;
 mod parser;
 mod runner;
 
-use std::io::Cursor;
-use std::collections::HashMap;
-use common::Expression;
+use std::io::{self, Read};
+use std::fs::File;
+use clap::{Arg, App};
 
-fn main() {
-    println!("Hello, world!");
+fn main() -> common::Result<()> {
+    pretty_env_logger::try_init().unwrap_or(());
+    let matches = App::new("Maiden")
+                          .version("1.0")
+                          .author("Tom Parker <palfrey@tevp.net>")
+                          .about("Rockstar interpreter")
+                          .arg(Arg::with_name("INPUT")
+                               .help("Sets the input file to use")
+                               .required(true)
+                               .index(1))
+                          .get_matches();
+    let mut f = File::open(matches.value_of("INPUT").unwrap())?;
+    let mut buffer = String::new();
+    f.read_to_string(&mut buffer)?;
+
+    let program = parser::parse(&buffer)?;
+    runner::run(program, &mut io::stdout())?;
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Cursor;
+    use std::collections::HashMap;
+    use common::Expression;
+
     fn test_program(code: &str, end_variables: HashMap<String, Expression>, expected_output: &str) {
         pretty_env_logger::try_init().unwrap_or(());
         let program = parser::parse(code).unwrap();

@@ -2,7 +2,6 @@ use nom::types::CompleteStr;
 use std::ops::IndexMut;
 use std::ops::Deref;
 use common::*;
-use pretty_env_logger;
 use nom;
 use std::collections::HashMap;
 
@@ -462,44 +461,50 @@ pub fn parse(input: &str) -> Result<Program> {
     return Ok(Program{commands, functions});
 }
 
-#[test]
-fn multi_word_quote_parse() {
-    assert_eq!(
-        (CompleteStr(""), vec![SymbolType::Say, SymbolType::String("shout let it all out".to_string())]),
-        line(CompleteStr("say \"shout let it all out\"")).unwrap());
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_env_logger;
 
-#[test]
-fn check_evaluate() {
-    pretty_env_logger::try_init().unwrap_or(());
-    assert_eq!(evaluate(&SymbolType::Words(vec!["a".to_string(), "lovestruck".to_string(), "ladykiller".to_string()])).unwrap(), Expression::Integer(100));
-    assert_eq!(evaluate(&SymbolType::Words(vec!["nothing".to_string()])).unwrap(), Expression::Integer(0));
-}
+    #[test]
+    fn multi_word_quote_parse() {
+        assert_eq!(
+            (CompleteStr(""), vec![SymbolType::Say, SymbolType::String("shout let it all out".to_string())]),
+            line(CompleteStr("say \"shout let it all out\"")).unwrap());
+    }
 
-#[test]
-fn check_full_expression_parse() {
-    pretty_env_logger::try_init().unwrap_or(());
-    let expression = Expression::And(
-        Box::new(Expression::Is(
-            Box::new(Expression::Call("Midnight".to_string(), vec![Expression::Variable("my world".to_string()), Expression::Variable("Fire".to_string())])),
-            Box::new(Expression::Integer(0)),
-        )),
-        Box::new(Expression::Is(
-            Box::new(Expression::Call("Midnight".to_string(), vec![Expression::Variable("my world".to_string()), Expression::Variable("Hate".to_string())])),
-            Box::new(Expression::Integer(0))
-        ))
-    );
-    let commands = vec![Command::If{expression: expression, if_end: None}];
-    let functions = HashMap::new();
-    assert_eq!(parse("If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing").unwrap(), Program{commands, functions});
-}
+    #[test]
+    fn check_evaluate() {
+        pretty_env_logger::try_init().unwrap_or(());
+        assert_eq!(evaluate(&SymbolType::Words(vec!["a".to_string(), "lovestruck".to_string(), "ladykiller".to_string()])).unwrap(), Expression::Integer(100));
+        assert_eq!(evaluate(&SymbolType::Words(vec!["nothing".to_string()])).unwrap(), Expression::Integer(0));
+    }
 
-#[test]
-fn check_expression_parse() {
-    pretty_env_logger::try_init().unwrap_or(());
-    let raw_lines = lines(CompleteStr("If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing")).unwrap();
-    assert_eq!(raw_lines, (CompleteStr(""), vec![vec![
-        SymbolType::If, SymbolType::Taking { target: "Midnight".to_string(), args: vec!["my world".to_string(), "Fire".to_string()] }, SymbolType::Is, SymbolType::Integer(0), 
-        SymbolType::And,
-        SymbolType::Taking { target: "Midnight".to_string(), args: vec!["my world".to_string(), "Hate".to_string()] }, SymbolType::Is, SymbolType::Integer(0)]]));
+    #[test]
+    fn check_full_expression_parse() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let expression = Expression::And(
+            Box::new(Expression::Is(
+                Box::new(Expression::Call("Midnight".to_string(), vec![Expression::Variable("my world".to_string()), Expression::Variable("Fire".to_string())])),
+                Box::new(Expression::Integer(0)),
+            )),
+            Box::new(Expression::Is(
+                Box::new(Expression::Call("Midnight".to_string(), vec![Expression::Variable("my world".to_string()), Expression::Variable("Hate".to_string())])),
+                Box::new(Expression::Integer(0))
+            ))
+        );
+        let commands = vec![Command::If{expression: expression, if_end: None}];
+        let functions = HashMap::new();
+        assert_eq!(parse("If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing").unwrap(), Program{commands, functions});
+    }
+
+    #[test]
+    fn check_expression_parse() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let raw_lines = lines(CompleteStr("If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing")).unwrap();
+        assert_eq!(raw_lines, (CompleteStr(""), vec![vec![
+            SymbolType::If, SymbolType::Taking { target: "Midnight".to_string(), args: vec!["my world".to_string(), "Fire".to_string()] }, SymbolType::Is, SymbolType::Integer(0),
+            SymbolType::And,
+            SymbolType::Taking { target: "Midnight".to_string(), args: vec!["my world".to_string(), "Hate".to_string()] }, SymbolType::Is, SymbolType::Integer(0)]]));
+    }
 }
