@@ -60,7 +60,7 @@ named!(word<CompleteStr, SymbolType>,
             other_args: many0!(
                 do_parse!(
                     take_while!(is_space) >>
-                    tag!(",") >>
+                    alt!(tag!(",") | tag_no_case!("and")) >>
                     take_while1!(is_space) >>
                     var: variable >>
                     (var)
