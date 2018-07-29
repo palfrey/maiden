@@ -11,8 +11,6 @@ pub enum Expression {
     Call(String, Vec<Expression>),
     Nothing,
 
-    Dummy, // used by parser only
-
     // binary operators
     Is(Box<Expression>, Box<Expression>),
     Subtract(Box<Expression>, Box<Expression>),
@@ -48,7 +46,7 @@ pub enum SymbolType {
     Integer(u32)
 }
 
-pub static lowest_precedence: SymbolType = SymbolType::Dummy;
+pub static LOWEST_PRECDENCE: SymbolType = SymbolType::Dummy;
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
@@ -84,7 +82,6 @@ error_chain!{
             description("extra text we couldn't parse")
             display("extra unparsed text: '{}'", t)
         }
-        UnbalancedExpression(problem: String)
         MissingVariable(name: String)
         MissingFunction(name: String)
         WrongArgCount(expected: usize, got: usize)

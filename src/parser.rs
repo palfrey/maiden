@@ -140,7 +140,7 @@ named!(lines<CompleteStr, Vec<Vec<SymbolType>>>, many0!(
         take_while1!(is_newline) => {|_| vec![SymbolType::Newline]} |
         do_parse!(
             a_line: line >>
-            take_while_m_n!(0, 1, is_newline) >>
+            opt!(alt!(tag!("\n") | tag!("\r"))) >>
             take_while!(is_space) >>
             (a_line)
         ) => {|l| l }
@@ -244,7 +244,7 @@ fn parse_expression(items: Vec<&SymbolType>) -> Result<Expression> {
     // based off of https://en.wikipedia.org/wiki/Operator-precedence_parser#Pseudo-code
     let describe = format!("{:?}", items);
     debug!("Begin parse: {}", describe);
-    return Ok(parse_expression_1(&items, 0, single_symbol_to_expression(items[0])?, &lowest_precedence)?.0);
+    return Ok(parse_expression_1(&items, 0, single_symbol_to_expression(items[0])?, &LOWEST_PRECDENCE)?.0);
 }
 
 fn parse_expression_1(items: &Vec<&SymbolType>, mut index: usize, mut lhs: Expression, precedence: &SymbolType) -> Result<(Expression, usize)> {

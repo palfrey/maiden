@@ -179,7 +179,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                     }
                 };
             }
-            Command::FunctionDeclaration {name, args, func_end} => {
+            Command::FunctionDeclaration {name: _, args: _, func_end} => {
                 pc = func_end.expect("func_end");
             }
             Command::EndFunction{return_value} => {
@@ -191,9 +191,6 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 if !to_boolean(&resolve) {
                     pc = if_end.expect("if_end");
                 }
-            }
-            _ => {
-                unimplemented!("{:?}", command);
             }
         }
         pc +=1;
