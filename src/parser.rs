@@ -342,7 +342,7 @@ pub fn parse(input: &str) -> Result<Program> {
                     let if_len = commands.len();
                     match commands.index_mut(if_start) {
                         Command::If {expression: _, if_end: ref mut if_end} => {
-                            if_end.get_or_insert(if_len);
+                            if_end.get_or_insert(if_len-1); // because there's not a real next to jump over
                         }
                         _ => {
                             panic!("return to non-if command");

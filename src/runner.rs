@@ -66,7 +66,10 @@ fn run_expression(state: &mut State, program: &Program, expression: &Expression)
         }
         &Expression::Variable(ref name) => {
             match state.variables.get(&name.to_lowercase()) {
-                Some(exp) => Ok(exp.clone()),
+                Some(exp) => {
+                    debug!("Got variable {} with value {:?}", &name, exp);
+                    Ok(exp.clone())
+                }
                 None => {
                     bail!(ErrorKind::MissingVariable(name.clone()));
                 }
@@ -82,7 +85,7 @@ fn run_expression(state: &mut State, program: &Program, expression: &Expression)
                 bail!(ErrorKind::WrongArgCount(func.args.len(), args.len()))
             }
             for i in 0..args.len() {
-                let value = run_expression(state, program, &args[0])?;
+                let value = run_expression(state, program, &args[i])?;
                 state.variables.insert(func.args[i].to_lowercase(), value);
             }
             run_core(state, program, func.location+1)
@@ -104,6 +107,20 @@ pub fn run(program: Program, writer: &mut Write) -> Result<HashMap<String, Expre
         run_core(&mut state, &program, pc)?;
     } // FIXME: Drop once NLL is merged
     return Ok(variables);
+}
+
+fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
+    match value {
+        Expression::Integer(x) => Ok(format!("{}", x)),
+        Expression::String(s) => Ok(s.to_string()),
+        Expression::Variable(x) => {
+            let v = state.variables.get(&x.to_lowercase()).expect(&format!("Can't find '{}'", x)).clone();
+            get_printable(&v, state)
+        }
+        _ => {
+            unimplemented!("Say '{:?}'", value);
+        }
+    }
 }
 
 fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expression)> {
@@ -151,12 +168,10 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 pc = loop_start-1;
             }
             Command::Say {value} => {
-                match value {
-                    Expression::Integer(x) => writeln!(state.writer, "{}", x)?,
-                    Expression::String(s) => writeln!(state.writer, "{}", s)?,
-                    _ => {
-                        warn!("{:?}", value);
-                        unimplemented!();
+                match get_printable(value, state) {
+                    Ok(x) => writeln!(state.writer, "{}", x)?,
+                    Err(_) => {
+                        unimplemented!("Say '{:?}'", value);
                     }
                 };
             }
@@ -168,6 +183,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
             }
             Command::If {expression, if_end} => {
                 let resolve = run_expression(state, program, expression)?;
+                debug!("if: {:?} {:?}", &resolve, expression);
                 if !to_boolean(&resolve) {
                     pc = if_end.expect("if_end");
                 }
