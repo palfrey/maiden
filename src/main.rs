@@ -20,109 +20,113 @@ fn main() {
     println!("Hello, world!");
 }
 
-fn test_program(code: &str, end_variables: HashMap<String, Expression>, expected_output: &str) {
-    pretty_env_logger::try_init().unwrap_or(());
-    let program = parser::parse(code).unwrap();
-    info!("Commands: {:?}", program.commands);
-    let mut writer = Cursor::new(Vec::new());
-    let variables = runner::run(program, &mut writer).unwrap();
-    writer.set_position(0);
-    let res = std::str::from_utf8(writer.get_ref()).unwrap();
-    if res != "" {
-        debug!("{}", res);
-    }
-    assert_eq!(expected_output, res);
-    assert_eq!(end_variables, variables);
-}
-
-// https://gist.github.com/DmitrySoshnikov/8439eac0a09d9fafe55a83c88d049117
-macro_rules! hashmap(
-    { $($key:expr => $value:expr),+, } => {
-        {
-            let mut m = ::std::collections::HashMap::new();
-            $(
-                m.insert($key.to_string(), $value);
-            )+
-            m
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn test_program(code: &str, end_variables: HashMap<String, Expression>, expected_output: &str) {
+        pretty_env_logger::try_init().unwrap_or(());
+        let program = parser::parse(code).unwrap();
+        info!("Commands: {:?}", program.commands);
+        let mut writer = Cursor::new(Vec::new());
+        let variables = runner::run(program, &mut writer).unwrap();
+        writer.set_position(0);
+        let res = std::str::from_utf8(writer.get_ref()).unwrap();
+        if res != "" {
+            debug!("{}", res);
         }
-     };
-);
+        assert_eq!(expected_output, res);
+        assert_eq!(end_variables, variables);
+    }
 
-#[test]
-fn test_counting() {
-    let program = "Limit is 100
-Counter is 0
-Fizz is 3
-Buzz is 5
-Until Counter is Limit
-	Build Counter up
-End";
-    let end_variables = hashmap! {
-        "buzz" => Expression::Integer(5),
-        "limit" => Expression::Integer(100),
-        "counter" => Expression::Integer(100),
-        "fizz" => Expression::Integer(3),
-    };
-    test_program(program, end_variables, "");
-}
+    // https://gist.github.com/DmitrySoshnikov/8439eac0a09d9fafe55a83c88d049117
+    macro_rules! hashmap(
+        { $($key:expr => $value:expr),+, } => {
+            {
+                let mut m = ::std::collections::HashMap::new();
+                $(
+                    m.insert($key.to_string(), $value);
+                )+
+                m
+            }
+        };
+    );
 
-#[test]
-fn test_rocking_counting() {
-    let program = "Desire is a lovestruck ladykiller
-My world is nothing
-Fire is ice
-Hate is water
-Until my world is Desire,
-Build my world up
-And around we go";
-    let end_variables = hashmap! {
-        "my world" => Expression::Integer(100),
-        "fire" => Expression::Integer(3),
-        "hate" => Expression::Integer(5),
-        "desire" => Expression::Integer(100),
-    };
-    test_program(program, end_variables, "");
-}
+    #[test]
+    fn test_counting() {
+        let program = "Limit is 100
+    Counter is 0
+    Fizz is 3
+    Buzz is 5
+    Until Counter is Limit
+        Build Counter up
+    End";
+        let end_variables = hashmap! {
+            "buzz" => Expression::Integer(5),
+            "limit" => Expression::Integer(100),
+            "counter" => Expression::Integer(100),
+            "fizz" => Expression::Integer(3),
+        };
+        test_program(program, end_variables, "");
+    }
 
-#[test]
-fn rocking_fizzbuzz() {
-    let program = "Midnight takes your heart and your soul
-While your heart is as high as your soul
-Put your heart without your soul into your heart
+    #[test]
+    fn test_rocking_counting() {
+        let program = "Desire is a lovestruck ladykiller
+    My world is nothing
+    Fire is ice
+    Hate is water
+    Until my world is Desire,
+    Build my world up
+    And around we go";
+        let end_variables = hashmap! {
+            "my world" => Expression::Integer(100),
+            "fire" => Expression::Integer(3),
+            "hate" => Expression::Integer(5),
+            "desire" => Expression::Integer(100),
+        };
+        test_program(program, end_variables, "");
+    }
 
-Give back your heart
+    #[test]
+    fn rocking_fizzbuzz() {
+        let program = "Midnight takes your heart and your soul
+    While your heart is as high as your soul
+    Put your heart without your soul into your heart
 
-Desire is a lovestruck ladykiller
-My world is nothing
-Fire is ice
-Hate is water
-Until my world is Desire,
-Build my world up
-If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing
-Shout \"FizzBuzz!\"
-Take it to the top
+    Give back your heart
 
-If Midnight taking my world, Fire is nothing
-Shout \"Fizz!\"
-Take it to the top
+    Desire is a lovestruck ladykiller
+    My world is nothing
+    Fire is ice
+    Hate is water
+    Until my world is Desire,
+    Build my world up
+    If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing
+    Shout \"FizzBuzz!\"
+    Take it to the top
 
-If Midnight taking my world, Hate is nothing
-Say \"Buzz!\"
-Take it to the top
+    If Midnight taking my world, Fire is nothing
+    Shout \"Fizz!\"
+    Take it to the top
 
-Whisper my world
-And around we go";
-    let end_variables = hashmap! {
-        "my world" => Expression::Integer(100),
-        "fire" => Expression::Integer(3),
-        "hate" => Expression::Integer(5),
-        "desire" => Expression::Integer(100),
-    };
-    test_program(program, end_variables, "1\n2\nFizz!\n4\nBuzz!\nFizz!\n7\n8\nFizz!\nBuzz!\n11\nFizz!\n13\n14\nFizzBuzz!\n16\n17\nFizz!\n19\nBuzz!\nFizz!\n22\n23\nFizz!\nBuzz!\n26\nFizz!\n28\n29\nFizzBuzz!\n31\n32\nFizz!\n34\nBuzz!\nFizz!\n37\n38\nFizz!\nBuzz!\n41\nFizz!\n43\n44\nFizzBuzz!\n46\n47\nFizz!\n49\nBuzz!\nFizz!\n52\n53\nFizz!\nBuzz!\n56\nFizz!\n58\n59\nFizzBuzz!\n61\n62\nFizz!\n64\nBuzz!\nFizz!\n67\n68\nFizz!\nBuzz!\n71\nFizz!\n73\n74\nFizzBuzz!\n76\n77\nFizz!\n79\nBuzz!\nFizz!\n82\n83\nFizz!\nBuzz!\n86\nFizz!\n88\n89\nFizzBuzz!\n91\n92\nFizz!\n94\nBuzz!\nFizz!\n97\n98\nFizz!\nBuzz!\n");
-}
+    If Midnight taking my world, Hate is nothing
+    Say \"Buzz!\"
+    Take it to the top
 
-#[test]
-fn multi_word_say() {
-    let end_variables = HashMap::new();
-    test_program("say \"shout let it all out\"", end_variables, "shout let it all out\n");
+    Whisper my world
+    And around we go";
+        let end_variables = hashmap! {
+            "my world" => Expression::Integer(100),
+            "fire" => Expression::Integer(3),
+            "hate" => Expression::Integer(5),
+            "desire" => Expression::Integer(100),
+        };
+        test_program(program, end_variables, "1\n2\nFizz!\n4\nBuzz!\nFizz!\n7\n8\nFizz!\nBuzz!\n11\nFizz!\n13\n14\nFizzBuzz!\n16\n17\nFizz!\n19\nBuzz!\nFizz!\n22\n23\nFizz!\nBuzz!\n26\nFizz!\n28\n29\nFizzBuzz!\n31\n32\nFizz!\n34\nBuzz!\nFizz!\n37\n38\nFizz!\nBuzz!\n41\nFizz!\n43\n44\nFizzBuzz!\n46\n47\nFizz!\n49\nBuzz!\nFizz!\n52\n53\nFizz!\nBuzz!\n56\nFizz!\n58\n59\nFizzBuzz!\n61\n62\nFizz!\n64\nBuzz!\nFizz!\n67\n68\nFizz!\nBuzz!\n71\nFizz!\n73\n74\nFizzBuzz!\n76\n77\nFizz!\n79\nBuzz!\nFizz!\n82\n83\nFizz!\nBuzz!\n86\nFizz!\n88\n89\nFizzBuzz!\n91\n92\nFizz!\n94\nBuzz!\nFizz!\n97\n98\nFizz!\nBuzz!\n");
+    }
+
+    #[test]
+    fn multi_word_say() {
+        let end_variables = HashMap::new();
+        test_program("say \"shout let it all out\"", end_variables, "shout let it all out\n");
+    }
 }
