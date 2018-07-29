@@ -84,10 +84,14 @@ named!(word<CompleteStr, SymbolType>,
         alt_complete!(
             tag_no_case!("end") | tag_no_case!("around we go")
         ) => {|_| SymbolType::Next} |
-        tag_no_case!("take it to the top") => {|_| SymbolType::Continue} |
+        alt_complete!(
+            tag_no_case!("take it to the top") | tag_no_case!("continue")
+        ) => {|_| SymbolType::Continue} |
         tag_no_case!("give back") => {|_| SymbolType::Return} |
         tag_no_case!("takes") => {|_| SymbolType::Takes} |
-        tag_no_case!("without") => {|_| SymbolType::Subtract} |
+        alt_complete!(
+            tag_no_case!("without") | tag_no_case!("minus")
+        ) => {|_| SymbolType::Subtract} |
         tag_no_case!("into") => {|_| SymbolType::Where} |
         tag_no_case!("put") => {|_| SymbolType::Put} |
         tag!("nothing") => {|_| SymbolType::Integer(0) } |
@@ -100,6 +104,12 @@ named!(word<CompleteStr, SymbolType>,
             tag!("\"") >>
             (phrase)
         ) => {|p: CompleteStr| SymbolType::String(p.to_string())} |
+        do_parse!(
+            tag!("(") >>
+            take_until!(")") >>
+            tag!(")") >>
+            ()
+        ) => {|_| SymbolType::Comment } |
         take_while1!(is_alphabetic) => {|word: CompleteStr| SymbolType::Words(vec![word.to_string()])}
     ));
 
@@ -359,7 +369,9 @@ pub fn parse(input: &str) -> Result<Program> {
                 let loop_start = loop_starts.last().expect("loop_starts");
                 commands.push(Command::Next { loop_start: *loop_start });
             }
-            [SymbolType::Newline] => {
+            [SymbolType::Newline] |
+            [SymbolType::Comment] => {
+                // Comment on it's own is newline-equivalent
                 if !if_starts.is_empty() {
                     let if_start = if_starts.pop().expect("if_starts");
                     let if_len = commands.len();
@@ -573,5 +585,12 @@ mod tests {
                     target: "Midnight".to_string(),
                     args: vec!["my world".to_string(), "Hate".to_string()] },
                 SymbolType::Is, SymbolType::Integer(0)]]));
+    }
+
+    #[test]
+    fn comment_parsing() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let raw_lines = lines(CompleteStr("(foo bar baz)")).unwrap();
+        assert_eq!(raw_lines.0, CompleteStr(""));
     }
 }

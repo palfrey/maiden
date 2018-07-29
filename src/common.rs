@@ -44,6 +44,7 @@ pub enum SymbolType {
     String(String),
     Words(Vec<String>),
     Integer(u32),
+    Comment,
 }
 
 pub static LOWEST_PRECDENCE: SymbolType = SymbolType::Dummy;

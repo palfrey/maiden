@@ -148,7 +148,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
     let mut total_instr = 0;
     loop {
         total_instr += 1;
-        if total_instr > 1000 {
+        if total_instr > 100000 {
             panic!("Ran out of instr");
         }
         let command = match program.commands.get(pc) {
@@ -167,7 +167,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                     .get(&target.to_lowercase())
                     .expect(&format!("Can't find '{}'", target))
                     .clone();
-                info!("Value of {} is {:?}", target, val);
+                debug!("Value of {} is {:?}", target, val);
                 match val {
                     Expression::Integer(x) => {
                         state.variables.insert(
