@@ -2,21 +2,28 @@ use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
 pub enum Expression {
+    // Single items
     Integer(i32),
     String(String),
     Variable(String),
-    And(Box<Expression>, Box<Expression>),
-    Subtract(Box<Expression>, Box<Expression>),
-    Is(Box<Expression>, Box<Expression>),
-    GreaterThanOrEqual(Box<Expression>, Box<Expression>),
-    Call(String, Vec<Expression>),
     True,
     False,
-    Nothing
+    Call(String, Vec<Expression>),
+    Nothing,
+
+    Dummy, // used by parser only
+
+    // binary operators
+    Is(Box<Expression>, Box<Expression>),
+    Subtract(Box<Expression>, Box<Expression>),
+    And(Box<Expression>, Box<Expression>),
+    GreaterThanOrEqual(Box<Expression>, Box<Expression>),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, PartialOrd)]
 pub enum SymbolType {
+    Dummy,
+    And,
     Is,
     Build,
     Up,
@@ -26,7 +33,6 @@ pub enum SymbolType {
     Continue,
     Return,
     Say,
-    And,
     If,
     Taking{target: String, args: Vec<String>},
     Takes,
@@ -41,6 +47,8 @@ pub enum SymbolType {
     Words(Vec<String>),
     Integer(u32)
 }
+
+pub static lowest_precedence: SymbolType = SymbolType::Dummy;
 
 #[derive(Debug, PartialEq)]
 pub enum Command {

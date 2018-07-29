@@ -200,77 +200,87 @@ fn evaluate(value: &SymbolType) -> Result<Expression> {
     }
 }
 
-fn build_binop(output: &mut Vec<Expression>, describe: &str) -> Result<(Box<Expression>, Box<Expression>)> {
-    if output.len() < 2 {
-        bail!(ErrorKind::UnbalancedExpression(describe.to_string()));
+fn next_operator<'a>(items: &Vec<&'a SymbolType>, mut index: usize) -> Option<(&'a SymbolType, usize)> {
+    loop {
+        let item_poss = items.get(index);
+        if item_poss.is_none() {
+            return None;
+        }
+        let item = item_poss.unwrap();
+        match item {
+            &SymbolType::Is | &SymbolType::GreaterThanOrEqual | &SymbolType::Subtract | &SymbolType::And => {
+                return Some((item, index));
+            }
+            _ => {}
+        }
+        index +=1;
     }
-    let second = output.pop().expect("second");
-    let first = output.pop().expect("first");
-    return Ok((Box::new(first), Box::new(second)));
+}
+
+fn single_symbol_to_expression(sym: &SymbolType) -> Result<Expression> {
+    return match sym {
+        &SymbolType::Words(_) => {
+            evaluate(sym)
+        },
+        &SymbolType::Variable(ref name) => {
+            Ok(Expression::Variable(name.clone()))
+        }
+        &SymbolType::String(ref phrase) => {
+            Ok(Expression::String(phrase.clone()))
+        }
+        &SymbolType::Integer(ref val) => {
+            Ok(Expression::Integer(*val as i32))
+        }
+        &SymbolType::Taking{ref target, ref args} => {
+            Ok(Expression::Call(target.to_string(), args.iter().map(|s| Expression::Variable(s.to_string())).collect()))
+        }
+        _ => {
+            unimplemented!("single symbol: {:?}", sym);
+        }
+    }
 }
 
 fn parse_expression(items: Vec<&SymbolType>) -> Result<Expression> {
-    // based off of https://en.wikipedia.org/wiki/Shunting-yard_algorithm
-    let mut output: Vec<Expression> = Vec::new();
-    let mut operators: Vec<&SymbolType> = Vec::new();
+    // based off of https://en.wikipedia.org/wiki/Operator-precedence_parser#Pseudo-code
     let describe = format!("{:?}", items);
-    for item in items {
-        match item {
-            &SymbolType::Words(_) => {
-                 output.push(evaluate(item)?);
-            },
-            &SymbolType::Is | &SymbolType::GreaterThanOrEqual | &SymbolType::Subtract | &SymbolType::And => {
-                operators.push(item);
-            }
-            &SymbolType::Variable(ref name) => {
-                output.push(Expression::Variable(name.clone()));
-            }
-            &SymbolType::String(ref phrase) => {
-                output.push(Expression::String(phrase.clone()));
-            }
-            &SymbolType::Integer(ref val) => {
-                output.push(Expression::Integer(*val as i32));
-            }
-            &SymbolType::Taking{ref target, ref args} => {
-                output.push(Expression::Call(target.to_string(), args.iter().map(|s| Expression::Variable(s.to_string())).collect()));
-            }
-            _ => {
-                error!("No parse for {:?}", item);
-            }
+    debug!("Begin parse: {}", describe);
+    return Ok(parse_expression_1(&items, 0, single_symbol_to_expression(items[0])?, &lowest_precedence)?.0);
+}
+
+fn parse_expression_1(items: &Vec<&SymbolType>, mut index: usize, mut lhs: Expression, precedence: &SymbolType) -> Result<(Expression, usize)> {
+    debug!("index: {}, lhs: {:?} precedence: {:?}", index, lhs, precedence);
+    let mut lookahead = next_operator(items, index);
+    while lookahead.is_some() && lookahead.unwrap().0 >= precedence {
+        debug!("lookahead: {:?}", lookahead.unwrap());
+        let op = lookahead.unwrap().0;
+        index = if lookahead.is_some() {lookahead.unwrap().1 + 1} else {index};
+        let mut rhs = single_symbol_to_expression(items[index])?;
+        lookahead = next_operator(items, index);
+        while lookahead.is_some() && lookahead.unwrap().0 > op {
+            let res = parse_expression_1(items, index, rhs, &items[lookahead.unwrap().1])?;
+            rhs = res.0;
+            index = res.1;
+            lookahead = next_operator(items, index);
         }
-    }
-    operators.reverse();
-    debug!("operators: {:?}", operators);
-    debug!("output: {:?}", output);
-    for op in operators {
-        match op {
+        lhs = match op {
             &SymbolType::Is => {
-                let (first, second) = build_binop(&mut output, &describe)?;
-                output.push(Expression::Is(first, second));
+                Expression::Is(Box::new(lhs.clone()), Box::new(rhs))
             }
             &SymbolType::GreaterThanOrEqual => {
-                let (first, second) = build_binop(&mut output, &describe)?;
-                output.push(Expression::GreaterThanOrEqual(first, second));
+                Expression::GreaterThanOrEqual(Box::new(lhs.clone()), Box::new(rhs))
             }
             &SymbolType::Subtract => {
-                let (first, second) = build_binop(&mut output, &describe)?;
-                output.push(Expression::Subtract(first, second));
+                Expression::Subtract(Box::new(lhs.clone()), Box::new(rhs))
             }
             &SymbolType::And => {
-                let (first, second) = build_binop(&mut output, &describe)?;
-                output.push(Expression::And(first, second));
+                Expression::And(Box::new(lhs.clone()), Box::new(rhs))
             }
             _ => {
-                error!("No operation for {:?}", op);
+                unimplemented!("No operation for {:?}", op);
             }
         }
     }
-    if output.len() == 1 {
-        return Ok(output[0].clone());
-    }
-    else {
-        bail!(ErrorKind::UnbalancedExpression(describe));
-    }
+    return Ok((lhs.clone(), index));
 }
 
 fn build_next(commands: &mut Vec<Command>, loop_starts: &mut Vec<usize>) {
