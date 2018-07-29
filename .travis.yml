@@ -11,7 +11,7 @@ matrix:
     - rust: nightly
   fast_finish: true
 before_script:
-  - cargo install rustfmt
+  - cargo install rustfmt --force
 script:
   - cargo fmt --all -- --write-mode diff --force
   - cargo build --all
