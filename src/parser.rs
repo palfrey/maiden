@@ -6,7 +6,7 @@ use nom;
 use std::collections::HashMap;
 
 fn is_space(chr: char) -> bool {
-    chr == ' ' || chr == '\t'
+    chr == ' ' || chr == '\t' || chr == '.'
 }
 
 fn is_newline(chr: char) -> bool {
@@ -405,7 +405,7 @@ pub fn parse(input: &str) -> Result<Program> {
                     }
                     commands.push(Command::EndFunction { return_value: Expression::Nothing });
                 } else {
-                    error!("Bad double-newline");
+                    debug!("Double newline that doesn't end anything");
                 }
             }
             _ => {
