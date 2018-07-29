@@ -88,7 +88,11 @@ fn run_expression(state: &mut State, program: &Program, expression: &Expression)
                 let value = run_expression(state, program, &args[i])?;
                 state.variables.insert(func.args[i].to_lowercase(), value);
             }
-            run_core(state, program, func.location+1)
+            let ret = run_core(state, program, func.location+1);
+            for i in 0..func.args.len() {
+                state.variables.remove(&func.args[i].to_lowercase());
+            }
+            ret
         }
         _ => {
             unimplemented!("No runner for {:?}", expression);
