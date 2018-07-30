@@ -30,7 +30,7 @@ fn run_mathbinop(
     program: &Program,
     first: &Expression,
     second: &Expression,
-    f: fn(i32, i32) -> i32,
+    f: fn(i128, i128) -> i128,
 ) -> Result<Expression> {
     let res_first = run_expression(state, program, first.deref())?;
     let res_second = run_expression(state, program, second.deref())?;
@@ -58,11 +58,34 @@ fn to_boolean(expression: &Expression) -> bool {
     }
 }
 
+fn call_function(state: &mut State, program: &Program, target: &str, args: &Vec<Expression>) -> Result<Expression> {
+    let func_wrap = program.functions.get(target);
+    if func_wrap.is_none() {
+        bail!(ErrorKind::MissingFunction(target.to_string()));
+    }
+    let func = func_wrap.unwrap();
+    if args.len() != func.args.len() {
+        bail!(ErrorKind::WrongArgCount(func.args.len(), args.len()))
+    }
+    for i in 0..args.len() {
+        let value = run_expression(state, program, &args[i])?;
+        state.variables.insert(func.args[i].to_lowercase(), value);
+    }
+    let ret = run_core(state, program, func.location + 1);
+    for i in 0..func.args.len() {
+        state.variables.remove(&func.args[i].to_lowercase());
+    }
+    ret
+}
+
 fn run_expression(state: &mut State, program: &Program, expression: &Expression) -> Result<Expression> {
     debug!("Expression: {:?}", expression);
     return match expression {
         &Expression::Is(ref first, ref second) => {
             return run_binop(state, program, first, second, |f, s| f == s);
+        }
+        &Expression::Aint(ref first, ref second) => {
+            return run_binop(state, program, first, second, |f, s| f != s);
         }
         &Expression::And(ref first, ref second) => {
             return run_binop(state, program, first, second, |f, s| {
@@ -72,8 +95,20 @@ fn run_expression(state: &mut State, program: &Program, expression: &Expression)
         &Expression::GreaterThanOrEqual(ref first, ref second) => {
             return run_binop(state, program, first, second, |f, s| f >= s);
         }
+        &Expression::GreaterThan(ref first, ref second) => {
+            return run_binop(state, program, first, second, |f, s| f > s);
+        }
+        &Expression::LessThan(ref first, ref second) => {
+            return run_binop(state, program, first, second, |f, s| f < s);
+        }
         &Expression::Subtract(ref first, ref second) => {
             return run_mathbinop(state, program, first, second, |f, s| f - s);
+        }
+        &Expression::Add(ref first, ref second) => {
+            return run_mathbinop(state, program, first, second, |f, s| f + s);
+        }
+        &Expression::Times(ref first, ref second) => {
+            return run_mathbinop(state, program, first, second, |f, s| f * s);
         }
         &Expression::String(_) |
         &Expression::Integer(_) => Ok(expression.clone()),
@@ -88,25 +123,7 @@ fn run_expression(state: &mut State, program: &Program, expression: &Expression)
                 }
             }
         }
-        &Expression::Call(ref target, ref args) => {
-            let func_wrap = program.functions.get(target);
-            if func_wrap.is_none() {
-                bail!(ErrorKind::MissingFunction(target.clone()));
-            }
-            let func = func_wrap.unwrap();
-            if args.len() != func.args.len() {
-                bail!(ErrorKind::WrongArgCount(func.args.len(), args.len()))
-            }
-            for i in 0..args.len() {
-                let value = run_expression(state, program, &args[i])?;
-                state.variables.insert(func.args[i].to_lowercase(), value);
-            }
-            let ret = run_core(state, program, func.location + 1);
-            for i in 0..func.args.len() {
-                state.variables.remove(&func.args[i].to_lowercase());
-            }
-            ret
-        }
+        &Expression::Call(ref target, ref args) => call_function(state, program, target, args),
         _ => {
             unimplemented!("No runner for {:?}", expression);
         }
@@ -144,6 +161,26 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
     }
 }
 
+fn alter_variable(state: &mut State, target: &str, f: &Fn(i128) -> i128) {
+    let val = state
+        .variables
+        .get(&target.to_lowercase())
+        .expect(&format!("Can't find '{}'", target))
+        .clone();
+    debug!("Value of {} is {:?}", target, val);
+    match val {
+        Expression::Integer(x) => {
+            state.variables.insert(
+                target.to_lowercase(),
+                Expression::Integer(f(x)),
+            );
+        }
+        _ => {
+            error!("Attempt to alter non-integer '{}'", target);
+        }
+    };
+}
+
 fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expression)> {
     let mut total_instr = 0;
     loop {
@@ -162,23 +199,10 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 state.variables.insert(target.to_lowercase(), val);
             }
             Command::Increment { target } => {
-                let val = state
-                    .variables
-                    .get(&target.to_lowercase())
-                    .expect(&format!("Can't find '{}'", target))
-                    .clone();
-                debug!("Value of {} is {:?}", target, val);
-                match val {
-                    Expression::Integer(x) => {
-                        state.variables.insert(
-                            target.to_lowercase(),
-                            Expression::Integer(x + 1),
-                        );
-                    }
-                    _ => {
-                        error!("Attempt to increment non-integer '{}'", target);
-                    }
-                };
+                alter_variable(state, target, &|x| x + 1);
+            }
+            Command::Decrement { target } => {
+                alter_variable(state, target, &|x| x - 1);
             }
             Command::Until {
                 expression,
@@ -225,6 +249,9 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 if !to_boolean(&resolve) {
                     pc = if_end.expect("if_end");
                 }
+            }
+            Command::Call { name, args } => {
+                call_function(state, program, name, args)?;
             }
         }
         pc += 1;

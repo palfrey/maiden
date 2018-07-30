@@ -3,7 +3,7 @@ use std::collections::HashMap;
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
 pub enum Expression {
     // Single items
-    Integer(i32),
+    Integer(i128),
     String(String),
     Variable(String),
     True,
@@ -13,9 +13,14 @@ pub enum Expression {
 
     // binary operators
     Is(Box<Expression>, Box<Expression>),
+    Aint(Box<Expression>, Box<Expression>),
+    Add(Box<Expression>, Box<Expression>),
     Subtract(Box<Expression>, Box<Expression>),
+    Times(Box<Expression>, Box<Expression>),
     And(Box<Expression>, Box<Expression>),
     GreaterThanOrEqual(Box<Expression>, Box<Expression>),
+    GreaterThan(Box<Expression>, Box<Expression>),
+    LessThan(Box<Expression>, Box<Expression>),
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd)]
@@ -25,6 +30,8 @@ pub enum SymbolType {
     Is,
     Build,
     Up,
+    Knock,
+    Down,
     Until,
     While,
     Next,
@@ -35,11 +42,16 @@ pub enum SymbolType {
     Taking { target: String, args: Vec<String> },
     Takes,
     Comma,
+    GreaterThanOrEqual,
+    GreaterThan,
+    LessThan,
+    Add,
     Subtract,
+    Times,
     Put,
     Where,
     Newline,
-    GreaterThanOrEqual,
+    Aint,
     Variable(String),
     String(String),
     Words(Vec<String>),
@@ -65,6 +77,7 @@ pub enum Command {
         if_end: Option<usize>,
     },
     Increment { target: String },
+    Decrement { target: String },
     Next { loop_start: usize },
     Say { value: Expression },
     FunctionDeclaration {
@@ -73,6 +86,7 @@ pub enum Command {
         func_end: Option<usize>,
     },
     EndFunction { return_value: Expression },
+    Call { name: String, args: Vec<Expression> },
 }
 
 #[derive(Debug, PartialEq)]
@@ -99,5 +113,6 @@ error_chain!{
         MissingVariable(name: String)
         MissingFunction(name: String)
         WrongArgCount(expected: usize, got: usize)
+        UnbalancedExpression(description: String)
     }
 }

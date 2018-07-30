@@ -11,7 +11,7 @@ fn main() {
     for path in paths {
         let name = path.unwrap().file_name().into_string().unwrap();
         if name.ends_with(".rock") {
-            let test_name = name.replace(".", "_");
+            let test_name = name.replace(".", "_").replace("-", "_");
             write!(
                 f,
                 "
