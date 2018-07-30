@@ -522,6 +522,7 @@ pub fn parse(input: &str) -> Result<Program> {
                                     Some(sym) => {
                                         if sym != &SymbolType::And {
                                             error!("Bad 'function declaration' section: {:?} {:?}", sym, section);
+                                            break;
                                         }
                                     }
                                     None => {
@@ -530,6 +531,7 @@ pub fn parse(input: &str) -> Result<Program> {
                                 }
                             } else {
                                 error!("Bad 'function declaration' section: {:?}", section);
+                                break;
                             }
                         }
                         func_starts.push(commands.len());
