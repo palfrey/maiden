@@ -1,9 +1,10 @@
 use std::collections::HashMap;
+use num_bigint::BigInt;
 
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
 pub enum Expression {
     // Single items
-    Integer(i128),
+    Integer(BigInt),
     String(String),
     Variable(String),
     True,

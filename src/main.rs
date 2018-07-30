@@ -9,6 +9,8 @@ extern crate pretty_env_logger;
 extern crate error_chain;
 extern crate clap;
 extern crate regex;
+extern crate num_bigint;
+extern crate num_traits;
 
 mod common;
 mod parser;
@@ -46,6 +48,7 @@ mod tests {
     use std::io::Cursor;
     use std::collections::HashMap;
     use common::Expression;
+    use num_bigint::ToBigInt;
 
     fn test_program(code: &str, end_variables: HashMap<String, Expression>, expected_output: &str) {
         pretty_env_logger::try_init().unwrap_or(());
@@ -86,10 +89,10 @@ mod tests {
     End";
         let end_variables =
             hashmap! {
-            "buzz" => Expression::Integer(5),
-            "limit" => Expression::Integer(100),
-            "counter" => Expression::Integer(100),
-            "fizz" => Expression::Integer(3),
+            "buzz" => Expression::Integer(5i32.to_bigint().unwrap()),
+            "limit" => Expression::Integer(100i32.to_bigint().unwrap()),
+            "counter" => Expression::Integer(100i32.to_bigint().unwrap()),
+            "fizz" => Expression::Integer(3i32.to_bigint().unwrap()),
         };
         test_program(program, end_variables, "");
     }
@@ -105,10 +108,10 @@ mod tests {
     And around we go";
         let end_variables =
             hashmap! {
-            "my world" => Expression::Integer(100),
-            "fire" => Expression::Integer(3),
-            "hate" => Expression::Integer(5),
-            "desire" => Expression::Integer(100),
+            "my world" => Expression::Integer(100i32.to_bigint().unwrap()),
+            "fire" => Expression::Integer(3i32.to_bigint().unwrap()),
+            "hate" => Expression::Integer(5i32.to_bigint().unwrap()),
+            "desire" => Expression::Integer(100i32.to_bigint().unwrap()),
         };
         test_program(program, end_variables, "");
     }
@@ -143,10 +146,10 @@ mod tests {
     And around we go";
         let end_variables =
             hashmap! {
-            "my world" => Expression::Integer(100),
-            "fire" => Expression::Integer(3),
-            "hate" => Expression::Integer(5),
-            "desire" => Expression::Integer(100),
+            "my world" => Expression::Integer(100i32.to_bigint().unwrap()),
+            "fire" => Expression::Integer(3i32.to_bigint().unwrap()),
+            "hate" => Expression::Integer(5i32.to_bigint().unwrap()),
+            "desire" => Expression::Integer(100i32.to_bigint().unwrap()),
         };
         test_program(
             program,

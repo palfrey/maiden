@@ -2,6 +2,7 @@ use common::*;
 use std::io::Write;
 use std::collections::HashMap;
 use std::ops::Deref;
+use num_bigint::BigInt;
 
 struct State<'a> {
     writer: &'a mut Write,
@@ -30,14 +31,14 @@ fn run_mathbinop(
     program: &Program,
     first: &Expression,
     second: &Expression,
-    f: fn(i128, i128) -> i128,
+    f: fn(&BigInt, &BigInt) -> BigInt,
 ) -> Result<Expression> {
     let res_first = run_expression(state, program, first.deref())?;
     let res_second = run_expression(state, program, second.deref())?;
     debug!("first: {:?} second: {:?}", res_first, res_second);
     // one if-let per if apparently, until https://github.com/rust-lang/rfcs/issues/929 gets resolved
-    if let Expression::Integer(f_i) = res_first {
-        if let Expression::Integer(s_i) = res_second {
+    if let Expression::Integer(ref f_i) = res_first {
+        if let Expression::Integer(ref s_i) = res_second {
             return Ok(Expression::Integer(f(f_i, s_i)));
         }
     }
@@ -161,7 +162,7 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
     }
 }
 
-fn alter_variable(state: &mut State, target: &str, f: &Fn(i128) -> i128) {
+fn alter_variable(state: &mut State, target: &str, f: &Fn(BigInt) -> BigInt) {
     let val = state
         .variables
         .get(&target.to_lowercase())

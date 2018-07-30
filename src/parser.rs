@@ -5,6 +5,8 @@ use common::*;
 use nom;
 use std::collections::HashMap;
 use regex::Regex;
+use num_bigint::{BigInt, ToBigInt};
+use num_traits::identities::Zero;
 
 fn is_space(chr: char) -> bool {
     chr == ' ' || chr == '\t' || chr == '.'
@@ -270,17 +272,17 @@ fn evaluate(value: &SymbolType) -> Result<Expression> {
         SymbolType::Words(words) => {
             if words.len() == 1 {
                 if words[0] == "nothing" {
-                    return Ok(Expression::Integer(0));
+                    return Ok(Expression::Integer(BigInt::zero()));
                 }
                 let as_int = words[0].parse::<i128>();
                 if let Ok(int) = as_int {
-                    return Ok(Expression::Integer(int));
+                    return Ok(Expression::Integer(int.to_bigint().unwrap()));
                 }
             }
-            let mut number = 0i128;
+            let mut number = BigInt::zero();
             for word in words {
                 number *= 10;
-                let len: i128 = (word.len() % 10) as i128;
+                let len: i16 = (word.len() % 10) as i16;
                 number += len;
             }
             return Ok(Expression::Integer(number));
@@ -325,7 +327,7 @@ fn single_symbol_to_expression(sym: &SymbolType) -> Result<Expression> {
         &SymbolType::Words(_) => evaluate(sym),
         &SymbolType::Variable(ref name) => Ok(Expression::Variable(name.clone())),
         &SymbolType::String(ref phrase) => Ok(Expression::String(phrase.clone())),
-        &SymbolType::Integer(ref val) => Ok(Expression::Integer(*val as i128)),
+        &SymbolType::Integer(ref val) => Ok(Expression::Integer(val.to_bigint().unwrap())),
         &SymbolType::Taking {
             ref target,
             ref args,
@@ -638,9 +640,9 @@ mod tests {
         assert_eq!(
             evaluate(&SymbolType::Words(
                 vec!["a".to_string(), "lovestruck".to_string(), "ladykiller".to_string()])).unwrap(),
-            Expression::Integer(100)
+            Expression::Integer(100i32.to_bigint().unwrap())
         );
-        assert_eq!(evaluate(&SymbolType::Words(vec!["nothing".to_string()])).unwrap(), Expression::Integer(0));
+        assert_eq!(evaluate(&SymbolType::Words(vec!["nothing".to_string()])).unwrap(), Expression::Integer(0i32.to_bigint().unwrap()));
     }
 
     #[test]
@@ -652,14 +654,14 @@ mod tests {
                     "Midnight".to_string(),
                     vec![Expression::Variable("my world".to_string()), Expression::Variable("Fire".to_string())],
                 )),
-                Box::new(Expression::Integer(0)),
+                Box::new(Expression::Integer(BigInt::zero())),
             )),
             Box::new(Expression::Is(
                 Box::new(Expression::Call(
                     "Midnight".to_string(),
                     vec![Expression::Variable("my world".to_string()), Expression::Variable("Hate".to_string())],
                 )),
-                Box::new(Expression::Integer(0)),
+                Box::new(Expression::Integer(BigInt::zero())),
             )),
         );
         let commands = vec![Command::If{expression: expression, if_end: None}];
