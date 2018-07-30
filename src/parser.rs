@@ -26,13 +26,24 @@ fn word_character(chr: char) -> bool {
     (chr >= 'A' && chr <= 'Z') || (chr >= 'a' && chr <= 'z')
 }
 
-named!(proper_variable<CompleteStr, String>,
-    do_parse!( // FIXME: Expand to multi-word Proper variables
+named!(title_case<CompleteStr, String>,
+    do_parse!(
+        not!(keyword) >> // to shortcut the "Until Counter" case
         first: take_while_m_n!(1, 1, char::is_uppercase) >>
         rest: take_while1!(char::is_lowercase) >>
         (format!("{}{}", first, rest))
-    )
-);
+    ));
+
+named!(proper_variable<CompleteStr, String>,
+    do_parse!(
+        first: title_case >>
+        rest: many0!(do_parse!(
+            take_while1!(is_space) >>
+            word: title_case >>
+            (word)
+        )) >>
+        (format!("{}{}{}", first, if rest.is_empty() {""} else {" "}, rest.join(" ")))
+    ));
 
 named!(variable<CompleteStr, String>, alt_complete!(
     do_parse!(
@@ -50,29 +61,34 @@ named!(variable<CompleteStr, String>, alt_complete!(
     proper_variable => {|s| s }
 ));
 
+named!(keyword<CompleteStr, CompleteStr>, // single-words only
+    alt_complete!(
+        tag_no_case!("and") |
+        tag_no_case!("build") |
+        tag_no_case!("end") |
+        tag_no_case!("if") |
+        tag_no_case!("into") |
+        tag_no_case!("is") |
+        tag_no_case!("minus") |
+        tag_no_case!("put") |
+        tag_no_case!("say") |
+        tag_no_case!("shout") |
+        tag_no_case!("takes") |
+        tag_no_case!("until") |
+        tag_no_case!("up") |
+        tag_no_case!("was") |
+        tag_no_case!("while") |
+        tag_no_case!("whisper") |
+        tag_no_case!("without")
+    )
+);
+
 named!(word<CompleteStr, SymbolType>,
     alt_complete!(
-        do_parse!(
-            target: variable >>
-            take_while1!(is_space) >>
-            tag_no_case!("taking") >>
-            take_while1!(is_space) >>
-            first_arg: variable >>
-            other_args: many0!(
-                do_parse!(
-                    take_while!(is_space) >>
-                    alt!(tag!(",") | tag_no_case!("and")) >>
-                    take_while1!(is_space) >>
-                    var: variable >>
-                    (var)
-                )) >>
-            (target, first_arg, other_args)
-        ) => {|(target, first_arg, mut other_args): (String, String, Vec<String>)| {
-            other_args.insert(0, first_arg);
-            SymbolType::Taking{target, args: other_args}
-        }} |
         tag_no_case!("is as high as") => {|_| SymbolType::GreaterThanOrEqual} |
-        tag_no_case!("is") => {|_| SymbolType::Is} |
+        alt_complete!(
+            tag_no_case!("is") | tag_no_case!("was")
+        ) => {|_| SymbolType::Is} |
         tag_no_case!("if") => {|_| SymbolType::If} |
         tag_no_case!("build") => {|_| SymbolType::Build} |
         tag_no_case!("up") => {|_| SymbolType::Up} |
@@ -95,7 +111,26 @@ named!(word<CompleteStr, SymbolType>,
         ) => {|_| SymbolType::Subtract} |
         tag_no_case!("into") => {|_| SymbolType::Where} |
         tag_no_case!("put") => {|_| SymbolType::Put} |
-        tag!("nothing") => {|_| SymbolType::Integer(0) } |
+        tag_no_case!("nothing") => {|_| SymbolType::Integer(0) } |
+        do_parse!(
+            target: variable >>
+            take_while1!(is_space) >>
+            tag_no_case!("taking") >>
+            take_while1!(is_space) >>
+            first_arg: variable >>
+            other_args: many0!(
+                do_parse!(
+                    take_while!(is_space) >>
+                    alt!(tag!(",") | tag_no_case!("and")) >>
+                    take_while1!(is_space) >>
+                    var: variable >>
+                    (var)
+                )) >>
+            (target, first_arg, other_args)
+        ) => {|(target, first_arg, mut other_args): (String, String, Vec<String>)| {
+            other_args.insert(0, first_arg);
+            SymbolType::Taking{target, args: other_args}
+        }} |
         take_while1!(char::is_numeric) => {|n: CompleteStr| SymbolType::Integer(n.parse::<u32>().unwrap())} |
         variable => {|s| SymbolType::Variable(s) } |
         tag!(",") => {|_| SymbolType::Comma} |
@@ -118,7 +153,7 @@ named!(poetic_number_literal_core<CompleteStr, (String, Vec<CompleteStr>)>,
     do_parse!(
         pv: proper_variable >>
         take_while1!(is_space) >>
-        tag_no_case!("is") >>
+        tag!("is") >>
         words: many1!(
             do_parse!(
                 take_while1!(is_space) >>
@@ -612,5 +647,22 @@ mod tests {
         pretty_env_logger::try_init().unwrap_or(());
         let raw_lines = lines("ain't").unwrap();
         assert_eq!(raw_lines, (String::from(""), vec![vec![SymbolType::Words(vec!["aint".to_string()])]]));
+    }
+
+    #[test]
+    fn multi_word_proper_variable(){
+        pretty_env_logger::try_init().unwrap_or(());
+        let raw_lines = lines("Liftin High takes the spirit and greatness").unwrap();
+        assert_eq!(raw_lines, (String::from(""), vec![vec![SymbolType::Variable("Liftin High".to_string()),
+            SymbolType::Takes, SymbolType::Variable("the spirit".to_string()), 
+            SymbolType::And, SymbolType::Words(vec!["greatness".to_string()])]]));
+    }
+
+    #[test]
+    fn not_proper_variable() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let raw_lines = lines("Until Counter is Limit").unwrap();
+        assert_eq!(raw_lines, (String::from(""), vec![vec![
+            SymbolType::Until, SymbolType::Variable("Counter".to_string()), SymbolType::Is, SymbolType::Variable("Limit".to_string())]]));
     }
 }
