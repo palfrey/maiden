@@ -217,7 +217,7 @@ named!(pub line<CompleteStr, Vec<SymbolType>>, alt_complete!(
 named!(lines_core<CompleteStr, Vec<Vec<SymbolType>>>, many0!(
     alt!(
         do_parse!(
-            take_while1!(is_newline) >>
+            alt!(tag!("\n") | tag!("\r")) >>
             take_while!(is_space) >>
             ()
         ) => {|_| vec![SymbolType::Newline]} |
