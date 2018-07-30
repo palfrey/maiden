@@ -4,6 +4,7 @@ use std::ops::Deref;
 use common::*;
 use nom;
 use std::collections::HashMap;
+use regex::Regex;
 
 fn is_space(chr: char) -> bool {
     chr == ' ' || chr == '\t' || chr == '.'
@@ -21,7 +22,7 @@ fn string_character(chr: char) -> bool {
     !is_newline(chr) && !is_quote(chr)
 }
 
-fn is_alphabetic(chr: char) -> bool {
+fn word_character(chr: char) -> bool {
     (chr >= 'A' && chr <= 'Z') || (chr >= 'a' && chr <= 'z')
 }
 
@@ -110,7 +111,7 @@ named!(word<CompleteStr, SymbolType>,
             tag!(")") >>
             ()
         ) => {|_| SymbolType::Comment } |
-        take_while1!(is_alphabetic) => {|word: CompleteStr| SymbolType::Words(vec![word.to_string()])}
+        take_while1!(word_character) => {|word: CompleteStr| SymbolType::Words(vec![word.to_string()])}
     ));
 
 named!(poetic_number_literal_core<CompleteStr, (String, Vec<CompleteStr>)>,
@@ -121,7 +122,7 @@ named!(poetic_number_literal_core<CompleteStr, (String, Vec<CompleteStr>)>,
         words: many1!(
             do_parse!(
                 take_while1!(is_space) >>
-                word: take_while1!(is_alphabetic) >>
+                word: take_while1!(word_character) >>
                 (word)
             )
         ) >>
@@ -147,7 +148,7 @@ named!(pub line<CompleteStr, Vec<SymbolType>>, alt_complete!(
     )) => {|s| s }
 ));
 
-named!(lines<CompleteStr, Vec<Vec<SymbolType>>>, many0!(
+named!(lines_core<CompleteStr, Vec<Vec<SymbolType>>>, many0!(
     alt!(
         do_parse!(
             take_while1!(is_newline) >>
@@ -161,6 +162,18 @@ named!(lines<CompleteStr, Vec<Vec<SymbolType>>>, many0!(
             (a_line)
         ) => {|l| l }
     )));
+
+fn lines(input: &str) -> nom::IResult<String, Vec<Vec<SymbolType>>> {
+    let re = Regex::new(r"'s\W+").unwrap();
+    let fixed_contractions = re.replace_all(input, " is ").into_owned().replace("'", "");
+    let complete: CompleteStr = CompleteStr(&fixed_contractions);
+    return match lines_core(complete) {
+        Ok(ret) => Ok((ret.0.to_string(), ret.1)),
+        Err(_) => {
+            unimplemented!();
+        }
+    }
+}
 
 fn compact_words(line: Vec<SymbolType>) -> Vec<SymbolType> {
     let mut symbols: Vec<SymbolType> = Vec::new();
@@ -335,7 +348,7 @@ fn build_next(commands: &mut Vec<Command>, loop_starts: &mut Vec<usize>) {
 }
 
 pub fn parse(input: &str) -> Result<Program> {
-    let raw_lines = lines(CompleteStr(input)).unwrap();
+    let raw_lines = lines(input).unwrap();
     if raw_lines.0.len() > 0 {
         bail!(ErrorKind::UnparsedText(raw_lines.0.deref().to_string()));
     }
@@ -570,10 +583,10 @@ mod tests {
     #[test]
     fn check_expression_parse() {
         pretty_env_logger::try_init().unwrap_or(());
-        let raw_lines = lines(CompleteStr(
+        let raw_lines = lines(
             "If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing",
-        )).unwrap();
-        assert_eq!(raw_lines, (CompleteStr(""), vec![vec![
+        ).unwrap();
+        assert_eq!(raw_lines, (String::from(""), vec![vec![
             SymbolType::If,
                 SymbolType::Taking {
                     target: "Midnight".to_string(),
@@ -590,7 +603,14 @@ mod tests {
     #[test]
     fn comment_parsing() {
         pretty_env_logger::try_init().unwrap_or(());
-        let raw_lines = lines(CompleteStr("(foo bar baz)")).unwrap();
-        assert_eq!(raw_lines.0, CompleteStr(""));
+        let raw_lines = lines("(foo bar baz)").unwrap();
+        assert_eq!(raw_lines.0, String::from(""));
+    }
+
+    #[test]
+    fn aint_parsing() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let raw_lines = lines("ain't").unwrap();
+        assert_eq!(raw_lines, (String::from(""), vec![vec![SymbolType::Words(vec!["aint".to_string()])]]));
     }
 }
