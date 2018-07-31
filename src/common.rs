@@ -52,6 +52,7 @@ pub enum SymbolType {
     Where,
     Newline,
     Aint,
+    Else,
     Variable(String),
     String(String),
     Words(Vec<String>),

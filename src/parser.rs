@@ -66,6 +66,7 @@ named!(keyword<CompleteStr, CompleteStr>, // single-words only
         tag_no_case!("and") |
         tag_no_case!("build") |
         tag_no_case!("end") |
+        tag_no_case!("else") |
         tag_no_case!("if") |
         tag_no_case!("into") |
         tag_no_case!("is") |
@@ -153,6 +154,7 @@ named!(word<CompleteStr, SymbolType>,
         ) => {|_| SymbolType::Times } |
         tag_no_case!("into") => {|_| SymbolType::Where} |
         tag_no_case!("put") => {|_| SymbolType::Put} |
+        tag_no_case!("else") => {|_| SymbolType::Else} |
         tag_no_case!("nothing") => {|_| SymbolType::Integer(0) } |
         do_parse!(
             target: variable >>
@@ -272,7 +274,6 @@ fn compact_words(line: Vec<SymbolType>) -> Vec<SymbolType> {
     if !words.is_empty() {
         symbols.push(SymbolType::Words(words));
     }
-    debug!("{:?}", symbols);
     return symbols;
 }
 
