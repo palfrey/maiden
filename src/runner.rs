@@ -229,7 +229,8 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 pc = loop_start - 1;
             }
             Command::Say { value } => {
-                match get_printable(value, state) {
+                let resolve = run_expression(state, program, value)?;
+                match get_printable(&resolve, state) {
                     Ok(x) => writeln!(state.writer, "{}", x)?,
                     Err(_) => {
                         unimplemented!("Say '{:?}'", value);
