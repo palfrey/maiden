@@ -67,14 +67,17 @@ fn call_function(state: &mut State, program: &Program, target: &str, args: &Vec<
     if args.len() != func.args.len() {
         bail!(ErrorKind::WrongArgCount(func.args.len(), args.len()))
     }
+
+    let mut new_variables = state.variables.clone();
+    let mut new_state = State {
+        writer: state.writer,
+        variables: &mut new_variables
+    };
     for i in 0..args.len() {
-        let value = run_expression(state, program, &args[i])?;
-        state.variables.insert(func.args[i].to_lowercase(), value);
+        let value = run_expression(&mut new_state, program, &args[i])?;
+        new_state.variables.insert(func.args[i].to_lowercase(), value);
     }
-    let ret = run_core(state, program, func.location + 1);
-    for i in 0..func.args.len() {
-        state.variables.remove(&func.args[i].to_lowercase());
-    }
+    let ret = run_core(&mut new_state, program, func.location + 1);
     ret
 }
 
