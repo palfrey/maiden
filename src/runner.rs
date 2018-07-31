@@ -71,11 +71,14 @@ fn call_function(state: &mut State, program: &Program, target: &str, args: &Vec<
     let mut new_variables = state.variables.clone();
     let mut new_state = State {
         writer: state.writer,
-        variables: &mut new_variables
+        variables: &mut new_variables,
     };
     for i in 0..args.len() {
         let value = run_expression(&mut new_state, program, &args[i])?;
-        new_state.variables.insert(func.args[i].to_lowercase(), value);
+        new_state.variables.insert(
+            func.args[i].to_lowercase(),
+            value,
+        );
     }
     let ret = run_core(&mut new_state, program, func.location + 1);
     ret
