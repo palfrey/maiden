@@ -87,12 +87,23 @@ named!(keyword<CompleteStr, CompleteStr>, // single-words only
 
 named!(word<CompleteStr, SymbolType>,
     alt_complete!(
-        tag_no_case!("is as high as") => {|_| SymbolType::GreaterThanOrEqual} |
+        do_parse!(
+            tag_no_case!("is") >>
+            take_while1!(is_space) >>
+            tag_no_case!("as") >>
+            take_while1!(is_space) >>
+            alt_complete!(
+                tag_no_case!("high") | tag_no_case!("strong") | tag_no_case!("big")
+            ) >>
+            take_while1!(is_space) >>
+            tag_no_case!("as") >>
+            (())
+        ) => {|_| SymbolType::GreaterThanOrEqual} |
         do_parse!(
             tag_no_case!("is") >>
             take_while1!(is_space) >>
             alt_complete!(
-                tag_no_case!("less") | tag_no_case!("weaker") | tag_no_case!("lower")
+                tag_no_case!("less") | tag_no_case!("weaker") | tag_no_case!("lower") | tag_no_case!("smaller")
             ) >>
             take_while1!(is_space) >>
             tag_no_case!("than") >>
@@ -102,7 +113,7 @@ named!(word<CompleteStr, SymbolType>,
             tag_no_case!("is") >>
             take_while1!(is_space) >>
             alt_complete!(
-                tag_no_case!("higher") | tag_no_case!("stronger") | tag_no_case!("bigger")
+                tag_no_case!("higher") | tag_no_case!("stronger") | tag_no_case!("bigger") | tag_no_case!("greater")
             ) >>
             take_while1!(is_space) >>
             tag_no_case!("than") >>
@@ -609,7 +620,7 @@ pub fn parse(input: &str) -> Result<Program> {
                     let expression = parse_expression(expression_seq)?;
                     commands.push(Command::EndFunction { return_value: expression });
                 } else {
-                    error!("Don't recognise command sequence {:?}", section);
+                    panic!("Don't recognise command sequence {:?}", section);
                 }
             }
         }
