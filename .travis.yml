@@ -2,7 +2,6 @@ dist: trusty
 sudo: false
 language: rust
 cache: cargo
-rust: # for allow_failures
 matrix:
   include:
     - rust: stable
@@ -12,6 +11,7 @@ matrix:
       script: cargo build --all && cargo test --all
     - name: "web"
       rust: nightly
+      before_script: cargo install cargo-web
       script: cargo web build
     - rust: nightly
       script: cargo build --all && cargo test --all
