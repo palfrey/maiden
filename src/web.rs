@@ -21,7 +21,7 @@ impl Component<Context> for Model {
     fn create(_: Self::Properties, _: &mut Env<Context, Self>) -> Self {
         Model {
             value: "".into(),
-            program: "".into()
+            program: "".into(),
         }
     }
 
