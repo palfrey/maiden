@@ -1,8 +1,10 @@
 use yew::prelude::*;
+use parser;
 
 type Context = ();
 pub struct Model {
     value: String,
+    program: String,
 }
 
 pub enum Msg {
@@ -19,6 +21,7 @@ impl Component<Context> for Model {
     fn create(_: Self::Properties, _: &mut Env<Context, Self>) -> Self {
         Model {
             value: "".into(),
+            program: "".into()
         }
     }
 
@@ -28,7 +31,8 @@ impl Component<Context> for Model {
                 self.value = new_value;
             }
             Msg::ClickRun => {
-                // Update your model on events
+                let program = parser::parse(&self.value);
+                self.program = format!("{:?}", program);
             }
         }
         true
@@ -48,7 +52,7 @@ impl Renderable<Context, Model> for Model {
                      <button onclick=|_| Msg::ClickRun,>{ "run program" }</button>
                 </div>
                 <div>
-                    {&self.value}
+                    {&self.program}
                 </div>
             </div>
         }

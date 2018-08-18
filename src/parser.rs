@@ -621,7 +621,7 @@ pub fn parse(input: &str) -> Result<Program> {
                     let expression = parse_expression(expression_seq)?;
                     commands.push(Command::EndFunction { return_value: expression });
                 } else {
-                    panic!("Don't recognise command sequence {:?}", section);
+                    bail!(ErrorKind::BadCommandSequence(section.to_vec()));
                 }
             }
         }

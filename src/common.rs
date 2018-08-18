@@ -23,7 +23,7 @@ pub enum Expression {
     LessThan(Box<Expression>, Box<Expression>),
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Clone)]
 pub enum SymbolType {
     Dummy,
     And,
@@ -115,5 +115,9 @@ error_chain!{
         MissingFunction(name: String)
         WrongArgCount(expected: usize, got: usize)
         UnbalancedExpression(description: String)
+        BadCommandSequence(sequence: Vec<SymbolType>)
+        {
+            display("Don't recognise command sequence {:?}", sequence)
+        }
     }
 }
