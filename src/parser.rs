@@ -632,6 +632,18 @@ pub fn parse(input: &str) -> Result<Program> {
     });
 }
 
+fn print_command(command: &Command) -> String {
+    format!("{:?}", command)
+}
+
+pub fn print_program(program: &Program) -> String {
+    let mut res = String::new();
+    for command in &program.commands {
+        res += &(print_command(&command) + "\n");
+    }
+    return res;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -749,5 +761,14 @@ mod tests {
                 .unwrap(),
             Program{commands, functions}
         );
+    }
+
+    #[test]
+    fn pretty_print() {
+        assert_eq!(
+            print_program(&parse("Absolute takes a thought")
+                .unwrap()),
+            "FunctionDeclaration { name: \"Absolute\", args: [\"a thought\"], func_end: None }\n"
+        )
     }
 }

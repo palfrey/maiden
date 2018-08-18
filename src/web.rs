@@ -32,7 +32,14 @@ impl Component<Context> for Model {
             }
             Msg::ClickRun => {
                 let program = parser::parse(&self.value);
-                self.program = format!("{:?}", program);
+                match program {
+                    Err(err) => {
+                        self.program = format!("{:?}", err.0);
+                    }
+                    Ok(val) => {
+                        self.program = parser::print_program(&val);
+                    }
+                }
             }
         }
         true
@@ -52,7 +59,7 @@ impl Renderable<Context, Model> for Model {
                      <button onclick=|_| Msg::ClickRun,>{ "run program" }</button>
                 </div>
                 <div>
-                    {&self.program}
+                    <pre>{&self.program}</pre>
                 </div>
             </div>
         }
