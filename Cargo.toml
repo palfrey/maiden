@@ -11,3 +11,6 @@ error-chain = "0.12"
 clap = "2"
 assert_cmd = "0.6"
 regex = "1"
+
+[target.wasm32-unknown-unknown.dependencies]
+yew = "0.4"

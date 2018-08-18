@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 #![allow(non_shorthand_field_patterns)]
 
 #[macro_use]
@@ -10,14 +11,24 @@ extern crate error_chain;
 extern crate clap;
 extern crate regex;
 
+#[cfg(target_arch = "wasm32")]
+#[macro_use]
+extern crate yew;
+#[cfg(target_arch = "wasm32")]
+use yew::prelude::*;
+
 mod common;
 mod parser;
 mod runner;
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::io::{self, Read};
+#[cfg(not(target_arch = "wasm32"))]
 use std::fs::File;
+#[cfg(not(target_arch = "wasm32"))]
 use clap::{Arg, App};
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() -> common::Result<()> {
     pretty_env_logger::try_init().unwrap_or(());
     let matches = App::new("Maiden")
@@ -38,6 +49,17 @@ fn main() -> common::Result<()> {
     let program = parser::parse(&buffer)?;
     runner::run(program, &mut io::stdout())?;
     Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+mod web;
+
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    yew::initialize();
+    let app: App<_, web::Model> = App::new(());
+    app.mount_to_body();
+    yew::run_loop();
 }
 
 #[cfg(test)]

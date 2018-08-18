@@ -15,3 +15,6 @@ Experimental. Rockstar is still very much in active flux, and Maiden doesn't eve
 Usage
 -----
 `cargo run --quiet <your rockstar program>` works pretty well
+
+https://github.com/koute/cargo-web/issues/72
+ cargo +nightly web start --auto-reload
