@@ -1,10 +1,13 @@
 use yew::prelude::*;
 use parser;
+use std;
+use runner;
 
 type Context = ();
 pub struct Model {
     value: String,
     program: String,
+    res: String,
 }
 
 pub enum Msg {
@@ -13,8 +16,6 @@ pub enum Msg {
 }
 
 impl Component<Context> for Model {
-    // Some details omitted. Explore the examples to get more.
-
     type Message = Msg;
     type Properties = ();
 
@@ -22,6 +23,7 @@ impl Component<Context> for Model {
         Model {
             value: include_str!("../tests/modulo.rock").into(),
             program: "".into(),
+            res: "".into(),
         }
     }
 
@@ -38,6 +40,14 @@ impl Component<Context> for Model {
                     }
                     Ok(val) => {
                         self.program = parser::print_program(&val);
+                        let mut writer = std::io::Cursor::new(Vec::new());
+                        let res = runner::run(val, &mut writer);
+                        self.res = "".into();
+                        if let Err(err) = res {
+                            self.res += &format!("{:?}", err.0);
+                        }
+                        writer.set_position(0);
+                        self.res += std::str::from_utf8(writer.get_ref()).unwrap().into();
                     }
                 }
             }
@@ -64,6 +74,7 @@ impl Renderable<Context, Model> for Model {
                     </div>
                     <div class="col",>
                         <pre>{&self.program}</pre>
+                        <pre>{&self.res}</pre>
                     </div>
                 </div>
             </div>
