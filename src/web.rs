@@ -20,7 +20,7 @@ impl Component<Context> for Model {
 
     fn create(_: Self::Properties, _: &mut Env<Context, Self>) -> Self {
         Model {
-            value: "".into(),
+            value: include_str!("../tests/modulo.rock").into(),
             program: "".into(),
         }
     }
@@ -49,17 +49,20 @@ impl Component<Context> for Model {
 impl Renderable<Context, Model> for Model {
     fn view(&self) -> Html<Context, Self> {
         html! {
-            <div>
-                <div>
-                    <textarea rows=5,
-                        value=&self.value,
-                        oninput=|e| Msg::GotInput(e.value),
-                        placeholder="placeholder",>
-                    </textarea>
-                     <button onclick=|_| Msg::ClickRun,>{ "run program" }</button>
-                </div>
-                <div>
-                    <pre>{&self.program}</pre>
+            <div class="container-fluid",>
+                <div class="row",>
+                    <div class="col",>
+                        <textarea class="form-control",
+                            rows=20,
+                            value=&self.value,
+                            oninput=|e| Msg::GotInput(e.value),
+                            placeholder="placeholder",>
+                        </textarea>
+                        <button type="button", class=("btn", "btn-primary"), onclick=|_| Msg::ClickRun,>{ "Run program" }</button>
+                    </div>
+                    <div class="col",>
+                        <pre>{&self.program}</pre>
+                    </div>
                 </div>
             </div>
         }
