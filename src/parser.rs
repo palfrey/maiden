@@ -639,8 +639,32 @@ fn print_command(command: &Command) -> String {
 
 pub fn print_program(program: &Program) -> String {
     let mut res = String::new();
+    let mut indent = 0;
     for command in &program.commands {
+        match command {
+            Command::EndFunction | Command::EndIf => {
+                indent -= 1;
+            }
+            _ => {}
+        }
+        for _ in 0..indent {
+            res += "  ";
+        }
         res += &(print_command(&command) + "\n");
+        match command {
+            Command::FunctionDeclaration {
+                name: _,
+                args: _,
+                func_end: _,
+            } |
+            Command::If {
+                expression: _,
+                if_end: _,
+            } => {
+                indent += 1;
+            }
+            _ => {}
+        }
     }
     return res;
 }
