@@ -58,7 +58,9 @@ impl Renderable<Context, Model> for Model {
                             oninput=|e| Msg::GotInput(e.value),
                             placeholder="placeholder",>
                         </textarea>
-                        <button type="button", class=("btn", "btn-primary"), onclick=|_| Msg::ClickRun,>{ "Run program" }</button>
+                        <button type="button",
+                            class=("btn", "btn-primary"),
+                            onclick=|_| Msg::ClickRun,>{ "Run program" }</button>
                     </div>
                     <div class="col",>
                         <pre>{&self.program}</pre>
