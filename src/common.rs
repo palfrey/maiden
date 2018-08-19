@@ -77,6 +77,7 @@ pub enum Command {
         expression: Expression,
         if_end: Option<usize>,
     },
+    EndIf,
     Increment { target: String },
     Decrement { target: String },
     Next { loop_start: usize },
@@ -86,7 +87,8 @@ pub enum Command {
         args: Vec<String>,
         func_end: Option<usize>,
     },
-    EndFunction { return_value: Expression },
+    Return { return_value: Expression },
+    EndFunction,
     Call { name: String, args: Vec<Expression> },
 }
 

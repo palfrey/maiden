@@ -247,8 +247,11 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
             } => {
                 pc = func_end.expect("func_end");
             }
-            Command::EndFunction { return_value } => {
+            Command::Return { return_value } => {
                 return run_expression(state, program, return_value);
+            }
+            Command::EndFunction => {
+                return run_expression(state, program, &Expression::Nothing);
             }
             Command::If { expression, if_end } => {
                 let resolve = run_expression(state, program, expression)?;
@@ -260,6 +263,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
             Command::Call { name, args } => {
                 call_function(state, program, name, args)?;
             }
+            Command::EndIf => {}
         }
         pc += 1;
     }

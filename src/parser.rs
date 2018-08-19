@@ -486,12 +486,13 @@ pub fn parse(input: &str) -> Result<Program> {
                             expression: _,
                             if_end: ref mut if_end,
                         } => {
-                            if_end.get_or_insert(if_len - 1); // because there's not a real next to jump over
+                            if_end.get_or_insert(if_len);
                         }
                         _ => {
                             panic!("return to non-if command");
                         }
                     }
+                    commands.push(Command::EndIf);
                 } else if !loop_starts.is_empty() {
                     build_next(&mut commands, &mut loop_starts);
                 } else if !func_starts.is_empty() {
@@ -509,7 +510,7 @@ pub fn parse(input: &str) -> Result<Program> {
                             panic!("return to non-func command");
                         }
                     }
-                    commands.push(Command::EndFunction { return_value: Expression::Nothing });
+                    commands.push(Command::EndFunction);
                 } else {
                     debug!("Double newline that doesn't end anything");
                 }
@@ -619,7 +620,7 @@ pub fn parse(input: &str) -> Result<Program> {
                 } else if section[0] == SymbolType::Return && section.len() > 1 {
                     let expression_seq: Vec<&SymbolType> = section.iter().skip(1).collect();
                     let expression = parse_expression(expression_seq)?;
-                    commands.push(Command::EndFunction { return_value: expression });
+                    commands.push(Command::Return { return_value: expression });
                 } else {
                     bail!(ErrorKind::BadCommandSequence(section.to_vec()));
                 }
