@@ -705,7 +705,7 @@ pub fn parse(input: &str) -> Result<Program> {
     });
 }
 
-fn print_command(command: &CommandLine) -> String {
+fn print_command(command: &Command) -> String {
     format!("{:?}", command)
 }
 
@@ -719,10 +719,11 @@ pub fn print_program(program: &Program) -> String {
             }
             _ => {}
         }
+        res += &format!("{}: ", command.line);
         for _ in 0..indent {
             res += "  ";
         }
-        res += &(print_command(&command) + "\n");
+        res += &(print_command(&command.cmd) + "\n");
         match command.cmd {
             Command::FunctionDeclaration {
                 name: _,
@@ -881,7 +882,7 @@ mod tests {
         assert_eq!(
             print_program(&parse("Absolute takes a thought")
                 .unwrap()),
-            "CommandLine { cmd: FunctionDeclaration { name: \"Absolute\", args: [\"a thought\"], func_end: None }, line: 1 }\n"
+            "1: FunctionDeclaration { name: \"Absolute\", args: [\"a thought\"], func_end: None }\n"
         )
     }
 }
