@@ -371,7 +371,7 @@ fn single_symbol_to_expression(sym: &SymbolType) -> Result<Expression> {
     };
 }
 
-fn parse_expression(items: Vec<&SymbolType>) -> Result<Expression> {
+fn parse_expression(items: Vec<&SymbolType>, line: u32) -> Result<Expression> {
     // based off of https://en.wikipedia.org/wiki/Operator-precedence_parser#Pseudo-code
     let describe = format!("{:?}", items);
     debug!("Begin parse: {}", describe);
@@ -382,7 +382,7 @@ fn parse_expression(items: Vec<&SymbolType>) -> Result<Expression> {
         &LOWEST_PRECDENCE,
     )?;
     if res.1 != items.len() - 1 {
-        bail!(ErrorKind::UnbalancedExpression(describe));
+        bail!(ErrorKind::UnbalancedExpression(describe, line));
     }
     return Ok(res.0);
 }
@@ -429,10 +429,10 @@ fn parse_expression_1(
     return Ok((lhs.clone(), index));
 }
 
-fn build_next(commands: &mut Vec<Command>, loop_starts: &mut Vec<usize>) {
+fn build_next(commands: &mut Vec<CommandLine>, loop_starts: &mut Vec<usize>) -> Command {
     let loop_start = loop_starts.pop().expect("loop_starts");
     let loop_len = commands.len();
-    match commands.index_mut(loop_start) {
+    match commands.index_mut(loop_start).cmd {
         Command::Until {
             loop_end: ref mut loop_end,
             expression: _,
@@ -449,7 +449,7 @@ fn build_next(commands: &mut Vec<Command>, loop_starts: &mut Vec<usize>) {
             panic!("loop to non-loop command");
         }
     }
-    commands.push(Command::Next { loop_start: loop_start });
+    return Command::Next { loop_start: loop_start };
 }
 
 pub fn parse(input: &str) -> Result<Program> {
@@ -458,11 +458,11 @@ pub fn parse(input: &str) -> Result<Program> {
     let raw_lines = lines(&fixed_input).unwrap();
     if raw_lines.0.fragment.len() > 0 {
         let pos = raw_lines.0;
-        bail!(ErrorKind::UnparsedText(format!("'{}' at line {}, offset {}", pos.fragment, pos.line, pos.offset)));
+        bail!(ErrorKind::UnparsedText(pos.fragment.to_string(), pos.line));
     }
     debug!("{:?}", raw_lines);
     let mut functions: HashMap<String, Function> = HashMap::new();
-    let mut commands: Vec<Command> = Vec::new();
+    let mut commands: Vec<CommandLine> = Vec::new();
     let mut loop_starts: Vec<usize> = Vec::new();
     let mut func_starts: Vec<usize> = Vec::new();
     let mut if_starts: Vec<usize> = Vec::new();
@@ -475,20 +475,22 @@ pub fn parse(input: &str) -> Result<Program> {
             symbols.pop();
         }
         debug!("{:?}", symbols);
+        let current_line = symbols.first().unwrap().position.line;
         let symbols: Vec<SymbolType> = symbols.into_iter().map(|t| t.symbol).collect();
         match symbols.as_slice() {
             [SymbolType::Build, SymbolType::Variable(target), SymbolType::Up] => {
-                commands.push(Command::Increment { target: target.to_string() });
+                commands.push(CommandLine{cmd:Command::Increment { target: target.to_string()}, line:current_line});
             }
             [SymbolType::Knock, SymbolType::Variable(target), SymbolType::Down] => {
-                commands.push(Command::Decrement { target: target.to_string() });
+                commands.push(CommandLine{cmd:Command::Decrement { target: target.to_string() }, line:current_line});
             }
             [SymbolType::Next] => {
-                build_next(&mut commands, &mut loop_starts);
+                let command = build_next(&mut commands, &mut loop_starts);
+                commands.push(CommandLine{cmd: command, line:current_line});
             }
             [SymbolType::Continue] => {
                 let loop_start = loop_starts.last().expect("loop_starts");
-                commands.push(Command::Next { loop_start: *loop_start });
+                commands.push(CommandLine{cmd:Command::Next { loop_start: *loop_start }, line:current_line});
             }
             [SymbolType::Newline] |
             [SymbolType::Comment] => {
@@ -497,10 +499,10 @@ pub fn parse(input: &str) -> Result<Program> {
                     let if_start = if_starts.pop().expect("if_starts");
                     let if_len = commands.len();
                     match commands.index_mut(if_start) {
-                        Command::If {
+                        CommandLine{cmd:Command::If {
                             expression: _,
                             if_end: ref mut if_end,
-                        } => {
+                        }, line:_} => {
                             if_end.get_or_insert(if_len - 1); // because there's not a real next to jump over
                         }
                         _ => {
@@ -508,87 +510,88 @@ pub fn parse(input: &str) -> Result<Program> {
                         }
                     }
                 } else if !loop_starts.is_empty() {
-                    build_next(&mut commands, &mut loop_starts);
+                    let command = build_next(&mut commands, &mut loop_starts);
+                    commands.push(CommandLine{cmd: command, line:current_line});
                 } else if !func_starts.is_empty() {
                     let func_start = func_starts.pop().expect("func_starts");
                     let func_len = commands.len();
                     match commands.index_mut(func_start) {
-                        Command::FunctionDeclaration {
+                        CommandLine{cmd: Command::FunctionDeclaration {
                             name: _,
                             args: _,
                             func_end: ref mut func_end,
-                        } => {
+                        }, line: _} => {
                             func_end.get_or_insert(func_len);
                         }
                         _ => {
                             panic!("return to non-func command");
                         }
                     }
-                    commands.push(Command::EndFunction { return_value: Expression::Nothing });
+                    commands.push(CommandLine{cmd:Command::EndFunction { return_value: Expression::Nothing }, line:current_line});
                 } else {
                     debug!("Double newline that doesn't end anything");
                 }
             }
             [SymbolType::Taking { target, args }] => {
-                commands.push(Command::Call {
+                commands.push(CommandLine{cmd:Command::Call {
                     name: target.to_string(),
                     args: args.iter()
                         .map(|a| Expression::Variable(a.to_string()))
                         .collect(),
-                });
+                }, line:current_line});
             }
             _ => {
                 // Better done with slice patterns once they stabilise
                 // (see https://github.com/rust-lang/rust/issues/23121)
                 if symbols[0] == SymbolType::Say && symbols.len() > 1 {
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
-                    let expression = parse_expression(expression_seq)?;
-                    commands.push(Command::Say { value: expression });
+                    let expression = parse_expression(expression_seq, current_line)?;
+                    commands.push(CommandLine{cmd:Command::Say { value: expression }, line:current_line});
                 } else if symbols.len() > 1 && symbols[1] == SymbolType::Is {
                     if let SymbolType::Variable(ref target) = symbols[0] {
                         let expression_seq: Vec<&SymbolType> = symbols.iter().skip(2).collect();
-                        let expression = parse_expression(expression_seq)?;
-                        commands.push(Command::Assignment {
+                        let expression = parse_expression(expression_seq, current_line)?;
+                        commands.push(CommandLine{cmd:Command::Assignment {
                             target: target.to_string(),
                             value: expression,
-                        });
+                        }, line:current_line});
                     } else {
                         error!("Bad 'is' section: {:?}", symbols);
                     }
                 } else if symbols[0] == SymbolType::Until && symbols.len() > 1 {
                     loop_starts.push(commands.len());
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
-                    let expression = parse_expression(expression_seq)?;
-                    commands.push(Command::Until {
+                    let expression = parse_expression(expression_seq, current_line)?;
+                    commands.push(CommandLine{cmd:Command::Until {
                         expression: expression,
                         loop_end: None,
-                    });
+                    }, line:current_line});
                 } else if symbols[0] == SymbolType::While && symbols.len() > 1 {
                     loop_starts.push(commands.len());
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
-                    let expression = parse_expression(expression_seq)?;
-                    commands.push(Command::While {
+                    let expression = parse_expression(expression_seq, current_line)?;
+                    commands.push(CommandLine{cmd:Command::While {
                         expression: expression,
                         loop_end: None,
-                    });
+                    }, line:current_line});
                 } else if symbols[0] == SymbolType::If && symbols.len() > 1 {
                     if_starts.push(commands.len());
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
-                    let expression = parse_expression(expression_seq)?;
-                    commands.push(Command::If {
+                    let expression = parse_expression(expression_seq, current_line)?;
+                    commands.push(CommandLine{cmd:Command::If {
                         expression: expression,
                         if_end: None,
-                    });
+                    }, line:current_line});
                 } else if symbols.len() > 3 && symbols[0] == SymbolType::Put &&
                            symbols[symbols.len() - 2] == SymbolType::Where
                 {
                     if let SymbolType::Variable(ref target) = symbols[symbols.len() - 1] {
                         let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).take(symbols.len() - 3).collect();
-                        let expression = parse_expression(expression_seq)?;
-                        commands.push(Command::Assignment {
+                        let expression = parse_expression(expression_seq, current_line)?;
+                        commands.push(CommandLine{cmd:Command::Assignment {
                             target: target.to_string(),
                             value: expression,
-                        });
+                        }, line:current_line});
                     } else {
                         error!("Bad 'put' section: {:?}", symbols);
                     }
@@ -623,18 +626,18 @@ pub fn parse(input: &str) -> Result<Program> {
                                 args: args.clone(),
                             },
                         );
-                        commands.push(Command::FunctionDeclaration {
+                        commands.push(CommandLine{cmd:Command::FunctionDeclaration {
                             name: name.to_string(),
                             args,
                             func_end: None,
-                        });
+                        }, line: current_line});
                     } else {
                         error!("Bad 'function declaration' section: {:?}", symbols);
                     }
                 } else if symbols[0] == SymbolType::Return && symbols.len() > 1 {
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
-                    let expression = parse_expression(expression_seq)?;
-                    commands.push(Command::EndFunction { return_value: expression });
+                    let expression = parse_expression(expression_seq, current_line)?;
+                    commands.push(CommandLine{cmd:Command::EndFunction { return_value: expression }, line:current_line});
                 } else {
                     panic!("Don't recognise command sequence {:?}", symbols);
                 }
@@ -690,7 +693,7 @@ mod tests {
                 Box::new(Expression::Integer(0)),
             )),
         );
-        let commands = vec![Command::If{expression: expression, if_end: None}];
+        let commands = vec![CommandLine{cmd: Command::If{expression: expression, if_end: None}, line: 1}];
         let functions = HashMap::new();
         assert_eq!(
             parse("If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing")
@@ -732,7 +735,7 @@ mod tests {
 
     #[test]
     fn apostrophe_parsing() {
-        let commands = vec![Command::Assignment{ target: "Bar".to_string(), value: Expression::Integer(4)}];
+        let commands = vec![CommandLine{cmd: Command::Assignment{ target: "Bar".to_string(), value: Expression::Integer(4)}, line:1}];
         let functions = HashMap::new();
         assert_eq!(
             parse("Bar is foo'd")
@@ -768,7 +771,7 @@ mod tests {
             Box::new(Expression::Variable("Davy".to_string())),
             Box::new(Expression::Variable("Greatness".to_string())),
         );
-        let commands = vec![Command::While{ expression, loop_end: None}];
+        let commands = vec![CommandLine{cmd: Command::While{ expression, loop_end: None}, line:1}];
         let functions = HashMap::new();
         assert_eq!(
             parse("While Davy ain't Greatness")

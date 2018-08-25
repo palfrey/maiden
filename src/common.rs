@@ -106,8 +106,14 @@ pub struct Function {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct CommandLine {
+    pub cmd: Command,
+    pub line: u32
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Program {
-    pub commands: Vec<Command>,
+    pub commands: Vec<CommandLine>,
     pub functions: HashMap<String, Function>,
 }
 
@@ -116,13 +122,11 @@ error_chain!{
         Io(::std::io::Error);
     }
     errors {
-        UnparsedText(t: String) {
-            description("extra text we couldn't parse")
-            display("extra unparsed text: '{}'", t)
-        }
-        MissingVariable(name: String)
-        MissingFunction(name: String)
-        WrongArgCount(expected: usize, got: usize)
-        UnbalancedExpression(description: String)
+        UnparsedText(t: String, line: u32)
+        MissingVariable(name: String, line: u32)
+        MissingFunction(name: String, line: u32)
+        WrongArgCount(expected: usize, got: usize, line: u32)
+        UnbalancedExpression(description: String, line: u32)
+        NoRunner(expression: String, line: u32)
     }
 }
