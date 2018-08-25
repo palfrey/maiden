@@ -239,8 +239,8 @@ named!(pub line<Span, Vec<Token>>, alt_complete!(
 named!(lines_core<Span, Vec<Vec<Token>>>, many0!(
     alt!(
         do_parse!(
-            alt!(tag!("\n") | tag!("\r")) >>
             pos: position!() >>
+            alt!(tag!("\n") | tag!("\r")) >>
             take_while!(is_space) >>
             (pos)
         ) => {|pos| vec![Token{position: pos, symbol: SymbolType::Newline}]} |
@@ -705,7 +705,7 @@ pub fn parse(input: &str) -> Result<Program> {
     });
 }
 
-fn print_command(command: &Command) -> String {
+fn print_command(command: &CommandLine) -> String {
     format!("{:?}", command)
 }
 
@@ -722,7 +722,7 @@ pub fn print_program(program: &Program) -> String {
         for _ in 0..indent {
             res += "  ";
         }
-        res += &(print_command(&command.cmd) + "\n");
+        res += &(print_command(&command) + "\n");
         match command.cmd {
             Command::FunctionDeclaration {
                 name: _,
@@ -881,7 +881,7 @@ mod tests {
         assert_eq!(
             print_program(&parse("Absolute takes a thought")
                 .unwrap()),
-            "FunctionDeclaration { name: \"Absolute\", args: [\"a thought\"], func_end: None }\n"
+            "CommandLine { cmd: FunctionDeclaration { name: \"Absolute\", args: [\"a thought\"], func_end: None }, line: 1 }\n"
         )
     }
 }
