@@ -108,7 +108,7 @@ pub struct Function {
 #[derive(Debug, PartialEq)]
 pub struct CommandLine {
     pub cmd: Command,
-    pub line: u32
+    pub line: u32,
 }
 
 #[derive(Debug, PartialEq)]

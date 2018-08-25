@@ -183,8 +183,7 @@ mod tests {
         if let common::ErrorKind::MissingVariable(name, line) = err {
             assert_eq!(name, "Desire");
             assert_eq!(line, 1);
-        }
-        else {
+        } else {
             assert!(false, err);
         }
     }

@@ -6,7 +6,7 @@ use std::ops::Deref;
 struct State<'a> {
     writer: &'a mut Write,
     variables: &'a mut HashMap<String, Expression>,
-    current_line: u32
+    current_line: u32,
 }
 
 fn run_binop(
@@ -62,18 +62,25 @@ fn to_boolean(expression: &Expression) -> bool {
 fn call_function(state: &mut State, program: &Program, target: &str, args: &Vec<Expression>) -> Result<Expression> {
     let func_wrap = program.functions.get(target);
     if func_wrap.is_none() {
-        bail!(ErrorKind::MissingFunction(target.to_string(), state.current_line));
+        bail!(ErrorKind::MissingFunction(
+            target.to_string(),
+            state.current_line,
+        ));
     }
     let func = func_wrap.unwrap();
     if args.len() != func.args.len() {
-        bail!(ErrorKind::WrongArgCount(func.args.len(), args.len(), state.current_line))
+        bail!(ErrorKind::WrongArgCount(
+            func.args.len(),
+            args.len(),
+            state.current_line,
+        ))
     }
 
     let mut new_variables = state.variables.clone();
     let mut new_state = State {
         writer: state.writer,
         variables: &mut new_variables,
-        current_line: 0
+        current_line: 0,
     };
     for i in 0..args.len() {
         let value = run_expression(&mut new_state, program, &args[i])?;
@@ -133,7 +140,10 @@ fn run_expression(state: &mut State, program: &Program, expression: &Expression)
         }
         &Expression::Call(ref target, ref args) => call_function(state, program, target, args),
         _ => {
-            bail!(ErrorKind::NoRunner(format!("{:?}", expression), state.current_line));
+            bail!(ErrorKind::NoRunner(
+                format!("{:?}", expression),
+                state.current_line,
+            ));
         }
     };
 }
@@ -145,7 +155,7 @@ pub fn run(program: Program, writer: &mut Write) -> Result<HashMap<String, Expre
         let mut state = State {
             variables: &mut variables,
             writer: writer,
-            current_line: 0
+            current_line: 0,
         };
         run_core(&mut state, &program, pc)?;
     } // FIXME: Drop once NLL is merged
@@ -204,7 +214,10 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
         state.current_line = command_line.line;
         debug!("command: {:?}", command_line);
         match command_line.cmd {
-            Command::Assignment { ref target, ref value } => {
+            Command::Assignment {
+                ref target,
+                ref value,
+            } => {
                 let val = run_expression(state, program, &value)?;
                 state.variables.insert(target.to_lowercase(), val);
             }
@@ -254,7 +267,10 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
             Command::EndFunction { ref return_value } => {
                 return run_expression(state, program, &return_value);
             }
-            Command::If { ref expression, if_end } => {
+            Command::If {
+                ref expression,
+                if_end,
+            } => {
                 let resolve = run_expression(state, program, &expression)?;
                 debug!("if: {:?} {:?}", &resolve, expression);
                 if !to_boolean(&resolve) {
