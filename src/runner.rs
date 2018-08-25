@@ -80,7 +80,7 @@ fn call_function(state: &mut State, program: &Program, target: &str, args: &Vec<
     let mut new_state = State {
         writer: state.writer,
         variables: &mut new_variables,
-        current_line: 0,
+        current_line: state.current_line,
     };
     for i in 0..args.len() {
         let value = run_expression(&mut new_state, program, &args[i])?;
