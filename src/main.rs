@@ -10,6 +10,8 @@ extern crate pretty_env_logger;
 extern crate error_chain;
 extern crate clap;
 extern crate regex;
+#[macro_use]
+extern crate nom_locate;
 
 #[cfg(target_arch = "wasm32")]
 #[macro_use]
@@ -22,11 +24,11 @@ mod parser;
 mod runner;
 
 #[cfg(not(target_arch = "wasm32"))]
-use std::io::{self, Read};
+use clap::{Arg, App};
 #[cfg(not(target_arch = "wasm32"))]
 use std::fs::File;
 #[cfg(not(target_arch = "wasm32"))]
-use clap::{Arg, App};
+use std::io::{self, Read};
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> common::Result<()> {
@@ -65,9 +67,9 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
-    use std::collections::HashMap;
     use common::Expression;
+    use std::collections::HashMap;
+    use std::io::Cursor;
 
     fn test_program(code: &str, end_variables: HashMap<String, Expression>, expected_output: &str) {
         pretty_env_logger::try_init().unwrap_or(());
@@ -192,5 +194,19 @@ mod tests {
             end_variables,
             "shout let it all out\n",
         );
+    }
+
+    #[test]
+    fn missing_variable() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let program = parser::parse("Put Desire into my world").unwrap();
+        let mut writer = Cursor::new(Vec::new());
+        let err = runner::run(program, &mut writer).err().unwrap().0;
+        if let common::ErrorKind::MissingVariable(name, line) = err {
+            assert_eq!(name, "Desire");
+            assert_eq!(line, 1);
+        } else {
+            assert!(false, err);
+        }
     }
 }

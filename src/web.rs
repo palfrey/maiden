@@ -1,7 +1,7 @@
-use yew::prelude::*;
 use parser;
-use std;
 use runner;
+use std;
+use yew::prelude::*;
 
 type Context = ();
 pub struct Model {

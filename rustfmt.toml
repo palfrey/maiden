@@ -1,1 +1,6 @@
 max_width = 120
+match_wildcard_trailing_comma = false
+enum_trailing_comma = false
+use_try_shorthand = true
+reorder_imports = true
+reorder_imports_in_group = true
