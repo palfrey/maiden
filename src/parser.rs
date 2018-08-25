@@ -712,6 +712,7 @@ fn print_command(command: &Command) -> String {
 pub fn print_program(program: &Program) -> String {
     let mut res = String::new();
     let mut indent = 0;
+    let mut last_line = 0;
     for command in &program.commands {
         match command.cmd {
             Command::EndFunction | Command::EndIf => {
@@ -719,6 +720,11 @@ pub fn print_program(program: &Program) -> String {
             }
             _ => {}
         }
+        while last_line < command.line-1 {
+            last_line +=1;
+            res += &format!("{}:\n", last_line);
+        }
+        last_line = command.line;
         res += &format!("{}: ", command.line);
         for _ in 0..indent {
             res += "  ";
