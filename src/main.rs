@@ -1,5 +1,3 @@
-#![allow(non_shorthand_field_patterns)]
-
 #[macro_use]
 extern crate nom;
 #[macro_use]
@@ -9,14 +7,16 @@ extern crate pretty_env_logger;
 extern crate error_chain;
 extern crate clap;
 extern crate regex;
+#[macro_use]
+extern crate nom_locate;
 
 mod common;
 mod parser;
 mod runner;
 
-use std::io::{self, Read};
-use std::fs::File;
 use clap::{Arg, App};
+use std::fs::File;
+use std::io::{self, Read};
 
 fn main() -> common::Result<()> {
     pretty_env_logger::try_init().unwrap_or(());
@@ -43,9 +43,9 @@ fn main() -> common::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
-    use std::collections::HashMap;
     use common::Expression;
+    use std::collections::HashMap;
+    use std::io::Cursor;
 
     fn test_program(code: &str, end_variables: HashMap<String, Expression>, expected_output: &str) {
         pretty_env_logger::try_init().unwrap_or(());
@@ -170,5 +170,19 @@ mod tests {
             end_variables,
             "shout let it all out\n",
         );
+    }
+
+    #[test]
+    fn missing_variable() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let program = parser::parse("Put Desire into my world").unwrap();
+        let mut writer = Cursor::new(Vec::new());
+        let err = runner::run(program, &mut writer).err().unwrap().0;
+        if let common::ErrorKind::MissingVariable(name, line) = err {
+            assert_eq!(name, "Desire");
+            assert_eq!(line, 1);
+        } else {
+            assert!(false, err);
+        }
     }
 }
