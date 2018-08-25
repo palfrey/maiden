@@ -11,7 +11,7 @@ matrix:
       script: cargo build --all && cargo test --all
     - name: "web"
       rust: nightly
-      before_script: cargo install cargo-web
+      before_script: cargo install cargo-web --force
       script: cargo web build
     - rust: nightly
       script: cargo build --all && cargo test --all
