@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+use nom::types::CompleteStr;
+use nom_locate::LocatedSpan;
+pub type Span<'a> = LocatedSpan<CompleteStr<'a>>;
 
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
 pub enum Expression {
@@ -58,6 +61,12 @@ pub enum SymbolType {
     Words(Vec<String>),
     Integer(u32),
     Comment,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Token<'a> {
+    pub position: Span<'a>,
+    pub symbol: SymbolType,
 }
 
 pub static LOWEST_PRECDENCE: SymbolType = SymbolType::Dummy;

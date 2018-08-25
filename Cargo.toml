@@ -5,6 +5,7 @@ authors = ["Tom Parker <palfrey@tevp.net>"]
 
 [dependencies]
 nom = "4"
+nom_locate = "0.3"
 log = "0.4"
 pretty_env_logger = "0.2"
 error-chain = "0.12"

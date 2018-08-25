@@ -9,6 +9,8 @@ extern crate pretty_env_logger;
 extern crate error_chain;
 extern crate clap;
 extern crate regex;
+#[macro_use]
+extern crate nom_locate;
 
 mod common;
 mod parser;
