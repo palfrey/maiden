@@ -720,8 +720,8 @@ pub fn print_program(program: &Program) -> String {
             }
             _ => {}
         }
-        while last_line < command.line-1 {
-            last_line +=1;
+        while last_line < command.line - 1 {
+            last_line += 1;
             res += &format!("{}:\n", last_line);
         }
         last_line = command.line;
