@@ -2,11 +2,11 @@ extern crate assert_cmd;
 
 #[cfg(test)]
 mod integration {
-    use std::process::Command;
     use assert_cmd::prelude::*;
+    use std;
     use std::fs::File;
     use std::io::Read;
-    use std;
+    use std::process::Command;
 
     include!(concat!(env!("OUT_DIR"), "/test.rs"));
 

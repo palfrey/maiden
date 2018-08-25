@@ -1,6 +1,6 @@
 use common::*;
-use std::io::Write;
 use std::collections::HashMap;
+use std::io::Write;
 use std::ops::Deref;
 
 struct State<'a> {

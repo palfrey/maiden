@@ -1,9 +1,9 @@
-use nom::types::CompleteStr;
-use std::ops::IndexMut;
 use common::*;
 use nom;
-use std::collections::HashMap;
+use nom::types::CompleteStr;
 use regex::Regex;
+use std::collections::HashMap;
+use std::ops::IndexMut;
 
 fn is_space(chr: char) -> bool {
     chr == ' ' || chr == '\t' || chr == '.'
@@ -434,13 +434,13 @@ fn build_next(commands: &mut Vec<CommandLine>, loop_starts: &mut Vec<usize>) -> 
     let loop_len = commands.len();
     match commands.index_mut(loop_start).cmd {
         Command::Until {
-            loop_end: ref mut loop_end,
+            ref mut loop_end,
             expression: _,
         } => {
             loop_end.get_or_insert(loop_len);
         }
         Command::While {
-            loop_end: ref mut loop_end,
+            ref mut loop_end,
             expression: _,
         } => {
             loop_end.get_or_insert(loop_len);
@@ -514,7 +514,7 @@ pub fn parse(input: &str) -> Result<Program> {
                         CommandLine {
                             cmd: Command::If {
                                 expression: _,
-                                if_end: ref mut if_end,
+                                ref mut if_end,
                             },
                             line: _,
                         } => {
@@ -538,7 +538,7 @@ pub fn parse(input: &str) -> Result<Program> {
                             cmd: Command::FunctionDeclaration {
                                 name: _,
                                 args: _,
-                                func_end: ref mut func_end,
+                                ref mut func_end,
                             },
                             line: _,
                         } => {

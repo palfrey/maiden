@@ -1,5 +1,3 @@
-#![allow(non_shorthand_field_patterns)]
-
 #[macro_use]
 extern crate nom;
 #[macro_use]
@@ -16,9 +14,9 @@ mod common;
 mod parser;
 mod runner;
 
-use std::io::{self, Read};
-use std::fs::File;
 use clap::{Arg, App};
+use std::fs::File;
+use std::io::{self, Read};
 
 fn main() -> common::Result<()> {
     pretty_env_logger::try_init().unwrap_or(());
@@ -45,9 +43,9 @@ fn main() -> common::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
-    use std::collections::HashMap;
     use common::Expression;
+    use std::collections::HashMap;
+    use std::io::Cursor;
 
     fn test_program(code: &str, end_variables: HashMap<String, Expression>, expected_output: &str) {
         pretty_env_logger::try_init().unwrap_or(());
