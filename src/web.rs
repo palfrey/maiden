@@ -7,6 +7,7 @@ pub struct Model {
     value: String,
     program: String,
     res: String,
+    link: ComponentLink<Model>,
 }
 
 pub enum Msg {
@@ -18,18 +19,20 @@ impl Component for Model {
     type Message = Msg;
     type Properties = ();
 
-    fn create(_: Self::Properties, _: ComponentLink<Self>) -> Self {
-        Model {
+    fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
+        Self {
             value: include_str!("../tests/modulo.rock").into(),
             program: "Click 'Run program' to see output".into(),
             res: "Click 'Run program' to see output".into(),
+            link: link,
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
-            Msg::GotInput(new_value) => {
-                self.value = new_value;
+            Msg::GotInput(input_data) => {
+                println!("Change");
+                self.value = input_data;
             }
             Msg::ClickRun => {
                 let program = parser::parse(&self.value);
@@ -60,6 +63,24 @@ impl Component for Model {
 
 impl Renderable<Model> for Model {
     fn view(&self) -> Html<Self> {
+        let input_callback = self.link.send_back(Msg::GotInput);
+        let callback = move |payload: String| input_callback.emit(payload);
+        js! {
+            function codeMirrorCallback() {
+                if (window.codeMirror) {
+                    window.codeMirror.on("change", function(cm, change) {
+                        console.log("change");
+                        var callback = @{callback};
+                        callback(cm.getValue());
+                    });
+                    console.log("setup callback");
+                }
+                else {
+                    window.setTimeout(codeMirrorCallback, 500);
+                }
+            }
+            codeMirrorCallback();
+        }
         html! {
             <div class="container-fluid",>
                 <div class="row",>
@@ -70,7 +91,6 @@ impl Renderable<Model> for Model {
                         <textarea id="editor",
                             class="form-control",
                             value=&self.value,
-                            oninput=|e| Msg::GotInput(e.value),
                             placeholder="placeholder",>
                         </textarea>
                     </div>
