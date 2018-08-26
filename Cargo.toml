@@ -6,12 +6,18 @@ authors = ["Tom Parker <palfrey@tevp.net>"]
 [dependencies]
 nom = "4"
 nom_locate = "0.3"
+error-chain = "0.12"
+clap = { version = "2", optional = true }
+regex = "1"
 log = "0.4"
 pretty_env_logger = "0.2"
-error-chain = "0.12"
-clap = "2"
+
+[dev-dependencies]
 assert_cmd = "0.6"
-regex = "1"
+
+[features]
+default = ["cmd"]
+cmd = ["clap"]
 
 [target.wasm32-unknown-unknown.dependencies]
 yew = { git = "https://github.com/DenisKolodin/yew", rev="7e921ffae" } # For ComponentLink. Replace with 0.5

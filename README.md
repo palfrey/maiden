@@ -17,4 +17,4 @@ Usage
 `cargo run --quiet <your rockstar program>` works pretty well
 
 https://github.com/koute/cargo-web/issues/72
- cargo +nightly web start --auto-reload
+cargo +nightly web start --auto-reload --no-default-features

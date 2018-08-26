@@ -6,9 +6,11 @@
 extern crate nom;
 #[macro_use]
 extern crate log;
+#[cfg(not(target_arch = "wasm32"))]
 extern crate pretty_env_logger;
 #[macro_use]
 extern crate error_chain;
+#[cfg(not(target_arch = "wasm32"))]
 extern crate clap;
 extern crate regex;
 #[macro_use]
