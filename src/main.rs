@@ -18,6 +18,10 @@ extern crate nom_locate;
 extern crate yew;
 #[cfg(target_arch = "wasm32")]
 use yew::prelude::*;
+#[cfg(target_arch = "wasm32")]
+extern crate stdweb;
+#[cfg(target_arch = "wasm32")]
+use stdweb::web::IParentNode;
 
 mod common;
 mod parser;
@@ -60,7 +64,11 @@ mod web;
 fn main() {
     yew::initialize();
     let app: App<_, web::Model> = App::new(());
-    app.mount_to_body();
+    let app_element = stdweb::web::document()
+        .query_selector("#app")
+        .unwrap()
+        .unwrap();
+    app.mount(app_element);
     yew::run_loop();
 }
 

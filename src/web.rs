@@ -62,15 +62,15 @@ impl Renderable<Context, Model> for Model {
             <div class="container-fluid",>
                 <div class="row",>
                     <div class="col",>
-                        <textarea class="form-control",
-                            rows=20,
+                        <button type="button",
+                            class=("btn", "btn-primary"),
+                            onclick=|_| Msg::ClickRun,>{ "Run program" }</button>
+                        <textarea id="editor",
+                            class="form-control",
                             value=&self.value,
                             oninput=|e| Msg::GotInput(e.value),
                             placeholder="placeholder",>
                         </textarea>
-                        <button type="button",
-                            class=("btn", "btn-primary"),
-                            onclick=|_| Msg::ClickRun,>{ "Run program" }</button>
                     </div>
                     <div class="col",>
                         <pre>{&self.program}</pre>

@@ -15,3 +15,4 @@ regex = "1"
 
 [target.wasm32-unknown-unknown.dependencies]
 yew = "0.4"
+stdweb = "0.4.5"
