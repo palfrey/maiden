@@ -114,42 +114,40 @@ impl Renderable<Model> for Model {
             codeMirrorCallback();
         }
         html! {
-            <div class="container-fluid",>
-                <div class="row",>
-                    <div class="col-6",>
-                        <button type="button",
-                            class=("btn", "btn-primary"),
-                            onclick=|_| Msg::ClickRun,>{ "Run program" }</button>
-                        <textarea id="editor",
-                            class="form-control",
-                            value=&self.value,
-                            placeholder="placeholder",>
-                        </textarea>
-                    </div>
-                    <div class="col-6",>
-                        <ul class=("nav", "nav-tabs"), id="outputTabs", role="tablist",>
-                            <li class="nav-item",>
-                                <a class=("nav-link", "active"),
-                                    id="ast-tab", data-toggle="tab",
-                                    href="#ast", role="tab",
-                                    aria-controls="ast", aria-selected="true",>{ "AST" }</a>
-                            </li>
-                            <li class="nav-item", id="output-tab-li",>
-                                <a class="nav-link", id="output-tab",
-                                    data-toggle="tab", href="#output",
-                                    role="tab", aria-controls="output",
-                                    aria-selected="false",>{ "Output" }</a>
-                            </li>
-                        </ul>
-                        <div class="tab-content", id="outputTabsContent",>
-                            <div class=("tab-pane", "fade", "show", "active"),
-                                id="ast", role="tabpanel", aria-labelledby="ast-tab",>
-                                {self.ast_tab()}
-                            </div>
-                            <div class=("tab-pane", "fade"), id="output",
-                                role="tabpanel", aria-labelledby="output-tab",>
-                                <pre>{&self.res}</pre>
-                            </div>
+            <div class="row",>
+                <div class="col-6",>
+                    <button type="button",
+                        class=("btn", "btn-primary"),
+                        onclick=|_| Msg::ClickRun,>{ "Run program" }</button>
+                    <textarea id="editor",
+                        class="form-control",
+                        value=&self.value,
+                        placeholder="placeholder",>
+                    </textarea>
+                </div>
+                <div class="col-6",>
+                    <ul class=("nav", "nav-tabs"), id="outputTabs", role="tablist",>
+                        <li class="nav-item",>
+                            <a class=("nav-link", "active"),
+                                id="ast-tab", data-toggle="tab",
+                                href="#ast", role="tab",
+                                aria-controls="ast", aria-selected="true",>{ "AST" }</a>
+                        </li>
+                        <li class="nav-item", id="output-tab-li",>
+                            <a class="nav-link", id="output-tab",
+                                data-toggle="tab", href="#output",
+                                role="tab", aria-controls="output",
+                                aria-selected="false",>{ "Output" }</a>
+                        </li>
+                    </ul>
+                    <div class="tab-content", id="outputTabsContent",>
+                        <div class=("tab-pane", "fade", "show", "active"),
+                            id="ast", role="tabpanel", aria-labelledby="ast-tab",>
+                            {self.ast_tab()}
+                        </div>
+                        <div class=("tab-pane", "fade"), id="output",
+                            role="tabpanel", aria-labelledby="output-tab",>
+                            <pre>{&self.res}</pre>
                         </div>
                     </div>
                 </div>
