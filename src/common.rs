@@ -90,6 +90,7 @@ pub enum Command {
     Increment { target: String },
     Decrement { target: String },
     Next { loop_start: usize },
+    Continue { loop_start: usize },
     Say { value: Expression },
     FunctionDeclaration {
         name: String,

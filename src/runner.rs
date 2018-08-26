@@ -245,7 +245,8 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                     pc = loop_end.expect("loop_end");
                 }
             }
-            Command::Next { loop_start } => {
+            Command::Next { loop_start } |
+            Command::Continue { loop_start } => {
                 pc = loop_start - 1;
             }
             Command::Say { ref value } => {

@@ -503,7 +503,7 @@ pub fn parse(input: &str) -> Result<Program> {
             [SymbolType::Continue] => {
                 let loop_start = loop_starts.last().expect("loop_starts");
                 commands.push(CommandLine {
-                    cmd: Command::Next { loop_start: *loop_start },
+                    cmd: Command::Continue { loop_start: *loop_start },
                     line: current_line,
                 });
             }
@@ -718,7 +718,9 @@ pub fn print_program(program: &Program) -> String {
     let mut last_line = 0;
     for command in &program.commands {
         match command.cmd {
-            Command::EndFunction | Command::EndIf => {
+            Command::EndFunction |
+            Command::EndIf |
+            Command::Next { loop_start: _ } => {
                 indent -= 1;
             }
             _ => {}
@@ -742,6 +744,14 @@ pub fn print_program(program: &Program) -> String {
             Command::If {
                 expression: _,
                 if_end: _,
+            } |
+            Command::While {
+                expression: _,
+                loop_end: _,
+            } |
+            Command::Until {
+                expression: _,
+                loop_end: _,
             } => {
                 indent += 1;
             }
