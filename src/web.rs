@@ -8,6 +8,7 @@ pub struct Model {
     value: String,
     program: String,
     res: String,
+    parse_error: bool,
     link: ComponentLink<Model>,
 }
 
@@ -30,6 +31,18 @@ impl Model {
             self.get_line(line as usize)
         )
     }
+
+    fn ast_tab(&self) -> Html<Self> {
+        if self.parse_error {
+            html! {
+                { &self.program }
+            }
+        } else {
+            html! {
+                <pre> { &self.program } </pre>
+            }
+        }
+    }
 }
 
 impl Component for Model {
@@ -41,6 +54,7 @@ impl Component for Model {
             value: include_str!("../tests/modulo.rock").into(),
             program: "Click 'Run program' to see output".into(),
             res: "Click 'Run program' to see output".into(),
+            parse_error: false,
             link: link,
         }
     }
@@ -56,9 +70,12 @@ impl Component for Model {
                 match program {
                     Err(err) => {
                         self.program = self.nicer_error(&err);
+                        self.parse_error = true;
+                        self.res = "".to_string()
                     }
                     Ok(val) => {
                         self.program = parser::print_program(&val);
+                        self.parse_error = false;
                         let mut writer = std::io::Cursor::new(Vec::new());
                         let res = runner::run(val, &mut writer);
                         self.res = "".into();
@@ -99,7 +116,7 @@ impl Renderable<Model> for Model {
         html! {
             <div class="container-fluid",>
                 <div class="row",>
-                    <div class="col",>
+                    <div class="col-6",>
                         <button type="button",
                             class=("btn", "btn-primary"),
                             onclick=|_| Msg::ClickRun,>{ "Run program" }</button>
@@ -109,7 +126,7 @@ impl Renderable<Model> for Model {
                             placeholder="placeholder",>
                         </textarea>
                     </div>
-                    <div class="col",>
+                    <div class="col-6",>
                         <ul class=("nav", "nav-tabs"), id="outputTabs", role="tablist",>
                             <li class="nav-item",>
                                 <a class=("nav-link", "active"),
@@ -127,7 +144,7 @@ impl Renderable<Model> for Model {
                         <div class="tab-content", id="outputTabsContent",>
                             <div class=("tab-pane", "fade", "show", "active"),
                                 id="ast", role="tabpanel", aria-labelledby="ast-tab",>
-                                <pre>{&self.program}</pre>
+                                {self.ast_tab()}
                             </div>
                             <div class=("tab-pane", "fade"), id="output",
                                 role="tabpanel", aria-labelledby="output-tab",>
