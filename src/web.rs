@@ -22,8 +22,8 @@ impl Component<Context> for Model {
     fn create(_: Self::Properties, _: &mut Env<Context, Self>) -> Self {
         Model {
             value: include_str!("../tests/modulo.rock").into(),
-            program: "".into(),
-            res: "".into(),
+            program: "Click 'Run program' to see output".into(),
+            res: "Click 'Run program' to see output".into(),
         }
     }
 
@@ -48,6 +48,9 @@ impl Component<Context> for Model {
                         }
                         writer.set_position(0);
                         self.res += std::str::from_utf8(writer.get_ref()).unwrap().into();
+                        js! { @(no_return)
+                            $("#outputTabs li#output-tab-li a").tab("show");
+                        };
                     }
                 }
             }
@@ -73,8 +76,30 @@ impl Renderable<Context, Model> for Model {
                         </textarea>
                     </div>
                     <div class="col",>
-                        <pre>{&self.program}</pre>
-                        <pre>{&self.res}</pre>
+                        <ul class=("nav", "nav-tabs"), id="outputTabs", role="tablist",>
+                            <li class="nav-item",>
+                                <a class=("nav-link", "active"),
+                                    id="ast-tab", data-toggle="tab",
+                                    href="#ast", role="tab",
+                                    aria-controls="ast", aria-selected="true",>{ "AST" }</a>
+                            </li>
+                            <li class="nav-item", id="output-tab-li",>
+                                <a class="nav-link", id="output-tab",
+                                    data-toggle="tab", href="#output",
+                                    role="tab", aria-controls="output",
+                                    aria-selected="false",>{ "Output" }</a>
+                            </li>
+                        </ul>
+                        <div class="tab-content", id="outputTabsContent",>
+                            <div class=("tab-pane", "fade", "show", "active"),
+                                id="ast", role="tabpanel", aria-labelledby="ast-tab",>
+                                <pre>{&self.program}</pre>
+                            </div>
+                            <div class=("tab-pane", "fade"), id="output",
+                                role="tabpanel", aria-labelledby="output-tab",>
+                                <pre>{&self.res}</pre>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

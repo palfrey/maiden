@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![allow(non_shorthand_field_patterns)]
+#![recursion_limit="5000"]
 
 #[macro_use]
 extern crate nom;
@@ -19,6 +20,7 @@ extern crate yew;
 #[cfg(target_arch = "wasm32")]
 use yew::prelude::*;
 #[cfg(target_arch = "wasm32")]
+#[macro_use]
 extern crate stdweb;
 #[cfg(target_arch = "wasm32")]
 use stdweb::web::IParentNode;
