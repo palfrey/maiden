@@ -64,6 +64,7 @@ impl Component for Model {
             Msg::GotInput(input_data) => {
                 println!("Change");
                 self.value = input_data;
+                false
             }
             Msg::ClickRun => {
                 let program = parser::parse(&self.value);
@@ -89,9 +90,9 @@ impl Component for Model {
                         };
                     }
                 }
+                true
             }
         }
-        true
     }
 }
 
