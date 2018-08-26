@@ -86,11 +86,9 @@ impl Renderable<Model> for Model {
             function codeMirrorCallback() {
                 if (window.codeMirror) {
                     window.codeMirror.on("change", function(cm, change) {
-                        console.log("change");
                         var callback = @{callback};
                         callback(cm.getValue());
                     });
-                    console.log("setup callback");
                 }
                 else {
                     window.setTimeout(codeMirrorCallback, 500);

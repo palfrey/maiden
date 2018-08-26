@@ -27,12 +27,10 @@
         <script>
             function setupCodeMirror() {
                 var editor = document.getElementById("editor");
-                console.log("trying to setup");
                 if (editor != null) {
                     window.codeMirror = CodeMirror.fromTextArea(editor,{
                         lineNumbers: true
                     });
-                    console.log("setup");
                 }
                 else {
                     window.setTimeout(setupCodeMirror, 500);
