@@ -1,3 +1,4 @@
+use common;
 use parser;
 use runner;
 use std;
@@ -13,6 +14,22 @@ pub struct Model {
 pub enum Msg {
     GotInput(String),
     ClickRun,
+}
+
+impl Model {
+    fn get_line(&self, line: usize) -> &str {
+        self.value.split("\n").nth(line - 1).unwrap()
+    }
+
+    fn nicer_error(&self, err: &common::Error) -> String {
+        let line = common::get_error_line(err);
+        format!(
+            "{} at line {}: \"{}\"",
+            err.0,
+            line,
+            self.get_line(line as usize)
+        )
+    }
 }
 
 impl Component for Model {
@@ -38,7 +55,7 @@ impl Component for Model {
                 let program = parser::parse(&self.value);
                 match program {
                     Err(err) => {
-                        self.program = format!("{:?}", err.0);
+                        self.program = self.nicer_error(&err);
                     }
                     Ok(val) => {
                         self.program = parser::print_program(&val);
@@ -46,7 +63,7 @@ impl Component for Model {
                         let res = runner::run(val, &mut writer);
                         self.res = "".into();
                         if let Err(err) = res {
-                            self.res += &format!("{:?}", err.0);
+                            self.res += &self.nicer_error(&err);
                         }
                         writer.set_position(0);
                         self.res += std::str::from_utf8(writer.get_ref()).unwrap().into();

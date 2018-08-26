@@ -124,15 +124,43 @@ error_chain!{
         Io(::std::io::Error);
     }
     errors {
-        UnparsedText(t: String, line: u32)
-        MissingVariable(name: String, line: u32)
-        MissingFunction(name: String, line: u32)
-        WrongArgCount(expected: usize, got: usize, line: u32)
-        UnbalancedExpression(description: String, line: u32)
-        NoRunner(expression: String, line: u32)
-        BadCommandSequence(sequence: Vec<SymbolType>)
-        {
+        UnparsedText(t: String, line: u32) {
+            display("Unparsed text '{}'", t)
+        }
+        MissingVariable(name: String, line: u32) {
+            display("Missing variable '{}'", name)
+        }
+        MissingFunction(name: String, line: u32) {
+            display("Missing function '{}'", name)
+        }
+        WrongArgCount(expected: usize, got: usize, line: u32) {
+            display("Wrong argument count to function (expected {}, got {})", expected, got)
+        }
+        UnbalancedExpression(expression: String, line: u32) {
+            display("Unbalanced expression '{}'", expression)
+        }
+        NoRunner(expression: String, line: u32) {
+            display("Don't know how to execute the expression '{}'", expression)
+        }
+        BadCommandSequence(sequence: Vec<SymbolType>, line: u32) {
             display("Don't recognise command sequence {:?}", sequence)
+        }
+    }
+}
+
+pub fn get_error_line(e: &Error) -> u32 {
+    match e {
+        Error(kind, _) => {
+            match kind {
+                ErrorKind::MissingVariable(_, line) => line.clone(),
+                ErrorKind::UnparsedText(_, line) => line.clone(),
+                ErrorKind::MissingFunction(_, line) => line.clone(),
+                ErrorKind::WrongArgCount(_, _, line) => line.clone(),
+                ErrorKind::UnbalancedExpression(_, line) => line.clone(),
+                ErrorKind::NoRunner(_, line) => line.clone(),
+                ErrorKind::BadCommandSequence(_, line) => line.clone(),
+                _ => unimplemented!(),
+            }
         }
     }
 }

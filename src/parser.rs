@@ -694,7 +694,7 @@ pub fn parse(input: &str) -> Result<Program> {
                         line: current_line,
                     });
                 } else {
-                    bail!(ErrorKind::BadCommandSequence(symbols.to_vec()));
+                    bail!(ErrorKind::BadCommandSequence(symbols.to_vec(), current_line));
                 }
             }
         }
