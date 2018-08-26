@@ -65,7 +65,7 @@ mod web;
 #[cfg(target_arch = "wasm32")]
 fn main() {
     yew::initialize();
-    let app: App<_, web::Model> = App::new(());
+    let app: App<web::Model> = App::new();
     let app_element = stdweb::web::document()
         .query_selector("#app")
         .unwrap()
