@@ -154,7 +154,7 @@ named!(word(Span) -> SymbolType,
         tag_no_case!("into") => {|_| SymbolType::Where} |
         tag_no_case!("put") => {|_| SymbolType::Put} |
         tag_no_case!("else") => {|_| SymbolType::Else} |
-        tag_no_case!("nothing") => {|_| SymbolType::Integer(0) } |
+        tag_no_case!("nothing") => {|_| SymbolType::Integer("0".to_string()) } |
         do_parse!(
             target: variable >>
             take_while1!(is_space) >>
@@ -174,7 +174,7 @@ named!(word(Span) -> SymbolType,
             other_args.insert(0, first_arg);
             SymbolType::Taking{target, args: other_args}
         }} |
-        take_while1!(char::is_numeric) => {|n: Span| SymbolType::Integer(n.fragment.parse::<u32>().unwrap())} |
+        take_while1!(char::is_numeric) => {|n: Span| SymbolType::Integer(n.fragment.to_string())} |
         variable => {|s| SymbolType::Variable(s) } |
         tag!(",") => {|_| SymbolType::Comma} |
         do_parse!(
@@ -348,12 +348,17 @@ fn next_operator<'a>(items: &Vec<&'a SymbolType>, mut index: usize) -> Option<(&
     }
 }
 
-fn single_symbol_to_expression(sym: &SymbolType) -> Result<Expression> {
+fn single_symbol_to_expression(sym: &SymbolType, line: u32) -> Result<Expression> {
     return match sym {
         &SymbolType::Words(_) => evaluate(sym),
         &SymbolType::Variable(ref name) => Ok(Expression::Variable(name.clone())),
         &SymbolType::String(ref phrase) => Ok(Expression::String(phrase.clone())),
-        &SymbolType::Integer(ref val) => Ok(Expression::Integer(*val as i128)),
+        &SymbolType::Integer(ref val) => {
+            return match val.parse::<i128>() {
+                Ok(i) => Ok(Expression::Integer(i)),
+                Err(_) => bail!(ErrorKind::ParseIntError(val.to_string(), line)),
+            };
+        }
         &SymbolType::Taking {
             ref target,
             ref args,
@@ -381,8 +386,9 @@ fn parse_expression(items: Vec<&SymbolType>, line: u32) -> Result<Expression> {
     let res = parse_expression_1(
         &items,
         0,
-        single_symbol_to_expression(items[0])?,
+        single_symbol_to_expression(items[0], line)?,
         &LOWEST_PRECDENCE,
+        line,
     )?;
     if res.1 != items.len() - 1 {
         bail!(ErrorKind::UnbalancedExpression(describe, line));
@@ -395,6 +401,7 @@ fn parse_expression_1(
     mut index: usize,
     mut lhs: Expression,
     precedence: &SymbolType,
+    line: u32,
 ) -> Result<(Expression, usize)> {
     debug!("index: {}, lhs: {:?} precedence: {:?}", index, lhs, precedence);
     let mut lookahead = next_operator(items, index);
@@ -406,10 +413,10 @@ fn parse_expression_1(
         } else {
             index
         };
-        let mut rhs = single_symbol_to_expression(items[index])?;
+        let mut rhs = single_symbol_to_expression(items[index], line)?;
         lookahead = next_operator(items, index);
         while lookahead.is_some() && lookahead.unwrap().0 > op {
-            let res = parse_expression_1(items, index, rhs, &items[lookahead.unwrap().1])?;
+            let res = parse_expression_1(items, index, rhs, &items[lookahead.unwrap().1], line)?;
             rhs = res.0;
             index = res.1;
             lookahead = next_operator(items, index);
@@ -830,12 +837,12 @@ mod tests {
                     target: "Midnight".to_string(),
                     args: vec!["my world".to_string(), "Fire".to_string()] },
                 SymbolType::Is,
-                SymbolType::Integer(0),
+                SymbolType::Integer("0".to_string()),
                 SymbolType::And,
                 SymbolType::Taking {
                     target: "Midnight".to_string(),
                     args: vec!["my world".to_string(), "Hate".to_string()] },
-                SymbolType::Is, SymbolType::Integer(0)],
+                SymbolType::Is, SymbolType::Integer("0".to_string())],
         );
     }
 
@@ -903,5 +910,20 @@ mod tests {
                 .unwrap()),
             "1: FunctionDeclaration { name: \"Absolute\", args: [\"a thought\"], func_end: None }\n"
         )
+    }
+
+    #[test]
+    fn too_long_int() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let err = parse("the loneliest is 340282366920938463463374607431768211455")
+            .err()
+            .unwrap()
+            .0;
+        if let ErrorKind::ParseIntError(val, line) = err {
+            assert_eq!(val, "340282366920938463463374607431768211455");
+            assert_eq!(line, 1);
+        } else {
+            assert!(false, err);
+        }
     }
 }

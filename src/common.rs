@@ -59,7 +59,7 @@ pub enum SymbolType {
     Variable(String),
     String(String),
     Words(Vec<String>),
-    Integer(u32),
+    Integer(String),
     Comment,
 }
 
@@ -146,6 +146,9 @@ error_chain!{
         BadCommandSequence(sequence: Vec<SymbolType>, line: u32) {
             display("Don't recognise command sequence {:?}", sequence)
         }
+        ParseIntError(number: String, line: u32) {
+            display("Unparsable integer: '{}'", number)
+        }
     }
 }
 
@@ -160,6 +163,7 @@ pub fn get_error_line(e: &Error) -> u32 {
                 ErrorKind::UnbalancedExpression(_, line) => line.clone(),
                 ErrorKind::NoRunner(_, line) => line.clone(),
                 ErrorKind::BadCommandSequence(_, line) => line.clone(),
+                ErrorKind::ParseIntError(_, line) => line.clone(),
                 _ => unimplemented!(),
             }
         }
