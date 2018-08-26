@@ -374,6 +374,9 @@ fn single_symbol_to_expression(sym: &SymbolType) -> Result<Expression> {
 fn parse_expression(items: Vec<&SymbolType>, line: u32) -> Result<Expression> {
     // based off of https://en.wikipedia.org/wiki/Operator-precedence_parser#Pseudo-code
     let describe = format!("{:?}", items);
+    if items.len() == 0 {
+        bail!(ErrorKind::UnbalancedExpression(describe, line));
+    }
     debug!("Begin parse: {}", describe);
     let res = parse_expression_1(
         &items,
