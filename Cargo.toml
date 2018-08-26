@@ -16,3 +16,7 @@ regex = "1"
 [target.wasm32-unknown-unknown.dependencies]
 yew = { git = "https://github.com/DenisKolodin/yew", rev="7e921ffae" } # For ComponentLink. Replace with 0.5
 stdweb = "0.4.5"
+
+[profile.release]
+lto = true
+opt-level = 's'
