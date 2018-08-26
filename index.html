@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <title>Maiden</title>
+        <link rel="stylesheet" href="//stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
+            integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.40.0/codemirror.min.css"
+            integrity="sha256-I8NyGs4wjbMuBSUE40o55W6k6P7tu/7G28/JGUUYCIs=" crossorigin="anonymous" />
+        <style>
+        .CodeMirror {
+            border: 1px solid #eee;
+            height: auto;
+        }
+        </style>
+    </head>
+    <body>
+        <div id="app"></div>
+        <script src="maiden.js"></script>
+        <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+            integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"
+            integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.40.0/codemirror.min.js"
+            integrity="sha256-bRw9NTR0/nKmhEQc8jg716nnkA6EwKx2C46i01QGKpc=" crossorigin="anonymous"></script>
+        <script>
+            function setupCodeMirror() {
+                var editor = document.getElementById("editor");
+                if (editor != null) {
+                    window.codeMirror = CodeMirror.fromTextArea(editor,{
+                        lineNumbers: true
+                    });
+                }
+                else {
+                    window.setTimeout(setupCodeMirror, 500);
+                }
+            }
+            setupCodeMirror();
+        </script>
+    </body>
+</html>
