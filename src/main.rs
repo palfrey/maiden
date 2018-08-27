@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-#![allow(non_shorthand_field_patterns)]
 #![recursion_limit="5000"]
 
 #[macro_use]
