@@ -1,18 +1,20 @@
 dist: trusty
 sudo: false
 language: rust
-rust:
-  - stable
-  - beta
-  - nightly
 cache: cargo
 matrix:
+  include:
+    - rust: stable
+      before_script: cargo install rustfmt --force
+      script: cargo fmt --all -- --write-mode diff --force && cargo build --all && cargo test --all
+    - rust: beta
+      script: cargo build --all && cargo test --all
+    - name: "web"
+      rust: nightly
+      before_script: cargo install cargo-web --force
+      script: cargo web build
+    - rust: nightly
+      script: cargo build --all && cargo test --all
   allow_failures:
     - rust: nightly
   fast_finish: true
-before_script:
-  - cargo install rustfmt --force
-script:
-  - cargo fmt --all -- --write-mode diff --force
-  - cargo build --all
-  - cargo test --all

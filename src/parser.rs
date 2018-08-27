@@ -154,7 +154,7 @@ named!(word(Span) -> SymbolType,
         tag_no_case!("into") => {|_| SymbolType::Where} |
         tag_no_case!("put") => {|_| SymbolType::Put} |
         tag_no_case!("else") => {|_| SymbolType::Else} |
-        tag_no_case!("nothing") => {|_| SymbolType::Integer(0) } |
+        tag_no_case!("nothing") => {|_| SymbolType::Integer("0".to_string()) } |
         do_parse!(
             target: variable >>
             take_while1!(is_space) >>
@@ -174,9 +174,8 @@ named!(word(Span) -> SymbolType,
             other_args.insert(0, first_arg);
             SymbolType::Taking{target, args: other_args}
         }} |
-        take_while1!(char::is_numeric) => {|n: Span| SymbolType::Integer(n.fragment.parse::<u32>().unwrap())} |
+        take_while1!(char::is_numeric) => {|n: Span| SymbolType::Integer(n.fragment.to_string())} |
         variable => {|s| SymbolType::Variable(s) } |
-        tag!(",") => {|_| SymbolType::Comma} |
         do_parse!(
             tag!("\"") >>
             phrase: take_while!(string_character) >>
@@ -192,7 +191,7 @@ named!(word(Span) -> SymbolType,
         take_while1!(word_character) => {|word: Span| SymbolType::Words(vec![word.to_string()])}
     ));
 
-named!(poetic_number_literal_core<Span, (Span, String, Vec<Span>)>,
+named!(poetic_number_literal_core<Span, (u32, String, Vec<Span>)>,
     do_parse!(
         pv: variable >>
         take_while1!(is_space) >>
@@ -205,12 +204,12 @@ named!(poetic_number_literal_core<Span, (Span, String, Vec<Span>)>,
                 (word)
             )
         ) >>
-        (position, pv, words)
+        (position.line, pv, words)
     )
 );
 
 fn poetic_number_literal(input: Span) -> nom::IResult<Span, Vec<Token>> {
-    let (rest, (position, target, words)) = poetic_number_literal_core(input)?;
+    let (rest, (line, target, words)) = poetic_number_literal_core(input)?;
     let literal = SymbolType::Words(words.iter().map(|s| s.to_string()).collect());
     return Ok((
         rest,
@@ -218,7 +217,7 @@ fn poetic_number_literal(input: Span) -> nom::IResult<Span, Vec<Token>> {
             .into_iter()
             .map(|x| {
                 Token {
-                    position,
+                    line: line,
                     symbol: x,
                 }
             })
@@ -228,35 +227,63 @@ fn poetic_number_literal(input: Span) -> nom::IResult<Span, Vec<Token>> {
 
 named!(pub line<Span, Vec<Token>>, alt_complete!(
     poetic_number_literal => {|s| s } |
-    many1!(do_parse!(
+    do_parse!(
         position: position!() >>
-        word: word >>
-        take_while!(is_space) >>
-        (Token{position: position, symbol:word})
-    )) => {|s| s }
+        first_word: word >>
+        other_words: many0!(
+            alt_complete!(
+                tag!(",") => {|_| Token{line: position.line, symbol: SymbolType::Comma}} |
+                do_parse!(
+                    take_while1!(is_space) >>
+                    word: word >>
+                    (Token{line: position.line, symbol: word})
+                ) => {|t| t}
+        )) >>
+        (Token{line: position.line, symbol: first_word}, other_words)
+    ) => {|(first, mut other):(Token, Vec<Token>)| {
+        other.insert(0, first);
+        other
+         }}
 ));
 
-named!(lines_core<Span, Vec<Vec<Token>>>, many0!(
-    alt!(
-        do_parse!(
-            alt!(tag!("\n") | tag!("\r")) >>
-            pos: position!() >>
-            take_while!(is_space) >>
-            (pos)
-        ) => {|pos| vec![Token{position: pos, symbol: SymbolType::Newline}]} |
-        do_parse!(
-            a_line: line >>
-            opt!(alt!(tag!("\n") | tag!("\r"))) >>
-            take_while!(is_space) >>
-            (a_line)
-        ) => {|l| l }
-    )));
+named!(blank_line<Span, Vec<Token>>,
+    do_parse!(
+        pos: position!() >>
+        take_while!(is_space) >>
+        alt!(tag!("\n") | tag!("\r")) >>
+        take_while!(is_space) >>
+        (vec![Token{line: pos.line, symbol: SymbolType::Newline}])
+    )
+);
+
+named!(lines_core<Span, (Vec<Token>, Vec<Vec<Token>>)>,
+    do_parse!(
+        many0!(blank_line) >>
+        first_line: line >>
+        other_lines: many0!(
+            alt_complete!(
+                do_parse!(
+                    take_while!(is_space) >>
+                    alt!(tag!("\n") | tag!("\r")) >>
+                    take_while!(is_space) >>
+                    a_line: line >>
+                    (a_line)
+                ) => {|l| l } |
+                blank_line => {|b| b }
+            )
+        ) >>
+        (first_line, other_lines)
+    )
+);
 
 fn lines(input: &str) -> nom::IResult<Span, Vec<Vec<Token>>> {
     let cs = CompleteStr(&input);
     let complete: Span = Span::new(cs);
     return match lines_core(complete) {
-        Ok(ret) => Ok(ret),
+        Ok((rest, (first, mut others))) => {
+            others.insert(0, first);
+            Ok((rest, others))
+        }
         Err(_) => {
             unimplemented!();
         }
@@ -266,7 +293,7 @@ fn lines(input: &str) -> nom::IResult<Span, Vec<Vec<Token>>> {
 fn compact_words(line: Vec<Token>) -> Vec<Token> {
     let mut symbols: Vec<Token> = Vec::new();
     let mut words = Vec::new();
-    let pos = line[0].position;
+    let pos = line[0].line;
     for word in line {
         match word.symbol {
             SymbolType::Words(other) => {
@@ -275,7 +302,7 @@ fn compact_words(line: Vec<Token>) -> Vec<Token> {
             _ => {
                 if !words.is_empty() {
                     symbols.push(Token {
-                        position: word.position,
+                        line: word.line,
                         symbol: SymbolType::Words(words),
                     });
                     words = Vec::new();
@@ -286,7 +313,7 @@ fn compact_words(line: Vec<Token>) -> Vec<Token> {
     }
     if !words.is_empty() {
         symbols.push(Token {
-            position: pos,
+            line: pos,
             symbol: SymbolType::Words(words),
         });
     }
@@ -348,12 +375,17 @@ fn next_operator<'a>(items: &Vec<&'a SymbolType>, mut index: usize) -> Option<(&
     }
 }
 
-fn single_symbol_to_expression(sym: &SymbolType) -> Result<Expression> {
+fn single_symbol_to_expression(sym: &SymbolType, line: u32) -> Result<Expression> {
     return match sym {
         &SymbolType::Words(_) => evaluate(sym),
         &SymbolType::Variable(ref name) => Ok(Expression::Variable(name.clone())),
         &SymbolType::String(ref phrase) => Ok(Expression::String(phrase.clone())),
-        &SymbolType::Integer(ref val) => Ok(Expression::Integer(*val as i128)),
+        &SymbolType::Integer(ref val) => {
+            return match val.parse::<i128>() {
+                Ok(i) => Ok(Expression::Integer(i)),
+                Err(_) => bail!(ErrorKind::ParseIntError(val.to_string(), line)),
+            };
+        }
         &SymbolType::Taking {
             ref target,
             ref args,
@@ -374,12 +406,16 @@ fn single_symbol_to_expression(sym: &SymbolType) -> Result<Expression> {
 fn parse_expression(items: Vec<&SymbolType>, line: u32) -> Result<Expression> {
     // based off of https://en.wikipedia.org/wiki/Operator-precedence_parser#Pseudo-code
     let describe = format!("{:?}", items);
+    if items.len() == 0 {
+        bail!(ErrorKind::UnbalancedExpression(describe, line));
+    }
     debug!("Begin parse: {}", describe);
     let res = parse_expression_1(
         &items,
         0,
-        single_symbol_to_expression(items[0])?,
+        single_symbol_to_expression(items[0], line)?,
         &LOWEST_PRECDENCE,
+        line,
     )?;
     if res.1 != items.len() - 1 {
         bail!(ErrorKind::UnbalancedExpression(describe, line));
@@ -392,6 +428,7 @@ fn parse_expression_1(
     mut index: usize,
     mut lhs: Expression,
     precedence: &SymbolType,
+    line: u32,
 ) -> Result<(Expression, usize)> {
     debug!("index: {}, lhs: {:?} precedence: {:?}", index, lhs, precedence);
     let mut lookahead = next_operator(items, index);
@@ -403,10 +440,10 @@ fn parse_expression_1(
         } else {
             index
         };
-        let mut rhs = single_symbol_to_expression(items[index])?;
+        let mut rhs = single_symbol_to_expression(items[index], line)?;
         lookahead = next_operator(items, index);
         while lookahead.is_some() && lookahead.unwrap().0 > op {
-            let res = parse_expression_1(items, index, rhs, &items[lookahead.unwrap().1])?;
+            let res = parse_expression_1(items, index, rhs, &items[lookahead.unwrap().1], line)?;
             rhs = res.0;
             index = res.1;
             lookahead = next_operator(items, index);
@@ -466,7 +503,9 @@ pub fn parse(input: &str) -> Result<Program> {
     let mut loop_starts: Vec<usize> = Vec::new();
     let mut func_starts: Vec<usize> = Vec::new();
     let mut if_starts: Vec<usize> = Vec::new();
+    let mut last_line = 0;
     for raw_symbols in raw_lines.1 {
+        debug!("raw_symbols: {:?}", raw_symbols);
         let mut symbols = compact_words(raw_symbols);
         if symbols[0].symbol == SymbolType::And {
             symbols.remove(0);
@@ -474,8 +513,12 @@ pub fn parse(input: &str) -> Result<Program> {
         if symbols[symbols.len() - 1].symbol == SymbolType::Comma {
             symbols.pop();
         }
-        debug!("{:?}", symbols);
-        let current_line = symbols.first().unwrap().position.line;
+        debug!("symbols: {:?}", symbols);
+        if symbols.is_empty() {
+            bail!(ErrorKind::NoSymbols(last_line+1));
+        }
+        let current_line = symbols.first().unwrap().line;
+        last_line = current_line;
         let symbols: Vec<SymbolType> = symbols.into_iter().map(|t| t.symbol).collect();
         match symbols.as_slice() {
             [SymbolType::Build, SymbolType::Variable(target), SymbolType::Up] => {
@@ -500,7 +543,7 @@ pub fn parse(input: &str) -> Result<Program> {
             [SymbolType::Continue] => {
                 let loop_start = loop_starts.last().expect("loop_starts");
                 commands.push(CommandLine {
-                    cmd: Command::Next { loop_start: *loop_start },
+                    cmd: Command::Continue { loop_start: *loop_start },
                     line: current_line,
                 });
             }
@@ -518,12 +561,16 @@ pub fn parse(input: &str) -> Result<Program> {
                             },
                             line: _,
                         } => {
-                            if_end.get_or_insert(if_len - 1); // because there's not a real next to jump over
+                            if_end.get_or_insert(if_len);
                         }
                         _ => {
                             panic!("return to non-if command");
                         }
                     }
+                    commands.push(CommandLine {
+                        cmd: Command::EndIf,
+                        line: current_line,
+                    });
                 } else if !loop_starts.is_empty() {
                     let command = build_next(&mut commands, &mut loop_starts);
                     commands.push(CommandLine {
@@ -549,7 +596,7 @@ pub fn parse(input: &str) -> Result<Program> {
                         }
                     }
                     commands.push(CommandLine {
-                        cmd: Command::EndFunction { return_value: Expression::Nothing },
+                        cmd: Command::EndFunction,
                         line: current_line,
                     });
                 } else {
@@ -686,11 +733,11 @@ pub fn parse(input: &str) -> Result<Program> {
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
                     let expression = parse_expression(expression_seq, current_line)?;
                     commands.push(CommandLine {
-                        cmd: Command::EndFunction { return_value: expression },
+                        cmd: Command::Return { return_value: expression },
                         line: current_line,
                     });
                 } else {
-                    panic!("Don't recognise command sequence {:?}", symbols);
+                    bail!(ErrorKind::BadCommandSequence(symbols.to_vec(), current_line));
                 }
             }
         }
@@ -699,6 +746,59 @@ pub fn parse(input: &str) -> Result<Program> {
         commands,
         functions,
     });
+}
+
+fn print_command(command: &Command) -> String {
+    format!("{:?}", command)
+}
+
+pub fn print_program(program: &Program) -> String {
+    let mut res = String::new();
+    let mut indent = 0;
+    let mut last_line = 0;
+    for command in &program.commands {
+        match command.cmd {
+            Command::EndFunction |
+            Command::EndIf |
+            Command::Next { loop_start: _ } => {
+                indent -= 1;
+            }
+            _ => {}
+        }
+        while last_line < command.line - 1 {
+            last_line += 1;
+            res += &format!("{}:\n", last_line);
+        }
+        last_line = command.line;
+        res += &format!("{}: ", command.line);
+        for _ in 0..indent {
+            res += "  ";
+        }
+        res += &(print_command(&command.cmd) + "\n");
+        match command.cmd {
+            Command::FunctionDeclaration {
+                name: _,
+                args: _,
+                func_end: _,
+            } |
+            Command::If {
+                expression: _,
+                if_end: _,
+            } |
+            Command::While {
+                expression: _,
+                loop_end: _,
+            } |
+            Command::Until {
+                expression: _,
+                loop_end: _,
+            } => {
+                indent += 1;
+            }
+            _ => {}
+        }
+    }
+    return res;
 }
 
 #[cfg(test)]
@@ -757,6 +857,7 @@ mod tests {
         pretty_env_logger::try_init().unwrap_or(());
         let mut raw_lines = lines(input).unwrap();
         assert_eq!(raw_lines.0.fragment, CompleteStr(""));
+        assert_eq!(raw_lines.1.len(), 1, "{:?}", raw_lines.1);
         assert_eq!(raw_lines.1.remove(0).into_iter().map(|t| t.symbol).collect::<Vec<_>>(), tokens);
     }
 
@@ -770,12 +871,12 @@ mod tests {
                     target: "Midnight".to_string(),
                     args: vec!["my world".to_string(), "Fire".to_string()] },
                 SymbolType::Is,
-                SymbolType::Integer(0),
+                SymbolType::Integer("0".to_string()),
                 SymbolType::And,
                 SymbolType::Taking {
                     target: "Midnight".to_string(),
                     args: vec!["my world".to_string(), "Hate".to_string()] },
-                SymbolType::Is, SymbolType::Integer(0)],
+                SymbolType::Is, SymbolType::Integer("0".to_string())],
         );
     }
 
@@ -821,6 +922,19 @@ mod tests {
     }
 
     #[test]
+    fn split_nothing() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let mut raw_lines = lines("If a thought is greater than nothinggggggggg").unwrap();
+        assert_eq!(raw_lines.0.fragment, CompleteStr("gggggggg"));
+        assert_eq!(raw_lines.1.len(), 1, "{:?}", raw_lines.1);
+        assert_eq!(raw_lines.1.remove(0).into_iter().map(|t| t.symbol).collect::<Vec<_>>(),
+            vec![
+                SymbolType::If, SymbolType::Variable("a thought".to_string()),
+                SymbolType::GreaterThan, SymbolType::Integer("0".to_string())
+            ]);
+    }
+
+    #[test]
     fn great_davy() {
         pretty_env_logger::try_init().unwrap_or(());
         let expression = Expression::Aint(
@@ -834,5 +948,29 @@ mod tests {
                 .unwrap(),
             Program{commands, functions}
         );
+    }
+
+    #[test]
+    fn pretty_print() {
+        assert_eq!(
+            print_program(&parse("Absolute takes a thought")
+                .unwrap()),
+            "1: FunctionDeclaration { name: \"Absolute\", args: [\"a thought\"], func_end: None }\n"
+        )
+    }
+
+    #[test]
+    fn too_long_int() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let err = parse("the loneliest is 340282366920938463463374607431768211455")
+            .err()
+            .unwrap()
+            .0;
+        if let ErrorKind::ParseIntError(val, line) = err {
+            assert_eq!(val, "340282366920938463463374607431768211455");
+            assert_eq!(line, 1);
+        } else {
+            assert!(false, err);
+        }
     }
 }

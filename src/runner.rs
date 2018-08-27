@@ -80,7 +80,7 @@ fn call_function(state: &mut State, program: &Program, target: &str, args: &Vec<
     let mut new_state = State {
         writer: state.writer,
         variables: &mut new_variables,
-        current_line: 0,
+        current_line: state.current_line,
     };
     for i in 0..args.len() {
         let value = run_expression(&mut new_state, program, &args[i])?;
@@ -245,7 +245,8 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                     pc = loop_end.expect("loop_end");
                 }
             }
-            Command::Next { loop_start } => {
+            Command::Next { loop_start } |
+            Command::Continue { loop_start } => {
                 pc = loop_start - 1;
             }
             Command::Say { ref value } => {
@@ -264,8 +265,11 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
             } => {
                 pc = func_end.expect("func_end");
             }
-            Command::EndFunction { ref return_value } => {
+            Command::Return { ref return_value } => {
                 return run_expression(state, program, &return_value);
+            }
+            Command::EndFunction => {
+                return run_expression(state, program, &Expression::Nothing);
             }
             Command::If {
                 ref expression,
@@ -280,6 +284,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
             Command::Call { ref name, ref args } => {
                 call_function(state, program, &name, &args)?;
             }
+            Command::EndIf => {}
         }
         pc += 1;
     }

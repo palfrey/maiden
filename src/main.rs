@@ -1,23 +1,42 @@
+#![recursion_limit="5000"]
+
 #[macro_use]
 extern crate nom;
 #[macro_use]
 extern crate log;
+#[cfg(not(target_arch = "wasm32"))]
 extern crate pretty_env_logger;
 #[macro_use]
 extern crate error_chain;
+#[cfg(not(target_arch = "wasm32"))]
 extern crate clap;
 extern crate regex;
 #[macro_use]
 extern crate nom_locate;
 
+#[cfg(target_arch = "wasm32")]
+#[macro_use]
+extern crate yew;
+#[cfg(target_arch = "wasm32")]
+use yew::prelude::*;
+#[cfg(target_arch = "wasm32")]
+#[macro_use]
+extern crate stdweb;
+#[cfg(target_arch = "wasm32")]
+use stdweb::web::IParentNode;
+
 mod common;
 mod parser;
 mod runner;
 
+#[cfg(not(target_arch = "wasm32"))]
 use clap::{Arg, App};
+#[cfg(not(target_arch = "wasm32"))]
 use std::fs::File;
+#[cfg(not(target_arch = "wasm32"))]
 use std::io::{self, Read};
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() -> common::Result<()> {
     pretty_env_logger::try_init().unwrap_or(());
     let matches = App::new("Maiden")
@@ -38,6 +57,21 @@ fn main() -> common::Result<()> {
     let program = parser::parse(&buffer)?;
     runner::run(program, &mut io::stdout())?;
     Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+mod web;
+
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    yew::initialize();
+    let app: App<web::Model> = App::new();
+    let app_element = stdweb::web::document()
+        .query_selector("#app")
+        .unwrap()
+        .unwrap();
+    app.mount(app_element);
+    yew::run_loop();
 }
 
 #[cfg(test)]

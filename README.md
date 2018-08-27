@@ -15,3 +15,10 @@ Experimental. Rockstar is still very much in active flux, and Maiden doesn't eve
 Usage
 -----
 `cargo run --quiet <your rockstar program>` works pretty well
+
+Web version
+-----------
+There's a deployed edition at https://palfrey.github.io/maiden/. To work with it
+1. [Install cargo web](https://github.com/koute/cargo-web#installation)
+2. Run `cargo +nightly web start --auto-reload`
+3. Goto http://localhost:8000/
