@@ -149,6 +149,9 @@ error_chain!{
         ParseIntError(number: String, line: u32) {
             display("Unparsable integer: '{}'", number)
         }
+        NoSymbols(line: u32) {
+            display("No symbols!")
+        }
     }
 }
 

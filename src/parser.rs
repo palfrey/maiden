@@ -176,7 +176,6 @@ named!(word(Span) -> SymbolType,
         }} |
         take_while1!(char::is_numeric) => {|n: Span| SymbolType::Integer(n.fragment.to_string())} |
         variable => {|s| SymbolType::Variable(s) } |
-        tag!(",") => {|_| SymbolType::Comma} |
         do_parse!(
             tag!("\"") >>
             phrase: take_while!(string_character) >>
@@ -228,35 +227,63 @@ fn poetic_number_literal(input: Span) -> nom::IResult<Span, Vec<Token>> {
 
 named!(pub line<Span, Vec<Token>>, alt_complete!(
     poetic_number_literal => {|s| s } |
-    many1!(do_parse!(
+    do_parse!(
         position: position!() >>
-        word: word >>
-        take_while!(is_space) >>
-        (Token{line: position.line, symbol:word})
-    )) => {|s| s }
+        first_word: word >>
+        other_words: many0!(
+            alt_complete!(
+                tag!(",") => {|_| Token{line: position.line, symbol: SymbolType::Comma}} |
+                do_parse!(
+                    take_while1!(is_space) >>
+                    word: word >>
+                    (Token{line: position.line, symbol: word})
+                ) => {|t| t}
+        )) >>
+        (Token{line: position.line, symbol: first_word}, other_words)
+    ) => {|(first, mut other):(Token, Vec<Token>)| {
+        other.insert(0, first);
+        other
+         }}
 ));
 
-named!(lines_core<Span, Vec<Vec<Token>>>, many0!(
-    alt!(
-        do_parse!(
-            pos: position!() >>
-            alt!(tag!("\n") | tag!("\r")) >>
-            take_while!(is_space) >>
-            (pos)
-        ) => {|pos: Span| vec![Token{line: pos.line, symbol: SymbolType::Newline}]} |
-        do_parse!(
-            a_line: line >>
-            opt!(alt!(tag!("\n") | tag!("\r"))) >>
-            take_while!(is_space) >>
-            (a_line)
-        ) => {|l| l }
-    )));
+named!(blank_line<Span, Vec<Token>>,
+    do_parse!(
+        pos: position!() >>
+        take_while!(is_space) >>
+        alt!(tag!("\n") | tag!("\r")) >>
+        take_while!(is_space) >>
+        (vec![Token{line: pos.line, symbol: SymbolType::Newline}])
+    )
+);
+
+named!(lines_core<Span, (Vec<Token>, Vec<Vec<Token>>)>,
+    do_parse!(
+        many0!(blank_line) >>
+        first_line: line >>
+        other_lines: many0!(
+            alt_complete!(
+                do_parse!(
+                    take_while!(is_space) >>
+                    alt!(tag!("\n") | tag!("\r")) >>
+                    take_while!(is_space) >>
+                    a_line: line >>
+                    (a_line)
+                ) => {|l| l } |
+                blank_line => {|b| b }
+            )
+        ) >>
+        (first_line, other_lines)
+    )
+);
 
 fn lines(input: &str) -> nom::IResult<Span, Vec<Vec<Token>>> {
     let cs = CompleteStr(&input);
     let complete: Span = Span::new(cs);
     return match lines_core(complete) {
-        Ok(ret) => Ok(ret),
+        Ok((rest, (first, mut others))) => {
+            others.insert(0, first);
+            Ok((rest, others))
+        }
         Err(_) => {
             unimplemented!();
         }
@@ -476,7 +503,9 @@ pub fn parse(input: &str) -> Result<Program> {
     let mut loop_starts: Vec<usize> = Vec::new();
     let mut func_starts: Vec<usize> = Vec::new();
     let mut if_starts: Vec<usize> = Vec::new();
+    let mut last_line = 0;
     for raw_symbols in raw_lines.1 {
+        debug!("raw_symbols: {:?}", raw_symbols);
         let mut symbols = compact_words(raw_symbols);
         if symbols[0].symbol == SymbolType::And {
             symbols.remove(0);
@@ -484,8 +513,12 @@ pub fn parse(input: &str) -> Result<Program> {
         if symbols[symbols.len() - 1].symbol == SymbolType::Comma {
             symbols.pop();
         }
-        debug!("{:?}", symbols);
+        debug!("symbols: {:?}", symbols);
+        if symbols.is_empty() {
+            bail!(ErrorKind::NoSymbols(last_line+1));
+        }
         let current_line = symbols.first().unwrap().line;
+        last_line = current_line;
         let symbols: Vec<SymbolType> = symbols.into_iter().map(|t| t.symbol).collect();
         match symbols.as_slice() {
             [SymbolType::Build, SymbolType::Variable(target), SymbolType::Up] => {
@@ -824,6 +857,7 @@ mod tests {
         pretty_env_logger::try_init().unwrap_or(());
         let mut raw_lines = lines(input).unwrap();
         assert_eq!(raw_lines.0.fragment, CompleteStr(""));
+        assert_eq!(raw_lines.1.len(), 1, "{:?}", raw_lines.1);
         assert_eq!(raw_lines.1.remove(0).into_iter().map(|t| t.symbol).collect::<Vec<_>>(), tokens);
     }
 
@@ -885,6 +919,19 @@ mod tests {
                 SymbolType::Until, SymbolType::Variable("Counter".to_string()),
                 SymbolType::Is, SymbolType::Variable("Limit".to_string())],
         );
+    }
+
+    #[test]
+    fn split_nothing() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let mut raw_lines = lines("If a thought is greater than nothinggggggggg").unwrap();
+        assert_eq!(raw_lines.0.fragment, CompleteStr("gggggggg"));
+        assert_eq!(raw_lines.1.len(), 1, "{:?}", raw_lines.1);
+        assert_eq!(raw_lines.1.remove(0).into_iter().map(|t| t.symbol).collect::<Vec<_>>(),
+            vec![
+                SymbolType::If, SymbolType::Variable("a thought".to_string()),
+                SymbolType::GreaterThan, SymbolType::Integer("0".to_string())
+            ]);
     }
 
     #[test]

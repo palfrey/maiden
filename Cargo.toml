@@ -25,4 +25,4 @@ stdweb = "0.4.5"
 
 [profile.release]
 lto = true
-opt-level = 's'
+#opt-level = 's'
