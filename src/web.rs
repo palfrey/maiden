@@ -85,6 +85,9 @@ impl Component for Model {
                         }
                         writer.set_position(0);
                         self.res += std::str::from_utf8(writer.get_ref()).unwrap().into();
+                        if self.res.is_empty() {
+                            self.res = "<No output from program>".to_string();
+                        }
                         js! { @(no_return)
                             $("#outputTabs li#output-tab-li a").tab("show");
                         };
