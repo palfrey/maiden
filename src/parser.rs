@@ -192,7 +192,7 @@ named!(word(Span) -> SymbolType,
         take_while1!(word_character) => {|word: Span| SymbolType::Words(vec![word.to_string()])}
     ));
 
-named!(poetic_number_literal_core<Span, (Span, String, Vec<Span>)>,
+named!(poetic_number_literal_core<Span, (u32, String, Vec<Span>)>,
     do_parse!(
         pv: variable >>
         take_while1!(is_space) >>
@@ -205,12 +205,12 @@ named!(poetic_number_literal_core<Span, (Span, String, Vec<Span>)>,
                 (word)
             )
         ) >>
-        (position, pv, words)
+        (position.line, pv, words)
     )
 );
 
 fn poetic_number_literal(input: Span) -> nom::IResult<Span, Vec<Token>> {
-    let (rest, (position, target, words)) = poetic_number_literal_core(input)?;
+    let (rest, (line, target, words)) = poetic_number_literal_core(input)?;
     let literal = SymbolType::Words(words.iter().map(|s| s.to_string()).collect());
     return Ok((
         rest,
@@ -218,7 +218,7 @@ fn poetic_number_literal(input: Span) -> nom::IResult<Span, Vec<Token>> {
             .into_iter()
             .map(|x| {
                 Token {
-                    position,
+                    line: line,
                     symbol: x,
                 }
             })
@@ -232,7 +232,7 @@ named!(pub line<Span, Vec<Token>>, alt_complete!(
         position: position!() >>
         word: word >>
         take_while!(is_space) >>
-        (Token{position: position, symbol:word})
+        (Token{line: position.line, symbol:word})
     )) => {|s| s }
 ));
 
@@ -243,7 +243,7 @@ named!(lines_core<Span, Vec<Vec<Token>>>, many0!(
             alt!(tag!("\n") | tag!("\r")) >>
             take_while!(is_space) >>
             (pos)
-        ) => {|pos| vec![Token{position: pos, symbol: SymbolType::Newline}]} |
+        ) => {|pos: Span| vec![Token{line: pos.line, symbol: SymbolType::Newline}]} |
         do_parse!(
             a_line: line >>
             opt!(alt!(tag!("\n") | tag!("\r"))) >>
@@ -266,7 +266,7 @@ fn lines(input: &str) -> nom::IResult<Span, Vec<Vec<Token>>> {
 fn compact_words(line: Vec<Token>) -> Vec<Token> {
     let mut symbols: Vec<Token> = Vec::new();
     let mut words = Vec::new();
-    let pos = line[0].position;
+    let pos = line[0].line;
     for word in line {
         match word.symbol {
             SymbolType::Words(other) => {
@@ -275,7 +275,7 @@ fn compact_words(line: Vec<Token>) -> Vec<Token> {
             _ => {
                 if !words.is_empty() {
                     symbols.push(Token {
-                        position: word.position,
+                        line: word.line,
                         symbol: SymbolType::Words(words),
                     });
                     words = Vec::new();
@@ -286,7 +286,7 @@ fn compact_words(line: Vec<Token>) -> Vec<Token> {
     }
     if !words.is_empty() {
         symbols.push(Token {
-            position: pos,
+            line: pos,
             symbol: SymbolType::Words(words),
         });
     }
@@ -485,7 +485,7 @@ pub fn parse(input: &str) -> Result<Program> {
             symbols.pop();
         }
         debug!("{:?}", symbols);
-        let current_line = symbols.first().unwrap().position.line;
+        let current_line = symbols.first().unwrap().line;
         let symbols: Vec<SymbolType> = symbols.into_iter().map(|t| t.symbol).collect();
         match symbols.as_slice() {
             [SymbolType::Build, SymbolType::Variable(target), SymbolType::Up] => {

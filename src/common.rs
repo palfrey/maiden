@@ -64,8 +64,8 @@ pub enum SymbolType {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Token<'a> {
-    pub position: Span<'a>,
+pub struct Token {
+    pub line: u32,
     pub symbol: SymbolType,
 }
 
