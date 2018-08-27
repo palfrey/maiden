@@ -14,7 +14,7 @@ pub struct Model {
 
 pub enum Msg {
     GotInput(String),
-    ClickRun,
+    ClickRun(()),
 }
 
 impl Model {
@@ -66,7 +66,7 @@ impl Component for Model {
                 self.value = input_data;
                 false
             }
-            Msg::ClickRun => {
+            Msg::ClickRun(()) => {
                 let program = parser::parse(&self.value);
                 match program {
                     Err(err) => {
@@ -102,14 +102,23 @@ impl Component for Model {
 impl Renderable<Model> for Model {
     fn view(&self) -> Html<Self> {
         let input_callback = self.link.send_back(Msg::GotInput);
-        let callback = move |payload: String| input_callback.emit(payload);
+        let run_callback = self.link.send_back(Msg::ClickRun);
+        let do_input = move |payload: String| input_callback.emit(payload);
+        let do_run = move || run_callback.emit(());
         js! {
             function codeMirrorCallback() {
                 if (window.codeMirror) {
                     if (!window.codeMirror.configured) {
                         window.codeMirror.on("change", function(cm, change) {
-                            var callback = @{callback};
+                            var callback = @{do_input};
                             callback(cm.getValue());
+                        });
+                        window.codeMirror.addKeyMap({
+                            "Cmd-Enter": function(cm) {
+                                var callback = @{do_run};
+                                console.log("Calling run");
+                                callback();
+                            }
                         });
                         console.log("setup callback");
                         window.codeMirror.configured = true;
@@ -126,7 +135,7 @@ impl Renderable<Model> for Model {
                 <div class="col-6",>
                     <button type="button",
                         class=("btn", "btn-primary"),
-                        onclick=|_| Msg::ClickRun,>{ "Run program" }</button>
+                        onclick=|_| Msg::ClickRun(()),>{ "Run program" }</button>
                     <textarea id="editor",
                         class="form-control",
                         value=&self.value,
