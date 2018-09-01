@@ -7,8 +7,9 @@ use yew::prelude::*;
 pub struct Model {
     value: String,
     program: String,
-    res: String,
     parse_error: bool,
+    res: String,
+    run_error: bool,
     link: ComponentLink<Model>,
 }
 
@@ -53,8 +54,9 @@ impl Component for Model {
         Self {
             value: include_str!("../tests/modulo.rock").into(),
             program: "Click 'Run program' to see output".into(),
-            res: "Click 'Run program' to see output".into(),
             parse_error: false,
+            res: "".into(),
+            run_error: false,
             link: link,
         }
     }
@@ -82,15 +84,16 @@ impl Component for Model {
                         self.res = "".into();
                         if let Err(err) = res {
                             self.res += &self.nicer_error(&err);
+                            self.run_error = true;
+                        }
+                        else {
+                            self.run_error = false;
                         }
                         writer.set_position(0);
                         self.res += std::str::from_utf8(writer.get_ref()).unwrap().into();
                         if self.res.is_empty() {
                             self.res = "<No output from program>".to_string();
                         }
-                        js! { @(no_return)
-                            $("#outputTabs li#output-tab-li a").tab("show");
-                        };
                     }
                 }
                 true
@@ -148,12 +151,16 @@ impl Renderable<Model> for Model {
                             <a class=("nav-link", "active"),
                                 id="ast-tab", data-toggle="tab",
                                 href="#ast", role="tab",
+                                style=if self.parse_error {"color: red"} else {"color: green"},
                                 aria-controls="ast", aria-selected="true",>{ "AST" }</a>
                         </li>
-                        <li class="nav-item", id="output-tab-li",>
+                        <li class="nav-item",
+                            id="output-tab-li",
+                            style=if self.parse_error {"display: none"} else {""},>
                             <a class="nav-link", id="output-tab",
                                 data-toggle="tab", href="#output",
                                 role="tab", aria-controls="output",
+                                style=if self.run_error {"color: red"} else {"color: green"},
                                 aria-selected="false",>{ "Output" }</a>
                         </li>
                     </ul>
@@ -162,7 +169,9 @@ impl Renderable<Model> for Model {
                             id="ast", role="tabpanel", aria-labelledby="ast-tab",>
                             {self.ast_tab()}
                         </div>
-                        <div class=("tab-pane", "fade"), id="output",
+                        <div class=("tab-pane", "fade"),
+                            id="output",
+                            style=if self.parse_error {"display: none"} else {""},
                             role="tabpanel", aria-labelledby="output-tab",>
                             <pre>{&self.res}</pre>
                         </div>
