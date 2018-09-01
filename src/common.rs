@@ -159,6 +159,9 @@ error_chain!{
         BadIs(sequence: Vec<SymbolType>, line: u32) {
             display("Bad 'is' section: {:?}", sequence)
         }
+        NoEndOfIf(line: u32) {
+            display("No end of if statement")
+        }
     }
 }
 
@@ -183,6 +186,7 @@ pub fn get_error_line(e: &Error) -> u32 {
                 ErrorKind::BadCommandSequence(_, line) => line.clone(),
                 ErrorKind::ParseIntError(_, line) => line.clone(),
                 ErrorKind::BadIs(_, line) => line.clone(),
+                ErrorKind::NoEndOfIf(line) => line.clone(),
                 _ => 0,
             }
         }

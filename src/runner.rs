@@ -278,7 +278,12 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 let resolve = run_expression(state, program, &expression)?;
                 debug!("if: {:?} {:?}", &resolve, expression);
                 if !to_boolean(&resolve) {
-                    pc = if_end.expect("if_end");
+                    match if_end {
+                        Some(val) => {
+                            pc = val;
+                        }
+                        None => bail!(ErrorKind::NoEndOfIf(state.current_line)),
+                    }
                 }
             }
             Command::Call { ref name, ref args } => {

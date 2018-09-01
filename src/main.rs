@@ -219,4 +219,17 @@ mod tests {
             assert!(false, err);
         }
     }
+
+    #[test]
+    fn end_of_if() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let program = parser::parse("if this is tests").unwrap();
+        let mut writer = Cursor::new(Vec::new());
+        let err = runner::run(program, &mut writer).err().unwrap().0;
+        if let common::ErrorKind::NoEndOfIf(line) = err {
+            assert_eq!(line, 1);
+        } else {
+            assert!(false, err);
+        }
+    }
 }
