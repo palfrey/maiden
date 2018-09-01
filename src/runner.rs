@@ -14,12 +14,12 @@ fn run_binop(
     program: &Program,
     first: &Expression,
     second: &Expression,
-    f: fn(&Expression, &Expression) -> bool,
+    f: fn(&State, &Expression, &Expression) -> Result<bool>,
 ) -> Result<Expression> {
     let res_first = run_expression(state, program, first.deref())?;
     let res_second = run_expression(state, program, second.deref())?;
     debug!("first: {:?} second: {:?}", res_first, res_second);
-    if f(&res_first, &res_second) {
+    if f(state, &res_first, &res_second)? {
         Ok(Expression::True)
     } else {
         Ok(Expression::False)
@@ -49,13 +49,16 @@ fn run_mathbinop(
     );
 }
 
-fn to_boolean(expression: &Expression) -> bool {
+fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
     if let &Expression::False = expression {
-        false
+        Ok(false)
     } else if let &Expression::True = expression {
-        true
+        Ok(true)
     } else {
-        panic!("Bad boolean resolve: {:?}", expression);
+        bail!(ErrorKind::BadBooleanResolve(
+            format!("{:?}", expression),
+            state.current_line,
+        ));
     }
 }
 
@@ -97,24 +100,24 @@ fn run_expression(state: &mut State, program: &Program, expression: &Expression)
     debug!("Expression: {:?}", expression);
     return match expression {
         &Expression::Is(ref first, ref second) => {
-            return run_binop(state, program, first, second, |f, s| f == s);
+            return run_binop(state, program, first, second, |_, f, s| Ok(f == s));
         }
         &Expression::Aint(ref first, ref second) => {
-            return run_binop(state, program, first, second, |f, s| f != s);
+            return run_binop(state, program, first, second, |_, f, s| Ok(f != s));
         }
         &Expression::And(ref first, ref second) => {
-            return run_binop(state, program, first, second, |f, s| {
-                return to_boolean(f) && to_boolean(s);
+            return run_binop(state, program, first, second, |st, f, s| {
+                return Ok(to_boolean(st, f)? && to_boolean(st, s)?);
             });
         }
         &Expression::GreaterThanOrEqual(ref first, ref second) => {
-            return run_binop(state, program, first, second, |f, s| f >= s);
+            return run_binop(state, program, first, second, |_, f, s| Ok(f >= s));
         }
         &Expression::GreaterThan(ref first, ref second) => {
-            return run_binop(state, program, first, second, |f, s| f > s);
+            return run_binop(state, program, first, second, |_, f, s| Ok(f > s));
         }
         &Expression::LessThan(ref first, ref second) => {
-            return run_binop(state, program, first, second, |f, s| f < s);
+            return run_binop(state, program, first, second, |_, f, s| Ok(f < s));
         }
         &Expression::Subtract(ref first, ref second) => {
             return run_mathbinop(state, program, first, second, |f, s| f - s);
@@ -232,7 +235,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 loop_end,
             } => {
                 let resolve = run_expression(state, program, &expression)?;
-                if to_boolean(&resolve) {
+                if to_boolean(state, &resolve)? {
                     pc = loop_end.expect("loop_end");
                 }
             }
@@ -241,7 +244,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 loop_end,
             } => {
                 let resolve = run_expression(state, program, &expression)?;
-                if !to_boolean(&resolve) {
+                if !to_boolean(state, &resolve)? {
                     pc = loop_end.expect("loop_end");
                 }
             }
@@ -277,7 +280,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
             } => {
                 let resolve = run_expression(state, program, &expression)?;
                 debug!("if: {:?} {:?}", &resolve, expression);
-                if !to_boolean(&resolve) {
+                if !to_boolean(state, &resolve)? {
                     match if_end {
                         Some(val) => {
                             pc = val;

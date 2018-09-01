@@ -144,6 +144,9 @@ error_chain!{
         UnbalancedExpression(expression: String, line: u32) {
             display("Unbalanced expression '{}'", expression)
         }
+        BadBooleanResolve(expression: String, line: u32) {
+            display("Bad boolean resolve: {:?}", expression)
+        }
         NoRunner(expression: String, line: u32) {
             display("Don't know how to execute the expression '{}'", expression)
         }
@@ -187,6 +190,7 @@ pub fn get_error_line(e: &Error) -> u32 {
                 ErrorKind::ParseIntError(_, line) => line.clone(),
                 ErrorKind::BadIs(_, line) => line.clone(),
                 ErrorKind::NoEndOfIf(line) => line.clone(),
+                ErrorKind::BadBooleanResolve(_, line) => line.clone(),
                 _ => 0,
             }
         }
