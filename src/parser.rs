@@ -567,13 +567,21 @@ pub fn parse(input: &str) -> Result<Program> {
                     }
                     commands.push(CommandLine {
                         cmd: Command::EndIf,
-                        line: current_line,
+                        line: if symbols[0] == SymbolType::Newline {
+                            current_line + 1 // Newline line is the one before this
+                        } else {
+                            current_line
+                        },
                     });
                 } else if !loop_starts.is_empty() {
                     let command = build_next(&mut commands, &mut loop_starts);
                     commands.push(CommandLine {
                         cmd: command,
-                        line: current_line,
+                        line: if symbols[0] == SymbolType::Newline {
+                            current_line + 1 // Newline line is the one before this
+                        } else {
+                            current_line
+                        },
                     });
                 } else if !func_starts.is_empty() {
                     let func_start = func_starts.pop().expect("func_starts");
@@ -595,7 +603,11 @@ pub fn parse(input: &str) -> Result<Program> {
                     }
                     commands.push(CommandLine {
                         cmd: Command::EndFunction,
-                        line: current_line,
+                        line: if symbols[0] == SymbolType::Newline {
+                            current_line + 1 // Newline line is the one before this
+                        } else {
+                            current_line
+                        },
                     });
                 } else {
                     debug!("Double newline that doesn't end anything");
