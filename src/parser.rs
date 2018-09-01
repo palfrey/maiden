@@ -703,7 +703,7 @@ pub fn parse(input: &str) -> Result<Program> {
                             line: current_line,
                         });
                     } else {
-                        error!("Bad 'put' section: {:?}", symbols);
+                        bail!(ErrorKind::BadPut(symbols.to_vec(), current_line));
                     }
                 } else if symbols.len() > 2 && symbols[1] == SymbolType::Takes {
                     if let SymbolType::Variable(ref name) = symbols[0] {
@@ -1015,6 +1015,22 @@ mod tests {
         let err = parse("if t is").err().unwrap().0;
         if let ErrorKind::UnbalancedExpression(name, line) = err {
             assert_eq!(name, "[Words([\"t\"]), Is]");
+            assert_eq!(line, 1);
+        } else {
+            assert!(false, err);
+        }
+    }
+
+    #[test]
+    fn bad_put() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let err = parse("put foo into bar").err().unwrap().0;
+        if let ErrorKind::BadPut(expression, line) = err {
+            assert_eq!(expression, vec![
+                SymbolType::Put,
+                SymbolType::Words(vec!["foo".to_string()]),
+                SymbolType::Where,
+                SymbolType::Words(vec!["bar".to_string()])]);
             assert_eq!(line, 1);
         } else {
             assert!(false, err);
