@@ -236,7 +236,12 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
             } => {
                 let resolve = run_expression(state, program, &expression)?;
                 if to_boolean(state, &resolve)? {
-                    pc = loop_end.expect("loop_end");
+                    match loop_end {
+                        Some(val) => {
+                            pc = val;
+                        }
+                        None => bail!(ErrorKind::NoEndLoop(state.current_line)),
+                    }
                 }
             }
             Command::While {
@@ -245,7 +250,12 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
             } => {
                 let resolve = run_expression(state, program, &expression)?;
                 if !to_boolean(state, &resolve)? {
-                    pc = loop_end.expect("loop_end");
+                    match loop_end {
+                        Some(val) => {
+                            pc = val;
+                        }
+                        None => bail!(ErrorKind::NoEndLoop(state.current_line)),
+                    }
                 }
             }
             Command::Next { loop_start } |

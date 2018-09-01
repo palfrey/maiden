@@ -206,12 +206,16 @@ mod tests {
         );
     }
 
+    fn test_error(input: &str) -> common::ErrorKind {
+        pretty_env_logger::try_init().unwrap_or(());
+        let program = parser::parse(input).unwrap();
+        let mut writer = Cursor::new(Vec::new());
+        runner::run(program, &mut writer).err().unwrap().0
+    }
+
     #[test]
     fn missing_variable() {
-        pretty_env_logger::try_init().unwrap_or(());
-        let program = parser::parse("Put Desire into my world").unwrap();
-        let mut writer = Cursor::new(Vec::new());
-        let err = runner::run(program, &mut writer).err().unwrap().0;
+        let err = test_error("Put Desire into my world");
         if let common::ErrorKind::MissingVariable(name, line) = err {
             assert_eq!(name, "Desire");
             assert_eq!(line, 1);
@@ -222,10 +226,7 @@ mod tests {
 
     #[test]
     fn end_of_if() {
-        pretty_env_logger::try_init().unwrap_or(());
-        let program = parser::parse("if this is tests").unwrap();
-        let mut writer = Cursor::new(Vec::new());
-        let err = runner::run(program, &mut writer).err().unwrap().0;
+        let err = test_error("if this is tests");
         if let common::ErrorKind::NoEndOfIf(line) = err {
             assert_eq!(line, 1);
         } else {
@@ -235,10 +236,7 @@ mod tests {
 
     #[test]
     fn bad_boolean() {
-        pretty_env_logger::try_init().unwrap_or(());
-        let program = parser::parse("if t").unwrap();
-        let mut writer = Cursor::new(Vec::new());
-        let err = runner::run(program, &mut writer).err().unwrap().0;
+        let err = test_error("if t");
         if let common::ErrorKind::BadBooleanResolve(name, line) = err {
             assert_eq!(name, "Integer(1)");
             assert_eq!(line, 1);
@@ -249,11 +247,18 @@ mod tests {
 
     #[test]
     fn no_end_func() {
-        pretty_env_logger::try_init().unwrap_or(());
-        let program = parser::parse("What Remains takes the fighters and a war").unwrap();
-        let mut writer = Cursor::new(Vec::new());
-        let err = runner::run(program, &mut writer).err().unwrap().0;
+        let err = test_error("What Remains takes the fighters and a war");
         if let common::ErrorKind::NoEndFunction(line) = err {
+            assert_eq!(line, 1);
+        } else {
+            assert!(false, err);
+        }
+    }
+
+    #[test]
+    fn no_end_loop() {
+        let err = test_error("until this is that");
+        if let common::ErrorKind::NoEndLoop(line) = err {
             assert_eq!(line, 1);
         } else {
             assert!(false, err);

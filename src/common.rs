@@ -168,6 +168,9 @@ error_chain!{
         NoEndFunction(line: u32) {
             display("No end of function")
         }
+        NoEndLoop(line: u32) {
+            display("No end of loop")
+        }
     }
 }
 
@@ -194,6 +197,7 @@ pub fn get_error_line(e: &Error) -> u32 {
                 ErrorKind::BadIs(_, line) => line.clone(),
                 ErrorKind::NoEndOfIf(line) => line.clone(),
                 ErrorKind::NoEndFunction(line) => line.clone(),
+                ErrorKind::NoEndLoop(line) => line.clone(),
                 ErrorKind::BadBooleanResolve(_, line) => line.clone(),
                 _ => 0,
             }
