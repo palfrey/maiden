@@ -142,7 +142,7 @@ error_chain!{
             display("Wrong argument count to function (expected {}, got {})", expected, got)
         }
         UnbalancedExpression(expression: String, line: u32) {
-            display("Unbalanced expression '{}'", expression)
+            display("Unbalanced expression {}", expression)
         }
         BadBooleanResolve(expression: String, line: u32) {
             display("Bad boolean resolve: {:?}", expression)

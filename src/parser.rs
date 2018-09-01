@@ -438,10 +438,17 @@ fn parse_expression_1(
         } else {
             index
         };
+        if index >= items.len() {
+            bail!(ErrorKind::UnbalancedExpression(format!("{:?}", items), line));
+        }
         let mut rhs = single_symbol_to_expression(items[index], line)?;
         lookahead = next_operator(items, index);
         while lookahead.is_some() && lookahead.unwrap().0 > op {
-            let res = parse_expression_1(items, index, rhs, &items[lookahead.unwrap().1], line)?;
+            let l = lookahead.unwrap().1;
+            if l >= items.len() {
+                bail!(ErrorKind::UnbalancedExpression(format!("{:?}", items), line));
+            }
+            let res = parse_expression_1(items, index, rhs, &items[l], line)?;
             rhs = res.0;
             index = res.1;
             lookahead = next_operator(items, index);
@@ -995,6 +1002,18 @@ mod tests {
             .0;
         if let ErrorKind::ParseIntError(val, line) = err {
             assert_eq!(val, "340282366920938463463374607431768211455");
+            assert_eq!(line, 1);
+        } else {
+            assert!(false, err);
+        }
+    }
+
+    #[test]
+    fn bad_expression() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let err = parse("if t is").err().unwrap().0;
+        if let ErrorKind::UnbalancedExpression(name, line) = err {
+            assert_eq!(name, "[Words([\"t\"]), Is]");
             assert_eq!(line, 1);
         } else {
             assert!(false, err);
