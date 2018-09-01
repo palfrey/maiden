@@ -206,6 +206,15 @@ mod tests {
         );
     }
 
+    #[test]
+    fn multiple_uppercase_proper_variable() {
+        let end_variables =
+            hashmap! {
+            "id" => Expression::Integer(3),
+        };
+        test_program("put foo into ID", end_variables, "");
+    }
+
     fn test_error(input: &str) -> common::ErrorKind {
         pretty_env_logger::try_init().unwrap_or(());
         let program = parser::parse(input).unwrap();
