@@ -246,4 +246,17 @@ mod tests {
             assert!(false, err);
         }
     }
+
+    #[test]
+    fn no_end_func() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let program = parser::parse("What Remains takes the fighters and a war").unwrap();
+        let mut writer = Cursor::new(Vec::new());
+        let err = runner::run(program, &mut writer).err().unwrap().0;
+        if let common::ErrorKind::NoEndFunction(line) = err {
+            assert_eq!(line, 1);
+        } else {
+            assert!(false, err);
+        }
+    }
 }

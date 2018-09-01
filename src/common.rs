@@ -165,6 +165,9 @@ error_chain!{
         NoEndOfIf(line: u32) {
             display("No end of if statement")
         }
+        NoEndFunction(line: u32) {
+            display("No end of function")
+        }
     }
 }
 
@@ -190,6 +193,7 @@ pub fn get_error_line(e: &Error) -> u32 {
                 ErrorKind::ParseIntError(_, line) => line.clone(),
                 ErrorKind::BadIs(_, line) => line.clone(),
                 ErrorKind::NoEndOfIf(line) => line.clone(),
+                ErrorKind::NoEndFunction(line) => line.clone(),
                 ErrorKind::BadBooleanResolve(_, line) => line.clone(),
                 _ => 0,
             }

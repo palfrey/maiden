@@ -266,7 +266,12 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 args: _,
                 func_end,
             } => {
-                pc = func_end.expect("func_end");
+                match func_end {
+                    Some(val) => {
+                        pc = val;
+                    }
+                    None => bail!(ErrorKind::NoEndFunction(state.current_line)),
+                }
             }
             Command::Return { ref return_value } => {
                 return run_expression(state, program, &return_value);
