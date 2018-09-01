@@ -152,6 +152,9 @@ error_chain!{
         NoSymbols(line: u32) {
             display("No symbols!")
         }
+        BadIs(sequence: Vec<SymbolType>, line: u32) {
+            display("Bad 'is' section: {:?}", sequence)
+        }
     }
 }
 
@@ -167,6 +170,7 @@ pub fn get_error_line(e: &Error) -> u32 {
                 ErrorKind::NoRunner(_, line) => line.clone(),
                 ErrorKind::BadCommandSequence(_, line) => line.clone(),
                 ErrorKind::ParseIntError(_, line) => line.clone(),
+                ErrorKind::BadIs(_, line) => line.clone(),
                 _ => unimplemented!(),
             }
         }

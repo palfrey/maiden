@@ -636,7 +636,7 @@ pub fn parse(input: &str) -> Result<Program> {
                             line: current_line,
                         });
                     } else {
-                        error!("Bad 'is' section: {:?}", symbols);
+                        bail!(ErrorKind::BadIs(symbols.to_vec(), current_line));
                     }
                 } else if symbols[0] == SymbolType::Until && symbols.len() > 1 {
                     loop_starts.push(commands.len());
@@ -957,6 +957,21 @@ mod tests {
                 .unwrap()),
             "1: FunctionDeclaration { name: \"Absolute\", args: [\"a thought\"], func_end: None }\n"
         )
+    }
+
+    #[test]
+    fn bad_fragment() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let err = parse("test is a").err().unwrap().0;
+        if let ErrorKind::BadIs(symbols, line) = err {
+            assert_eq!(symbols, vec![
+                SymbolType::Words(vec!["test".to_string()]),
+                SymbolType::Is,
+                SymbolType::Words(vec!["a".to_string()])]);
+            assert_eq!(line, 1);
+        } else {
+            assert!(false, err);
+        }
     }
 
     #[test]
