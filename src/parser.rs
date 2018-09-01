@@ -498,7 +498,8 @@ pub fn parse(input: &str) -> Result<Program> {
     let re = Regex::new(r"'s\W+").unwrap();
     let fixed_input = re.replace_all(input, " is ").replace("'", "");
     let raw_lines = lines(&fixed_input)?;
-    if raw_lines.0.fragment.len() > 0 {
+    if !raw_lines.0.fragment.is_empty() && raw_lines.0.fragment.chars().any(|c| !c.is_whitespace()) {
+        // ignore empty and all-whitespace blocks
         let pos = raw_lines.0;
         bail!(ErrorKind::UnparsedText(pos.fragment.to_string(), pos.line));
     }
