@@ -284,9 +284,7 @@ fn lines(input: &str) -> nom::IResult<Span, Vec<Vec<Token>>> {
             others.insert(0, first);
             Ok((rest, others))
         }
-        Err(_) => {
-            unimplemented!();
-        }
+        Err(err) => Err(err),
     };
 }
 
@@ -492,7 +490,7 @@ fn build_next(commands: &mut Vec<CommandLine>, loop_starts: &mut Vec<usize>) -> 
 pub fn parse(input: &str) -> Result<Program> {
     let re = Regex::new(r"'s\W+").unwrap();
     let fixed_input = re.replace_all(input, " is ").replace("'", "");
-    let raw_lines = lines(&fixed_input).unwrap();
+    let raw_lines = lines(&fixed_input)?;
     if raw_lines.0.fragment.len() > 0 {
         let pos = raw_lines.0;
         bail!(ErrorKind::UnparsedText(pos.fragment.to_string(), pos.line));

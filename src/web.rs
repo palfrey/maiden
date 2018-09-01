@@ -20,7 +20,11 @@ pub enum Msg {
 
 impl Model {
     fn get_line(&self, line: usize) -> &str {
-        self.value.split("\n").nth(line - 1).unwrap()
+        if line == 0 {
+            &self.value
+        } else {
+            self.value.split("\n").nth(line - 1).unwrap()
+        }
     }
 
     fn nicer_error(&self, err: &common::Error) -> String {

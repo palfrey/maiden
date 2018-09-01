@@ -125,6 +125,10 @@ error_chain!{
         Io(::std::io::Error);
     }
     errors {
+        Nom(kind: ::nom::ErrorKind) {
+            description("parsing error")
+            display("parsing error: {:?}", kind)
+        }
         UnparsedText(t: String, line: u32) {
             display("Unparsed text '{}'", t)
         }
@@ -158,6 +162,13 @@ error_chain!{
     }
 }
 
+impl<'a> From<::nom::Err<Span<'a>>> for Error {
+    fn from(err: ::nom::Err<Span<'a>>) -> Error {
+        let kind = err.into_error_kind();
+        Error::from_kind(ErrorKind::Nom(kind))
+    }
+}
+
 #[cfg(target_arch = "wasm32")]
 pub fn get_error_line(e: &Error) -> u32 {
     match e {
@@ -172,7 +183,7 @@ pub fn get_error_line(e: &Error) -> u32 {
                 ErrorKind::BadCommandSequence(_, line) => line.clone(),
                 ErrorKind::ParseIntError(_, line) => line.clone(),
                 ErrorKind::BadIs(_, line) => line.clone(),
-                _ => unimplemented!(),
+                _ => 0,
             }
         }
     }
