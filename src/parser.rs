@@ -748,10 +748,12 @@ pub fn parse(input: &str) -> Result<Program> {
     });
 }
 
+#[cfg(any(target_arch = "wasm32", test))]
 fn print_command(command: &Command) -> String {
     format!("{:?}", command)
 }
 
+#[cfg(any(target_arch = "wasm32", test))]
 pub fn print_program(program: &Program) -> String {
     let mut res = String::new();
     let mut indent = 0;

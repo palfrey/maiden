@@ -158,6 +158,7 @@ error_chain!{
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 pub fn get_error_line(e: &Error) -> u32 {
     match e {
         Error(kind, _) => {
