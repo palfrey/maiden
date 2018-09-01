@@ -15,7 +15,6 @@ pub struct Model {
 
 pub enum Msg {
     GotInput(String),
-    ClickRun(()),
 }
 
 impl Model {
@@ -48,6 +47,35 @@ impl Model {
             }
         }
     }
+
+    fn run_program(&mut self) {
+        let program = parser::parse(&self.value);
+        match program {
+            Err(err) => {
+                self.program = self.nicer_error(&err);
+                self.parse_error = true;
+                self.res = "".to_string()
+            }
+            Ok(val) => {
+                self.program = parser::print_program(&val);
+                self.parse_error = false;
+                let mut writer = std::io::Cursor::new(Vec::new());
+                let res = runner::run(val, &mut writer);
+                self.res = "".into();
+                if let Err(err) = res {
+                    self.res += &self.nicer_error(&err);
+                    self.run_error = true;
+                } else {
+                    self.run_error = false;
+                }
+                writer.set_position(0);
+                self.res += std::str::from_utf8(writer.get_ref()).unwrap().into();
+                if self.res.is_empty() {
+                    self.res = "<No output from program>".to_string();
+                }
+            }
+        }
+    }
 }
 
 impl Component for Model {
@@ -55,14 +83,16 @@ impl Component for Model {
     type Properties = ();
 
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
-        Self {
+        let mut res = Self {
             value: include_str!("../tests/modulo.rock").into(),
-            program: "Click 'Run program' to see output".into(),
+            program: "".into(),
             parse_error: false,
             res: "".into(),
             run_error: false,
             link: link,
-        }
+        };
+        res.run_program();
+        res
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
@@ -70,36 +100,7 @@ impl Component for Model {
             Msg::GotInput(input_data) => {
                 println!("Change");
                 self.value = input_data;
-                false
-            }
-            Msg::ClickRun(()) => {
-                let program = parser::parse(&self.value);
-                match program {
-                    Err(err) => {
-                        self.program = self.nicer_error(&err);
-                        self.parse_error = true;
-                        self.res = "".to_string()
-                    }
-                    Ok(val) => {
-                        self.program = parser::print_program(&val);
-                        self.parse_error = false;
-                        let mut writer = std::io::Cursor::new(Vec::new());
-                        let res = runner::run(val, &mut writer);
-                        self.res = "".into();
-                        if let Err(err) = res {
-                            self.res += &self.nicer_error(&err);
-                            self.run_error = true;
-                        }
-                        else {
-                            self.run_error = false;
-                        }
-                        writer.set_position(0);
-                        self.res += std::str::from_utf8(writer.get_ref()).unwrap().into();
-                        if self.res.is_empty() {
-                            self.res = "<No output from program>".to_string();
-                        }
-                    }
-                }
+                self.run_program();
                 true
             }
         }
@@ -109,9 +110,7 @@ impl Component for Model {
 impl Renderable<Model> for Model {
     fn view(&self) -> Html<Self> {
         let input_callback = self.link.send_back(Msg::GotInput);
-        let run_callback = self.link.send_back(Msg::ClickRun);
         let do_input = move |payload: String| input_callback.emit(payload);
-        let do_run = move || run_callback.emit(());
         js! {
             function codeMirrorCallback() {
                 if (window.codeMirror) {
@@ -119,13 +118,6 @@ impl Renderable<Model> for Model {
                         window.codeMirror.on("change", function(cm, change) {
                             var callback = @{do_input};
                             callback(cm.getValue());
-                        });
-                        window.codeMirror.addKeyMap({
-                            "Cmd-Enter": function(cm) {
-                                var callback = @{do_run};
-                                console.log("Calling run");
-                                callback();
-                            }
                         });
                         console.log("setup callback");
                         window.codeMirror.configured = true;
@@ -140,9 +132,6 @@ impl Renderable<Model> for Model {
         html! {
             <div class="row",>
                 <div class="col-6",>
-                    <button type="button",
-                        class=("btn", "btn-primary"),
-                        onclick=|_| Msg::ClickRun(()),>{ "Run program" }</button>
                     <textarea id="editor",
                         class="form-control",
                         value=&self.value,
