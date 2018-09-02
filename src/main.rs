@@ -1,4 +1,5 @@
 #![recursion_limit="5000"]
+#![deny(warnings)]
 
 #[macro_use]
 extern crate nom;

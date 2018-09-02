@@ -715,8 +715,7 @@ pub fn parse(input: &str) -> Result<Program> {
                                 match var_seq.next() {
                                     Some(sym) => {
                                         if sym != &SymbolType::And {
-                                            error!("Bad 'function declaration' section: {:?} {:?}", sym, symbols);
-                                            break;
+                                            bail!(ErrorKind::BadFunctionDeclaration(symbols.to_vec(), current_line));
                                         }
                                     }
                                     None => {
@@ -724,8 +723,7 @@ pub fn parse(input: &str) -> Result<Program> {
                                     }
                                 }
                             } else {
-                                error!("Bad 'function declaration' section: {:?}", symbols);
-                                break;
+                                bail!(ErrorKind::BadFunctionDeclaration(symbols.to_vec(), current_line));
                             }
                         }
                         func_starts.push(commands.len());
@@ -745,7 +743,7 @@ pub fn parse(input: &str) -> Result<Program> {
                             line: current_line,
                         });
                     } else {
-                        error!("Bad 'function declaration' section: {:?}", symbols);
+                        bail!(ErrorKind::BadFunctionDeclaration(symbols.to_vec(), current_line));
                     }
                 } else if symbols[0] == SymbolType::Return && symbols.len() > 1 {
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();

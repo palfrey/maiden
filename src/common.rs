@@ -165,6 +165,9 @@ error_chain!{
         BadPut(sequence: Vec<SymbolType>, line: u32) {
             display("Bad 'put' section: {:?}", sequence)
         }
+        BadFunctionDeclaration(sequence: Vec<SymbolType>, line: u32) {
+            display("Bad 'function declaration' section: {:?}", sequence)
+        }
         NoEndOfIf(line: u32) {
             display("No end of if statement")
         }
@@ -203,6 +206,7 @@ pub fn get_error_line(e: &Error) -> u32 {
                 ErrorKind::NoEndFunction(line) => line.clone(),
                 ErrorKind::NoEndLoop(line) => line.clone(),
                 ErrorKind::BadBooleanResolve(_, line) => line.clone(),
+                ErrorKind::BadFunctionDeclaration(_, line) => line.clone(),
                 _ => 0,
             }
         }
