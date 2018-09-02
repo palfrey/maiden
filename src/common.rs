@@ -177,6 +177,9 @@ error_chain!{
         NoEndLoop(line: u32) {
             display("No end of loop")
         }
+        Unimplemented(description: String, line: u32) {
+            display("Unimplemented: {}", description)
+        }
     }
 }
 
@@ -207,6 +210,7 @@ pub fn get_error_line(e: &Error) -> u32 {
                 ErrorKind::NoEndLoop(line) => line.clone(),
                 ErrorKind::BadBooleanResolve(_, line) => line.clone(),
                 ErrorKind::BadFunctionDeclaration(_, line) => line.clone(),
+                ErrorKind::Unimplemented(_, line) => line.clone(),
                 _ => 0,
             }
         }

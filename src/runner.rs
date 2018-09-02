@@ -42,11 +42,14 @@ fn run_mathbinop(
             return Ok(Expression::Integer(f(f_i, s_i)));
         }
     }
-    unimplemented!(
-        "Math op between non integers: {:?} {:?}",
-        res_first,
-        res_second
-    );
+    bail!(ErrorKind::Unimplemented(
+        format!(
+            "Math op between non integers: {:?} {:?}",
+            res_first,
+            res_second
+        ),
+        state.current_line,
+    ));
 }
 
 fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
@@ -178,12 +181,15 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
             get_printable(&v, state)
         }
         _ => {
-            unimplemented!("Say '{:?}'", value);
+            bail!(ErrorKind::Unimplemented(
+                format!("Say '{:?}'", value),
+                state.current_line,
+            ));
         }
     }
 }
 
-fn alter_variable(state: &mut State, target: &str, f: &Fn(i128) -> i128) {
+fn alter_variable(state: &mut State, target: &str, f: &Fn(i128) -> i128) -> Result<()> {
     let val = state
         .variables
         .get(&target.to_lowercase())
@@ -198,9 +204,13 @@ fn alter_variable(state: &mut State, target: &str, f: &Fn(i128) -> i128) {
             );
         }
         _ => {
-            error!("Attempt to alter non-integer '{}'", target);
+            bail!(ErrorKind::Unimplemented(
+                format!("Attempt to alter non-integer '{}'", target),
+                state.current_line,
+            ));
         }
     };
+    return Ok(());
 }
 
 fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expression)> {
@@ -225,10 +235,10 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 state.variables.insert(target.to_lowercase(), val);
             }
             Command::Increment { ref target } => {
-                alter_variable(state, &target, &|x| x + 1);
+                alter_variable(state, &target, &|x| x + 1)?;
             }
             Command::Decrement { ref target } => {
-                alter_variable(state, &target, &|x| x - 1);
+                alter_variable(state, &target, &|x| x - 1)?;
             }
             Command::Until {
                 ref expression,
@@ -267,7 +277,10 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 match get_printable(&resolve, state) {
                     Ok(x) => writeln!(state.writer, "{}", x)?,
                     Err(_) => {
-                        unimplemented!("Say '{:?}'", value);
+                        bail!(ErrorKind::Unimplemented(
+                            format!("Say '{:?}'", value),
+                            state.current_line,
+                        ));
                     }
                 };
             }

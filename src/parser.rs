@@ -318,7 +318,7 @@ fn compact_words(line: Vec<Token>) -> Vec<Token> {
     return symbols;
 }
 
-fn evaluate(value: &SymbolType) -> Result<Expression> {
+fn evaluate(value: &SymbolType, line: u32) -> Result<Expression> {
     match value {
         SymbolType::Words(words) => {
             if words.len() == 1 {
@@ -342,8 +342,7 @@ fn evaluate(value: &SymbolType) -> Result<Expression> {
             return Ok(Expression::String(phrase.to_string()));
         }
         _ => {
-            warn!("Evaluate: '{:?}'", value);
-            unimplemented!();
+            bail!(ErrorKind::Unimplemented(format!("Evaluate: '{:?}'", value), line));
         }
     }
 }
@@ -375,7 +374,7 @@ fn next_operator<'a>(items: &Vec<&'a SymbolType>, mut index: usize) -> Option<(&
 
 fn single_symbol_to_expression(sym: &SymbolType, line: u32) -> Result<Expression> {
     return match sym {
-        &SymbolType::Words(_) => evaluate(sym),
+        &SymbolType::Words(_) => evaluate(sym, line),
         &SymbolType::Variable(ref name) => Ok(Expression::Variable(name.clone())),
         &SymbolType::String(ref phrase) => Ok(Expression::String(phrase.clone())),
         &SymbolType::Integer(ref val) => {
@@ -396,7 +395,7 @@ fn single_symbol_to_expression(sym: &SymbolType, line: u32) -> Result<Expression
             ))
         }
         _ => {
-            unimplemented!("single symbol: {:?}", sym);
+            bail!(ErrorKind::Unimplemented(format!("Single symbol to expression: {:?}", sym), line));
         }
     };
 }
@@ -464,7 +463,7 @@ fn parse_expression_1(
             &SymbolType::Times => Expression::Times(Box::new(lhs.clone()), Box::new(rhs)),
             &SymbolType::And => Expression::And(Box::new(lhs.clone()), Box::new(rhs)),
             _ => {
-                unimplemented!("No operation for {:?}", op);
+                bail!(ErrorKind::Unimplemented(format!("No operation for {:?}", op), line));
             }
         }
     }
@@ -837,10 +836,10 @@ mod tests {
         pretty_env_logger::try_init().unwrap_or(());
         assert_eq!(
             evaluate(&SymbolType::Words(
-                vec!["a".to_string(), "lovestruck".to_string(), "ladykiller".to_string()])).unwrap(),
+                vec!["a".to_string(), "lovestruck".to_string(), "ladykiller".to_string()]), 0).unwrap(),
             Expression::Integer(100)
         );
-        assert_eq!(evaluate(&SymbolType::Words(vec!["nothing".to_string()])).unwrap(), Expression::Integer(0));
+        assert_eq!(evaluate(&SymbolType::Words(vec!["nothing".to_string()]), 0).unwrap(), Expression::Integer(0));
     }
 
     #[test]
