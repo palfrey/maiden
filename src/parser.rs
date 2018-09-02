@@ -85,6 +85,12 @@ named!(keyword<Span, Span>, // single-words only
     )
 );
 
+named!(literal_word<Span, Span>,
+    alt_complete!(
+        tag_no_case!("nothing")
+    )
+);
+
 named!(word(Span) -> SymbolType,
     alt_complete!(
         do_parse!(
@@ -197,6 +203,7 @@ named!(poetic_number_literal_core<Span, (u32, String, Vec<Span>)>,
         take_while1!(is_space) >>
         tag!("is") >>
         position: position!() >>
+        peek!(not!(tuple!(take_while1!(is_space), literal_word))) >> // number literals cannot start with a literal word
         words: many1!(
             do_parse!(
                 take_while1!(is_space) >>
@@ -949,6 +956,18 @@ mod tests {
                 SymbolType::If, SymbolType::Variable("a thought".to_string()),
                 SymbolType::GreaterThan, SymbolType::Integer("0".to_string())
             ]);
+    }
+
+    #[test]
+    fn literal_words() {
+        lines_tokens_check(
+            "My world is nothing without your love",
+            vec![
+                SymbolType::Variable("My world".to_string()), SymbolType::Is,
+                SymbolType::Integer("0".to_string()), SymbolType::Subtract,
+                SymbolType::Variable("your love".to_string())
+            ],
+        );
     }
 
     #[test]
