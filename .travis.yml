@@ -1,7 +1,18 @@
 dist: trusty
 sudo: false
 language: rust
-cache: cargo
+
+# Based on https://levans.fr/rust_travis_cache.html
+# Need to cache the whole `.cargo` directory to keep .crates.toml for
+# cargo-update to work
+cache:
+  directories:
+    - /home/travis/.cargo
+
+# But don't cache the cargo registry
+before_cache:
+  - rm -rf /home/travis/.cargo/registry
+
 stages:
 - test
 - name: deploy
