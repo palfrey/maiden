@@ -53,9 +53,9 @@ fn run_mathbinop(
 }
 
 fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
-    if let &Expression::False = expression {
+    if let Expression::False = *expression {
         Ok(false)
-    } else if let &Expression::True = expression {
+    } else if let Expression::True = *expression {
         Ok(true)
     } else {
         bail!(ErrorKind::BadBooleanResolve(
@@ -65,7 +65,7 @@ fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
     }
 }
 
-fn call_function(state: &mut State, program: &Program, target: &str, args: &Vec<Expression>) -> Result<Expression> {
+fn call_function(state: &mut State, program: &Program, target: &str, args: &[Expression]) -> Result<Expression> {
     let func_wrap = program.functions.get(target);
     if func_wrap.is_none() {
         bail!(ErrorKind::MissingFunction(
@@ -88,52 +88,51 @@ fn call_function(state: &mut State, program: &Program, target: &str, args: &Vec<
         variables: &mut new_variables,
         current_line: state.current_line,
     };
-    for i in 0..args.len() {
-        let value = run_expression(&mut new_state, program, &args[i])?;
+    for (i, arg) in args.iter().enumerate() {
+        let value = run_expression(&mut new_state, program, &arg)?;
         new_state.variables.insert(
             func.args[i].to_lowercase(),
             value,
         );
     }
-    let ret = run_core(&mut new_state, program, func.location + 1);
-    ret
+    return run_core(&mut new_state, program, func.location + 1);
 }
 
 fn run_expression(state: &mut State, program: &Program, expression: &Expression) -> Result<Expression> {
     debug!("Expression: {:?}", expression);
-    return match expression {
-        &Expression::Is(ref first, ref second) => {
+    return match *expression {
+        Expression::Is(ref first, ref second) => {
             return run_binop(state, program, first, second, |_, f, s| Ok(f == s));
         }
-        &Expression::Aint(ref first, ref second) => {
+        Expression::Aint(ref first, ref second) => {
             return run_binop(state, program, first, second, |_, f, s| Ok(f != s));
         }
-        &Expression::And(ref first, ref second) => {
+        Expression::And(ref first, ref second) => {
             return run_binop(state, program, first, second, |st, f, s| {
                 return Ok(to_boolean(st, f)? && to_boolean(st, s)?);
             });
         }
-        &Expression::GreaterThanOrEqual(ref first, ref second) => {
+        Expression::GreaterThanOrEqual(ref first, ref second) => {
             return run_binop(state, program, first, second, |_, f, s| Ok(f >= s));
         }
-        &Expression::GreaterThan(ref first, ref second) => {
+        Expression::GreaterThan(ref first, ref second) => {
             return run_binop(state, program, first, second, |_, f, s| Ok(f > s));
         }
-        &Expression::LessThan(ref first, ref second) => {
+        Expression::LessThan(ref first, ref second) => {
             return run_binop(state, program, first, second, |_, f, s| Ok(f < s));
         }
-        &Expression::Subtract(ref first, ref second) => {
+        Expression::Subtract(ref first, ref second) => {
             return run_mathbinop(state, program, first, second, |f, s| f - s);
         }
-        &Expression::Add(ref first, ref second) => {
+        Expression::Add(ref first, ref second) => {
             return run_mathbinop(state, program, first, second, |f, s| f + s);
         }
-        &Expression::Times(ref first, ref second) => {
+        Expression::Times(ref first, ref second) => {
             return run_mathbinop(state, program, first, second, |f, s| f * s);
         }
-        &Expression::String(_) |
-        &Expression::Integer(_) => Ok(expression.clone()),
-        &Expression::Variable(ref name) => {
+        Expression::String(_) |
+        Expression::Integer(_) => Ok(expression.clone()),
+        Expression::Variable(ref name) => {
             match state.variables.get(&name.to_lowercase()) {
                 Some(exp) => {
                     debug!("Got variable {} with value {:?}", &name, exp);
@@ -144,7 +143,7 @@ fn run_expression(state: &mut State, program: &Program, expression: &Expression)
                 }
             }
         }
-        &Expression::Call(ref target, ref args) => call_function(state, program, target, args),
+        Expression::Call(ref target, ref args) => call_function(state, program, target, args),
         _ => {
             bail!(ErrorKind::NoRunner(
                 format!("{:?}", expression),
@@ -154,16 +153,16 @@ fn run_expression(state: &mut State, program: &Program, expression: &Expression)
     };
 }
 
-pub fn run(program: Program, writer: &mut Write) -> Result<HashMap<String, Expression>> {
+pub fn run(program: &Program, writer: &mut Write) -> Result<HashMap<String, Expression>> {
     let pc = 0;
     let mut variables: HashMap<String, Expression> = HashMap::new();
     {
         let mut state = State {
             variables: &mut variables,
-            writer: writer,
+            writer,
             current_line: 0,
         };
-        run_core(&mut state, &program, pc)?;
+        run_core(&mut state, program, pc)?;
     } // FIXME: Drop once NLL is merged
     return Ok(variables);
 }
@@ -176,7 +175,7 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
             let v = state
                 .variables
                 .get(&x.to_lowercase())
-                .expect(&format!("Can't find '{}'", x))
+                .unwrap_or_else(|| panic!("Can't find '{}'", x))
                 .clone();
             get_printable(&v, state)
         }
@@ -193,7 +192,7 @@ fn alter_variable(state: &mut State, target: &str, f: &Fn(i128) -> i128) -> Resu
     let val = state
         .variables
         .get(&target.to_lowercase())
-        .expect(&format!("Can't find '{}'", target))
+        .unwrap_or_else(|| panic!("Can't find '{}'", target))
         .clone();
     debug!("Value of {} is {:?}", target, val);
     match val {
@@ -217,7 +216,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
     let mut total_instr = 0;
     loop {
         total_instr += 1;
-        if total_instr > 100000 {
+        if total_instr > 100_000 {
             panic!("Ran out of instr");
         }
         let command_line = match program.commands.get(pc) {
@@ -285,9 +284,8 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 };
             }
             Command::FunctionDeclaration {
-                name: _,
-                args: _,
                 func_end,
+                ..
             } => {
                 match func_end {
                     Some(val) => {

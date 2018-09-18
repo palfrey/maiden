@@ -1,5 +1,6 @@
 #![recursion_limit="5000"]
 #![deny(warnings)]
+#![allow(needless_return)]
 
 #[macro_use]
 extern crate nom;
@@ -56,7 +57,7 @@ fn main() -> common::Result<()> {
     f.read_to_string(&mut buffer)?;
 
     let program = parser::parse(&buffer)?;
-    runner::run(program, &mut io::stdout())?;
+    runner::run(&program, &mut io::stdout())?;
     Ok(())
 }
 
