@@ -45,8 +45,7 @@ fn run_mathbinop(
     bail!(ErrorKind::Unimplemented(
         format!(
             "Math op between non integers: {:?} {:?}",
-            res_first,
-            res_second
+            res_first, res_second
         ),
         state.current_line,
     ));
@@ -65,7 +64,12 @@ fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
     }
 }
 
-fn call_function(state: &mut State, program: &Program, target: &str, args: &[Expression]) -> Result<Expression> {
+fn call_function(
+    state: &mut State,
+    program: &Program,
+    target: &str,
+    args: &[Expression],
+) -> Result<Expression> {
     let func_wrap = program.functions.get(target);
     if func_wrap.is_none() {
         bail!(ErrorKind::MissingFunction(
@@ -90,15 +94,18 @@ fn call_function(state: &mut State, program: &Program, target: &str, args: &[Exp
     };
     for (i, arg) in args.iter().enumerate() {
         let value = run_expression(&mut new_state, program, &arg)?;
-        new_state.variables.insert(
-            func.args[i].to_lowercase(),
-            value,
-        );
+        new_state
+            .variables
+            .insert(func.args[i].to_lowercase(), value);
     }
     return run_core(&mut new_state, program, func.location + 1);
 }
 
-fn run_expression(state: &mut State, program: &Program, expression: &Expression) -> Result<Expression> {
+fn run_expression(
+    state: &mut State,
+    program: &Program,
+    expression: &Expression,
+) -> Result<Expression> {
     debug!("Expression: {:?}", expression);
     return match *expression {
         Expression::Is(ref first, ref second) => {
@@ -130,19 +137,16 @@ fn run_expression(state: &mut State, program: &Program, expression: &Expression)
         Expression::Times(ref first, ref second) => {
             return run_mathbinop(state, program, first, second, |f, s| f * s);
         }
-        Expression::String(_) |
-        Expression::Integer(_) => Ok(expression.clone()),
-        Expression::Variable(ref name) => {
-            match state.variables.get(&name.to_lowercase()) {
-                Some(exp) => {
-                    debug!("Got variable {} with value {:?}", &name, exp);
-                    Ok(exp.clone())
-                }
-                None => {
-                    bail!(ErrorKind::MissingVariable(name.clone(), state.current_line));
-                }
+        Expression::String(_) | Expression::Integer(_) => Ok(expression.clone()),
+        Expression::Variable(ref name) => match state.variables.get(&name.to_lowercase()) {
+            Some(exp) => {
+                debug!("Got variable {} with value {:?}", &name, exp);
+                Ok(exp.clone())
             }
-        }
+            None => {
+                bail!(ErrorKind::MissingVariable(name.clone(), state.current_line));
+            }
+        },
         Expression::Call(ref target, ref args) => call_function(state, program, target, args),
         _ => {
             bail!(ErrorKind::NoRunner(
@@ -197,10 +201,9 @@ fn alter_variable(state: &mut State, target: &str, f: &Fn(i128) -> i128) -> Resu
     debug!("Value of {} is {:?}", target, val);
     match val {
         Expression::Integer(x) => {
-            state.variables.insert(
-                target.to_lowercase(),
-                Expression::Integer(f(x)),
-            );
+            state
+                .variables
+                .insert(target.to_lowercase(), Expression::Integer(f(x)));
         }
         _ => {
             bail!(ErrorKind::Unimplemented(
@@ -267,8 +270,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                     }
                 }
             }
-            Command::Next { loop_start } |
-            Command::Continue { loop_start } => {
+            Command::Next { loop_start } | Command::Continue { loop_start } => {
                 pc = loop_start - 1;
             }
             Command::Say { ref value } => {
@@ -283,17 +285,12 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                     }
                 };
             }
-            Command::FunctionDeclaration {
-                func_end,
-                ..
-            } => {
-                match func_end {
-                    Some(val) => {
-                        pc = val;
-                    }
-                    None => bail!(ErrorKind::NoEndFunction(state.current_line)),
+            Command::FunctionDeclaration { func_end, .. } => match func_end {
+                Some(val) => {
+                    pc = val;
                 }
-            }
+                None => bail!(ErrorKind::NoEndFunction(state.current_line)),
+            },
             Command::Return { ref return_value } => {
                 return run_expression(state, program, &return_value);
             }

@@ -1,4 +1,4 @@
-#![recursion_limit="5000"]
+#![recursion_limit = "5000"]
 #![deny(warnings)]
 #![allow(needless_return)]
 
@@ -32,7 +32,7 @@ mod parser;
 mod runner;
 
 #[cfg(not(target_arch = "wasm32"))]
-use clap::{Arg, App};
+use clap::{App, Arg};
 #[cfg(not(target_arch = "wasm32"))]
 use std::fs::File;
 #[cfg(not(target_arch = "wasm32"))]
@@ -50,8 +50,7 @@ fn main() -> common::Result<()> {
                 .help("Sets the input file to use")
                 .required(true)
                 .index(1),
-        )
-        .get_matches();
+        ).get_matches();
     let mut f = File::open(matches.value_of("INPUT").unwrap())?;
     let mut buffer = String::new();
     f.read_to_string(&mut buffer)?;
@@ -120,8 +119,7 @@ mod tests {
     Until Counter is Limit
         Build Counter up
     End";
-        let end_variables =
-            hashmap! {
+        let end_variables = hashmap! {
             "buzz" => Expression::Integer(5),
             "limit" => Expression::Integer(100),
             "counter" => Expression::Integer(100),
@@ -139,8 +137,7 @@ mod tests {
     Until my world is Desire,
     Build my world up
     And around we go";
-        let end_variables =
-            hashmap! {
+        let end_variables = hashmap! {
             "my world" => Expression::Integer(100),
             "fire" => Expression::Integer(3),
             "hate" => Expression::Integer(5),
@@ -177,8 +174,7 @@ mod tests {
 
     Whisper my world
     And around we go";
-        let end_variables =
-            hashmap! {
+        let end_variables = hashmap! {
             "my world" => Expression::Integer(100),
             "fire" => Expression::Integer(3),
             "hate" => Expression::Integer(5),
@@ -210,8 +206,7 @@ mod tests {
 
     #[test]
     fn multiple_uppercase_proper_variable() {
-        let end_variables =
-            hashmap! {
+        let end_variables = hashmap! {
             "id" => Expression::Integer(3),
         };
         test_program("put foo into ID", end_variables, "");
