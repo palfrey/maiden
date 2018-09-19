@@ -87,7 +87,7 @@ mod tests {
         let program = parser::parse(code).unwrap();
         info!("Commands: {:?}", program.commands);
         let mut writer = Cursor::new(Vec::new());
-        let variables = runner::run(program, &mut writer).unwrap();
+        let variables = runner::run(&program, &mut writer).unwrap();
         writer.set_position(0);
         let res = std::str::from_utf8(writer.get_ref()).unwrap();
         if res != "" {
@@ -216,7 +216,7 @@ mod tests {
         pretty_env_logger::try_init().unwrap_or(());
         let program = parser::parse(input).unwrap();
         let mut writer = Cursor::new(Vec::new());
-        runner::run(program, &mut writer).err().unwrap().0
+        runner::run(&program, &mut writer).err().unwrap().0
     }
 
     #[test]
