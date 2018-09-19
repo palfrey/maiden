@@ -164,7 +164,6 @@ named!(word(Span) -> SymbolType,
         tag_no_case!("into") => {|_| SymbolType::Where} |
         tag_no_case!("put") => {|_| SymbolType::Put} |
         tag_no_case!("else") => {|_| SymbolType::Else} |
-        tag_no_case!("nothing") => {|_| SymbolType::Integer("0".to_string()) } |
         do_parse!(
             target: variable >>
             take_while1!(is_space) >>
@@ -965,14 +964,14 @@ mod tests {
                     args: vec!["my world".to_string(), "Fire".to_string()],
                 },
                 SymbolType::Is,
-                SymbolType::Integer("0".to_string()),
+                SymbolType::Words(vec!["nothing".to_string()]),
                 SymbolType::And,
                 SymbolType::Taking {
                     target: "Midnight".to_string(),
                     args: vec!["my world".to_string(), "Hate".to_string()],
                 },
                 SymbolType::Is,
-                SymbolType::Integer("0".to_string()),
+                SymbolType::Words(vec!["nothing".to_string()]),
             ],
         );
     }
@@ -1030,23 +1029,14 @@ mod tests {
 
     #[test]
     fn split_nothing() {
-        pretty_env_logger::try_init().unwrap_or(());
-        let mut raw_lines = lines("If a thought is greater than nothinggggggggg").unwrap();
-        assert_eq!(raw_lines.0.fragment, CompleteStr("gggggggg"));
-        assert_eq!(raw_lines.1.len(), 1, "{:?}", raw_lines.1);
-        assert_eq!(
-            raw_lines
-                .1
-                .remove(0)
-                .into_iter()
-                .map(|t| t.symbol)
-                .collect::<Vec<_>>(),
+        lines_tokens_check(
+            "If a thought is greater than nothinggggggggg",
             vec![
                 SymbolType::If,
                 SymbolType::Variable("a thought".to_string()),
                 SymbolType::GreaterThan,
-                SymbolType::Integer("0".to_string())
-            ]
+                SymbolType::Words(vec!["nothinggggggggg".to_string()]),
+            ],
         );
     }
 
@@ -1057,7 +1047,7 @@ mod tests {
             vec![
                 SymbolType::Variable("My world".to_string()),
                 SymbolType::Is,
-                SymbolType::Integer("0".to_string()),
+                SymbolType::Words(vec!["nothing".to_string()]),
                 SymbolType::Subtract,
                 SymbolType::Variable("your love".to_string()),
             ],
