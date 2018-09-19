@@ -1,3 +1,7 @@
+// because nom macros
+#![cfg_attr(feature = "cargo-clippy", allow(double_parens))]
+#![cfg_attr(feature = "cargo-clippy", allow(double_comparisons))]
+
 use common::*;
 use nom;
 use nom::types::CompleteStr;
@@ -222,12 +226,7 @@ fn poetic_number_literal(input: Span) -> nom::IResult<Span, Vec<Token>> {
         rest,
         vec![SymbolType::Variable(target), SymbolType::Is, literal]
             .into_iter()
-            .map(|x| {
-                Token {
-                    line: line,
-                    symbol: x,
-                }
-            })
+            .map(|x| Token { line, symbol: x })
             .collect(),
     ));
 }
@@ -349,28 +348,31 @@ fn evaluate(value: &SymbolType, line: u32) -> Result<Expression> {
             return Ok(Expression::String(phrase.to_string()));
         }
         _ => {
-            bail!(ErrorKind::Unimplemented(format!("Evaluate: '{:?}'", value), line));
+            bail!(ErrorKind::Unimplemented(
+                format!("Evaluate: '{:?}'", value),
+                line
+            ));
         }
     }
 }
 
-fn next_operator<'a>(items: &Vec<&'a SymbolType>, mut index: usize) -> Option<(&'a SymbolType, usize)> {
+fn next_operator<'a>(
+    items: &[&'a SymbolType],
+    mut index: usize,
+) -> Option<(&'a SymbolType, usize)> {
     loop {
         let item_poss = items.get(index);
-        if item_poss.is_none() {
-            return None;
-        }
-        let item = item_poss.unwrap();
-        match item {
-            &SymbolType::Is |
-            &SymbolType::Aint |
-            &SymbolType::GreaterThanOrEqual |
-            &SymbolType::GreaterThan |
-            &SymbolType::LessThan |
-            &SymbolType::Add |
-            &SymbolType::Subtract |
-            &SymbolType::Times |
-            &SymbolType::And => {
+        let item = item_poss?;
+        match *item {
+            SymbolType::Is
+            | SymbolType::Aint
+            | SymbolType::GreaterThanOrEqual
+            | SymbolType::GreaterThan
+            | SymbolType::LessThan
+            | SymbolType::Add
+            | SymbolType::Subtract
+            | SymbolType::Times
+            | SymbolType::And => {
                 return Some((item, index));
             }
             _ => {}
@@ -380,37 +382,38 @@ fn next_operator<'a>(items: &Vec<&'a SymbolType>, mut index: usize) -> Option<(&
 }
 
 fn single_symbol_to_expression(sym: &SymbolType, line: u32) -> Result<Expression> {
-    return match sym {
-        &SymbolType::Words(_) => evaluate(sym, line),
-        &SymbolType::Variable(ref name) => Ok(Expression::Variable(name.clone())),
-        &SymbolType::String(ref phrase) => Ok(Expression::String(phrase.clone())),
-        &SymbolType::Integer(ref val) => {
+    return match *sym {
+        SymbolType::Words(_) => evaluate(sym, line),
+        SymbolType::Variable(ref name) => Ok(Expression::Variable(name.clone())),
+        SymbolType::String(ref phrase) => Ok(Expression::String(phrase.clone())),
+        SymbolType::Integer(ref val) => {
             return match val.parse::<i128>() {
                 Ok(i) => Ok(Expression::Integer(i)),
                 Err(_) => bail!(ErrorKind::ParseIntError(val.to_string(), line)),
             };
         }
-        &SymbolType::Taking {
+        SymbolType::Taking {
             ref target,
             ref args,
-        } => {
-            Ok(Expression::Call(
-                target.to_string(),
-                args.iter()
-                    .map(|s| Expression::Variable(s.to_string()))
-                    .collect(),
-            ))
-        }
+        } => Ok(Expression::Call(
+            target.to_string(),
+            args.iter()
+                .map(|s| Expression::Variable(s.to_string()))
+                .collect(),
+        )),
         _ => {
-            bail!(ErrorKind::Unimplemented(format!("Single symbol to expression: {:?}", sym), line));
+            bail!(ErrorKind::Unimplemented(
+                format!("Single symbol to expression: {:?}", sym),
+                line
+            ));
         }
     };
 }
 
-fn parse_expression(items: Vec<&SymbolType>, line: u32) -> Result<Expression> {
+fn parse_expression(items: &[&SymbolType], line: u32) -> Result<Expression> {
     // based off of https://en.wikipedia.org/wiki/Operator-precedence_parser#Pseudo-code
     let describe = format!("{:?}", items);
-    if items.len() == 0 {
+    if items.is_empty() {
         bail!(ErrorKind::UnbalancedExpression(describe, line));
     }
     debug!("Begin parse: {}", describe);
@@ -428,13 +431,16 @@ fn parse_expression(items: Vec<&SymbolType>, line: u32) -> Result<Expression> {
 }
 
 fn parse_expression_1(
-    items: &Vec<&SymbolType>,
+    items: &[&SymbolType],
     mut index: usize,
     mut lhs: Expression,
     precedence: &SymbolType,
     line: u32,
 ) -> Result<(Expression, usize)> {
-    debug!("index: {}, lhs: {:?} precedence: {:?}", index, lhs, precedence);
+    debug!(
+        "index: {}, lhs: {:?} precedence: {:?}",
+        index, lhs, precedence
+    );
     let mut lookahead = next_operator(items, index);
     while lookahead.is_some() && lookahead.unwrap().0 >= precedence {
         debug!("lookahead: {:?}", lookahead.unwrap());
@@ -445,32 +451,45 @@ fn parse_expression_1(
             index
         };
         if index >= items.len() {
-            bail!(ErrorKind::UnbalancedExpression(format!("{:?}", items), line));
+            bail!(ErrorKind::UnbalancedExpression(
+                format!("{:?}", items),
+                line
+            ));
         }
         let mut rhs = single_symbol_to_expression(items[index], line)?;
         lookahead = next_operator(items, index);
         while lookahead.is_some() && lookahead.unwrap().0 > op {
             let l = lookahead.unwrap().1;
             if l >= items.len() {
-                bail!(ErrorKind::UnbalancedExpression(format!("{:?}", items), line));
+                bail!(ErrorKind::UnbalancedExpression(
+                    format!("{:?}", items),
+                    line
+                ));
             }
             let res = parse_expression_1(items, index, rhs, &items[l], line)?;
             rhs = res.0;
             index = res.1;
             lookahead = next_operator(items, index);
         }
-        lhs = match op {
-            &SymbolType::Is => Expression::Is(Box::new(lhs.clone()), Box::new(rhs)),
-            &SymbolType::Aint => Expression::Aint(Box::new(lhs.clone()), Box::new(rhs)),
-            &SymbolType::GreaterThanOrEqual => Expression::GreaterThanOrEqual(Box::new(lhs.clone()), Box::new(rhs)),
-            &SymbolType::GreaterThan => Expression::GreaterThan(Box::new(lhs.clone()), Box::new(rhs)),
-            &SymbolType::LessThan => Expression::LessThan(Box::new(lhs.clone()), Box::new(rhs)),
-            &SymbolType::Add => Expression::Add(Box::new(lhs.clone()), Box::new(rhs)),
-            &SymbolType::Subtract => Expression::Subtract(Box::new(lhs.clone()), Box::new(rhs)),
-            &SymbolType::Times => Expression::Times(Box::new(lhs.clone()), Box::new(rhs)),
-            &SymbolType::And => Expression::And(Box::new(lhs.clone()), Box::new(rhs)),
+        lhs = match *op {
+            SymbolType::Is => Expression::Is(Box::new(lhs.clone()), Box::new(rhs)),
+            SymbolType::Aint => Expression::Aint(Box::new(lhs.clone()), Box::new(rhs)),
+            SymbolType::GreaterThanOrEqual => {
+                Expression::GreaterThanOrEqual(Box::new(lhs.clone()), Box::new(rhs))
+            }
+            SymbolType::GreaterThan => {
+                Expression::GreaterThan(Box::new(lhs.clone()), Box::new(rhs))
+            }
+            SymbolType::LessThan => Expression::LessThan(Box::new(lhs.clone()), Box::new(rhs)),
+            SymbolType::Add => Expression::Add(Box::new(lhs.clone()), Box::new(rhs)),
+            SymbolType::Subtract => Expression::Subtract(Box::new(lhs.clone()), Box::new(rhs)),
+            SymbolType::Times => Expression::Times(Box::new(lhs.clone()), Box::new(rhs)),
+            SymbolType::And => Expression::And(Box::new(lhs.clone()), Box::new(rhs)),
             _ => {
-                bail!(ErrorKind::Unimplemented(format!("No operation for {:?}", op), line));
+                bail!(ErrorKind::Unimplemented(
+                    format!("No operation for {:?}", op),
+                    line
+                ));
             }
         }
     }
@@ -482,14 +501,12 @@ fn build_next(commands: &mut Vec<CommandLine>, loop_starts: &mut Vec<usize>) -> 
     let loop_len = commands.len();
     match commands.index_mut(loop_start).cmd {
         Command::Until {
-            ref mut loop_end,
-            expression: _,
+            ref mut loop_end, ..
         } => {
             loop_end.get_or_insert(loop_len);
         }
         Command::While {
-            ref mut loop_end,
-            expression: _,
+            ref mut loop_end, ..
         } => {
             loop_end.get_or_insert(loop_len);
         }
@@ -497,14 +514,16 @@ fn build_next(commands: &mut Vec<CommandLine>, loop_starts: &mut Vec<usize>) -> 
             panic!("loop to non-loop command");
         }
     }
-    return Command::Next { loop_start: loop_start };
+    return Command::Next { loop_start };
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
 pub fn parse(input: &str) -> Result<Program> {
     let re = Regex::new(r"'s\W+").unwrap();
     let fixed_input = re.replace_all(input, " is ").replace("'", "");
     let raw_lines = lines(&fixed_input)?;
-    if !raw_lines.0.fragment.is_empty() && raw_lines.0.fragment.chars().any(|c| !c.is_whitespace()) {
+    if !raw_lines.0.fragment.is_empty() && raw_lines.0.fragment.chars().any(|c| !c.is_whitespace())
+    {
         // ignore empty and all-whitespace blocks
         let pos = raw_lines.0;
         bail!(ErrorKind::UnparsedText(pos.fragment.to_string(), pos.line));
@@ -527,7 +546,7 @@ pub fn parse(input: &str) -> Result<Program> {
         }
         debug!("symbols: {:?}", symbols);
         if symbols.is_empty() {
-            bail!(ErrorKind::NoSymbols(last_line+1));
+            bail!(ErrorKind::NoSymbols(last_line + 1));
         }
         let current_line = symbols.first().unwrap().line;
         last_line = current_line;
@@ -535,13 +554,17 @@ pub fn parse(input: &str) -> Result<Program> {
         match symbols.as_slice() {
             [SymbolType::Build, SymbolType::Variable(target), SymbolType::Up] => {
                 commands.push(CommandLine {
-                    cmd: Command::Increment { target: target.to_string() },
+                    cmd: Command::Increment {
+                        target: target.to_string(),
+                    },
                     line: current_line,
                 });
             }
             [SymbolType::Knock, SymbolType::Variable(target), SymbolType::Down] => {
                 commands.push(CommandLine {
-                    cmd: Command::Decrement { target: target.to_string() },
+                    cmd: Command::Decrement {
+                        target: target.to_string(),
+                    },
                     line: current_line,
                 });
             }
@@ -555,23 +578,21 @@ pub fn parse(input: &str) -> Result<Program> {
             [SymbolType::Continue] => {
                 let loop_start = loop_starts.last().expect("loop_starts");
                 commands.push(CommandLine {
-                    cmd: Command::Continue { loop_start: *loop_start },
+                    cmd: Command::Continue {
+                        loop_start: *loop_start,
+                    },
                     line: current_line,
                 });
             }
-            [SymbolType::Newline] |
-            [SymbolType::Comment] => {
+            [SymbolType::Newline] | [SymbolType::Comment] => {
                 // Comment on it's own is newline-equivalent
                 if !if_starts.is_empty() {
                     let if_start = if_starts.pop().expect("if_starts");
                     let if_len = commands.len();
                     match commands.index_mut(if_start) {
                         CommandLine {
-                            cmd: Command::If {
-                                expression: _,
-                                ref mut if_end,
-                            },
-                            line: _,
+                            cmd: Command::If { ref mut if_end, .. },
+                            ..
                         } => {
                             if_end.get_or_insert(if_len);
                         }
@@ -602,12 +623,11 @@ pub fn parse(input: &str) -> Result<Program> {
                     let func_len = commands.len();
                     match commands.index_mut(func_start) {
                         CommandLine {
-                            cmd: Command::FunctionDeclaration {
-                                name: _,
-                                args: _,
-                                ref mut func_end,
-                            },
-                            line: _,
+                            cmd:
+                                Command::FunctionDeclaration {
+                                    ref mut func_end, ..
+                                },
+                            ..
                         } => {
                             func_end.get_or_insert(func_len);
                         }
@@ -631,7 +651,8 @@ pub fn parse(input: &str) -> Result<Program> {
                 commands.push(CommandLine {
                     cmd: Command::Call {
                         name: target.to_string(),
-                        args: args.iter()
+                        args: args
+                            .iter()
                             .map(|a| Expression::Variable(a.to_string()))
                             .collect(),
                     },
@@ -643,7 +664,7 @@ pub fn parse(input: &str) -> Result<Program> {
                 // (see https://github.com/rust-lang/rust/issues/23121)
                 if symbols[0] == SymbolType::Say && symbols.len() > 1 {
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
-                    let expression = parse_expression(expression_seq, current_line)?;
+                    let expression = parse_expression(&expression_seq, current_line)?;
                     commands.push(CommandLine {
                         cmd: Command::Say { value: expression },
                         line: current_line,
@@ -651,7 +672,7 @@ pub fn parse(input: &str) -> Result<Program> {
                 } else if symbols.len() > 1 && symbols[1] == SymbolType::Is {
                     if let SymbolType::Variable(ref target) = symbols[0] {
                         let expression_seq: Vec<&SymbolType> = symbols.iter().skip(2).collect();
-                        let expression = parse_expression(expression_seq, current_line)?;
+                        let expression = parse_expression(&expression_seq, current_line)?;
                         commands.push(CommandLine {
                             cmd: Command::Assignment {
                                 target: target.to_string(),
@@ -665,10 +686,10 @@ pub fn parse(input: &str) -> Result<Program> {
                 } else if symbols[0] == SymbolType::Until && symbols.len() > 1 {
                     loop_starts.push(commands.len());
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
-                    let expression = parse_expression(expression_seq, current_line)?;
+                    let expression = parse_expression(&expression_seq, current_line)?;
                     commands.push(CommandLine {
                         cmd: Command::Until {
-                            expression: expression,
+                            expression,
                             loop_end: None,
                         },
                         line: current_line,
@@ -676,10 +697,10 @@ pub fn parse(input: &str) -> Result<Program> {
                 } else if symbols[0] == SymbolType::While && symbols.len() > 1 {
                     loop_starts.push(commands.len());
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
-                    let expression = parse_expression(expression_seq, current_line)?;
+                    let expression = parse_expression(&expression_seq, current_line)?;
                     commands.push(CommandLine {
                         cmd: Command::While {
-                            expression: expression,
+                            expression,
                             loop_end: None,
                         },
                         line: current_line,
@@ -687,20 +708,22 @@ pub fn parse(input: &str) -> Result<Program> {
                 } else if symbols[0] == SymbolType::If && symbols.len() > 1 {
                     if_starts.push(commands.len());
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
-                    let expression = parse_expression(expression_seq, current_line)?;
+                    let expression = parse_expression(&expression_seq, current_line)?;
                     commands.push(CommandLine {
                         cmd: Command::If {
-                            expression: expression,
+                            expression,
                             if_end: None,
                         },
                         line: current_line,
                     });
-                } else if symbols.len() > 3 && symbols[0] == SymbolType::Put &&
-                           symbols[symbols.len() - 2] == SymbolType::Where
+                } else if symbols.len() > 3
+                    && symbols[0] == SymbolType::Put
+                    && symbols[symbols.len() - 2] == SymbolType::Where
                 {
                     if let SymbolType::Variable(ref target) = symbols[symbols.len() - 1] {
-                        let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).take(symbols.len() - 3).collect();
-                        let expression = parse_expression(expression_seq, current_line)?;
+                        let expression_seq: Vec<&SymbolType> =
+                            symbols.iter().skip(1).take(symbols.len() - 3).collect();
+                        let expression = parse_expression(&expression_seq, current_line)?;
                         commands.push(CommandLine {
                             cmd: Command::Assignment {
                                 target: target.to_string(),
@@ -721,7 +744,10 @@ pub fn parse(input: &str) -> Result<Program> {
                                 match var_seq.next() {
                                     Some(sym) => {
                                         if sym != &SymbolType::And {
-                                            bail!(ErrorKind::BadFunctionDeclaration(symbols.to_vec(), current_line));
+                                            bail!(ErrorKind::BadFunctionDeclaration(
+                                                symbols.to_vec(),
+                                                current_line
+                                            ));
                                         }
                                     }
                                     None => {
@@ -729,7 +755,10 @@ pub fn parse(input: &str) -> Result<Program> {
                                     }
                                 }
                             } else {
-                                bail!(ErrorKind::BadFunctionDeclaration(symbols.to_vec(), current_line));
+                                bail!(ErrorKind::BadFunctionDeclaration(
+                                    symbols.to_vec(),
+                                    current_line
+                                ));
                             }
                         }
                         func_starts.push(commands.len());
@@ -749,17 +778,25 @@ pub fn parse(input: &str) -> Result<Program> {
                             line: current_line,
                         });
                     } else {
-                        bail!(ErrorKind::BadFunctionDeclaration(symbols.to_vec(), current_line));
+                        bail!(ErrorKind::BadFunctionDeclaration(
+                            symbols.to_vec(),
+                            current_line
+                        ));
                     }
                 } else if symbols[0] == SymbolType::Return && symbols.len() > 1 {
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
-                    let expression = parse_expression(expression_seq, current_line)?;
+                    let expression = parse_expression(&expression_seq, current_line)?;
                     commands.push(CommandLine {
-                        cmd: Command::Return { return_value: expression },
+                        cmd: Command::Return {
+                            return_value: expression,
+                        },
                         line: current_line,
                     });
                 } else {
-                    bail!(ErrorKind::BadCommandSequence(symbols.to_vec(), current_line));
+                    bail!(ErrorKind::BadCommandSequence(
+                        symbols.to_vec(),
+                        current_line
+                    ));
                 }
             }
         }
@@ -782,9 +819,7 @@ pub fn print_program(program: &Program) -> String {
     let mut last_line = 0;
     for command in &program.commands {
         match command.cmd {
-            Command::EndFunction |
-            Command::EndIf |
-            Command::Next { loop_start: _ } => {
+            Command::EndFunction | Command::EndIf | Command::Next { loop_start: _ } => {
                 indent -= 1;
             }
             _ => {}
@@ -804,16 +839,16 @@ pub fn print_program(program: &Program) -> String {
                 name: _,
                 args: _,
                 func_end: _,
-            } |
-            Command::If {
+            }
+            | Command::If {
                 expression: _,
                 if_end: _,
-            } |
-            Command::While {
+            }
+            | Command::While {
                 expression: _,
                 loop_end: _,
-            } |
-            Command::Until {
+            }
+            | Command::Until {
                 expression: _,
                 loop_end: _,
             } => {
@@ -834,19 +869,33 @@ mod tests {
     fn multi_word_quote_parse() {
         let (span, tokens) = line(Span::new(CompleteStr("say \"shout let it all out\""))).unwrap();
         assert_eq!(CompleteStr(""), span.fragment);
-        assert_eq!(vec![SymbolType::Say, SymbolType::String("shout let it all out".to_string())],
-            tokens.into_iter().map(|t| t.symbol).collect::<Vec<_>>());
+        assert_eq!(
+            vec![
+                SymbolType::Say,
+                SymbolType::String("shout let it all out".to_string())
+            ],
+            tokens.into_iter().map(|t| t.symbol).collect::<Vec<_>>()
+        );
     }
 
     #[test]
     fn check_evaluate() {
         pretty_env_logger::try_init().unwrap_or(());
         assert_eq!(
-            evaluate(&SymbolType::Words(
-                vec!["a".to_string(), "lovestruck".to_string(), "ladykiller".to_string()]), 0).unwrap(),
+            evaluate(
+                &SymbolType::Words(vec![
+                    "a".to_string(),
+                    "lovestruck".to_string(),
+                    "ladykiller".to_string()
+                ]),
+                0
+            ).unwrap(),
             Expression::Integer(100)
         );
-        assert_eq!(evaluate(&SymbolType::Words(vec!["nothing".to_string()]), 0).unwrap(), Expression::Integer(0));
+        assert_eq!(
+            evaluate(&SymbolType::Words(vec!["nothing".to_string()]), 0).unwrap(),
+            Expression::Integer(0)
+        );
     }
 
     #[test]
@@ -856,24 +905,36 @@ mod tests {
             Box::new(Expression::Is(
                 Box::new(Expression::Call(
                     "Midnight".to_string(),
-                    vec![Expression::Variable("my world".to_string()), Expression::Variable("Fire".to_string())],
+                    vec![
+                        Expression::Variable("my world".to_string()),
+                        Expression::Variable("Fire".to_string()),
+                    ],
                 )),
                 Box::new(Expression::Integer(0)),
             )),
             Box::new(Expression::Is(
                 Box::new(Expression::Call(
                     "Midnight".to_string(),
-                    vec![Expression::Variable("my world".to_string()), Expression::Variable("Hate".to_string())],
+                    vec![
+                        Expression::Variable("my world".to_string()),
+                        Expression::Variable("Hate".to_string()),
+                    ],
                 )),
                 Box::new(Expression::Integer(0)),
             )),
         );
-        let commands = vec![CommandLine{cmd: Command::If{expression: expression, if_end: None}, line: 1}];
+        let commands = vec![CommandLine {
+            cmd: Command::If {
+                expression: expression,
+                if_end: None,
+            },
+            line: 1,
+        }];
         let functions = HashMap::new();
         assert_eq!(
             parse("If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing")
                 .unwrap(),
-            Program{commands, functions}
+            Program { commands, functions }
         );
     }
 
@@ -882,7 +943,15 @@ mod tests {
         let mut raw_lines = lines(input).unwrap();
         assert_eq!(raw_lines.0.fragment, CompleteStr(""));
         assert_eq!(raw_lines.1.len(), 1, "{:?}", raw_lines.1);
-        assert_eq!(raw_lines.1.remove(0).into_iter().map(|t| t.symbol).collect::<Vec<_>>(), tokens);
+        assert_eq!(
+            raw_lines
+                .1
+                .remove(0)
+                .into_iter()
+                .map(|t| t.symbol)
+                .collect::<Vec<_>>(),
+            tokens
+        );
     }
 
     #[test]
@@ -893,14 +962,18 @@ mod tests {
                 SymbolType::If,
                 SymbolType::Taking {
                     target: "Midnight".to_string(),
-                    args: vec!["my world".to_string(), "Fire".to_string()] },
+                    args: vec!["my world".to_string(), "Fire".to_string()],
+                },
                 SymbolType::Is,
                 SymbolType::Integer("0".to_string()),
                 SymbolType::And,
                 SymbolType::Taking {
                     target: "Midnight".to_string(),
-                    args: vec!["my world".to_string(), "Hate".to_string()] },
-                SymbolType::Is, SymbolType::Integer("0".to_string())],
+                    args: vec!["my world".to_string(), "Hate".to_string()],
+                },
+                SymbolType::Is,
+                SymbolType::Integer("0".to_string()),
+            ],
         );
     }
 
@@ -911,17 +984,20 @@ mod tests {
 
     #[test]
     fn apostrophe_parsing() {
-        let commands = vec![CommandLine{
-            cmd: Command::Assignment{
+        let commands = vec![CommandLine {
+            cmd: Command::Assignment {
                 target: "Bar".to_string(),
-                value: Expression::Integer(4)
+                value: Expression::Integer(4),
             },
-            line: 1}];
+            line: 1,
+        }];
         let functions = HashMap::new();
         assert_eq!(
-            parse("Bar is foo'd")
-                .unwrap(),
-            Program{commands, functions}
+            parse("Bar is foo'd").unwrap(),
+            Program {
+                commands,
+                functions
+            }
         );
     }
 
@@ -929,9 +1005,13 @@ mod tests {
     fn multi_word_proper_variable() {
         lines_tokens_check(
             "Liftin High takes the spirit and greatness",
-            vec![SymbolType::Variable("Liftin High".to_string()),
-                SymbolType::Takes, SymbolType::Variable("the spirit".to_string()),
-                SymbolType::And, SymbolType::Words(vec!["greatness".to_string()])],
+            vec![
+                SymbolType::Variable("Liftin High".to_string()),
+                SymbolType::Takes,
+                SymbolType::Variable("the spirit".to_string()),
+                SymbolType::And,
+                SymbolType::Words(vec!["greatness".to_string()]),
+            ],
         );
     }
 
@@ -940,8 +1020,11 @@ mod tests {
         lines_tokens_check(
             "Until Counter is Limit",
             vec![
-                SymbolType::Until, SymbolType::Variable("Counter".to_string()),
-                SymbolType::Is, SymbolType::Variable("Limit".to_string())],
+                SymbolType::Until,
+                SymbolType::Variable("Counter".to_string()),
+                SymbolType::Is,
+                SymbolType::Variable("Limit".to_string()),
+            ],
         );
     }
 
@@ -951,11 +1034,20 @@ mod tests {
         let mut raw_lines = lines("If a thought is greater than nothinggggggggg").unwrap();
         assert_eq!(raw_lines.0.fragment, CompleteStr("gggggggg"));
         assert_eq!(raw_lines.1.len(), 1, "{:?}", raw_lines.1);
-        assert_eq!(raw_lines.1.remove(0).into_iter().map(|t| t.symbol).collect::<Vec<_>>(),
+        assert_eq!(
+            raw_lines
+                .1
+                .remove(0)
+                .into_iter()
+                .map(|t| t.symbol)
+                .collect::<Vec<_>>(),
             vec![
-                SymbolType::If, SymbolType::Variable("a thought".to_string()),
-                SymbolType::GreaterThan, SymbolType::Integer("0".to_string())
-            ]);
+                SymbolType::If,
+                SymbolType::Variable("a thought".to_string()),
+                SymbolType::GreaterThan,
+                SymbolType::Integer("0".to_string())
+            ]
+        );
     }
 
     #[test]
@@ -963,9 +1055,11 @@ mod tests {
         lines_tokens_check(
             "My world is nothing without your love",
             vec![
-                SymbolType::Variable("My world".to_string()), SymbolType::Is,
-                SymbolType::Integer("0".to_string()), SymbolType::Subtract,
-                SymbolType::Variable("your love".to_string())
+                SymbolType::Variable("My world".to_string()),
+                SymbolType::Is,
+                SymbolType::Integer("0".to_string()),
+                SymbolType::Subtract,
+                SymbolType::Variable("your love".to_string()),
             ],
         );
     }
@@ -977,20 +1071,27 @@ mod tests {
             Box::new(Expression::Variable("Davy".to_string())),
             Box::new(Expression::Variable("Greatness".to_string())),
         );
-        let commands = vec![CommandLine{cmd: Command::While{ expression, loop_end: None}, line:1}];
+        let commands = vec![CommandLine {
+            cmd: Command::While {
+                expression,
+                loop_end: None,
+            },
+            line: 1,
+        }];
         let functions = HashMap::new();
         assert_eq!(
-            parse("While Davy ain't Greatness")
-                .unwrap(),
-            Program{commands, functions}
+            parse("While Davy ain't Greatness").unwrap(),
+            Program {
+                commands,
+                functions
+            }
         );
     }
 
     #[test]
     fn pretty_print() {
         assert_eq!(
-            print_program(&parse("Absolute takes a thought")
-                .unwrap()),
+            print_program(&parse("Absolute takes a thought").unwrap()),
             "1: FunctionDeclaration { name: \"Absolute\", args: [\"a thought\"], func_end: None }\n"
         )
     }
@@ -1000,10 +1101,14 @@ mod tests {
         pretty_env_logger::try_init().unwrap_or(());
         let err = parse("test is a").err().unwrap().0;
         if let ErrorKind::BadIs(symbols, line) = err {
-            assert_eq!(symbols, vec![
-                SymbolType::Words(vec!["test".to_string()]),
-                SymbolType::Is,
-                SymbolType::Words(vec!["a".to_string()])]);
+            assert_eq!(
+                symbols,
+                vec![
+                    SymbolType::Words(vec!["test".to_string()]),
+                    SymbolType::Is,
+                    SymbolType::Words(vec!["a".to_string()])
+                ]
+            );
             assert_eq!(line, 1);
         } else {
             assert!(false, err);
@@ -1042,11 +1147,15 @@ mod tests {
         pretty_env_logger::try_init().unwrap_or(());
         let err = parse("put foo into bar").err().unwrap().0;
         if let ErrorKind::BadPut(expression, line) = err {
-            assert_eq!(expression, vec![
-                SymbolType::Put,
-                SymbolType::Words(vec!["foo".to_string()]),
-                SymbolType::Where,
-                SymbolType::Words(vec!["bar".to_string()])]);
+            assert_eq!(
+                expression,
+                vec![
+                    SymbolType::Put,
+                    SymbolType::Words(vec!["foo".to_string()]),
+                    SymbolType::Where,
+                    SymbolType::Words(vec!["bar".to_string()])
+                ]
+            );
             assert_eq!(line, 1);
         } else {
             assert!(false, err);

@@ -1,5 +1,6 @@
-#![recursion_limit="5000"]
+#![recursion_limit = "5000"]
 #![deny(warnings)]
+#![cfg_attr(feature = "cargo-clippy", allow(needless_return))]
 
 #[macro_use]
 extern crate nom;
@@ -31,7 +32,7 @@ mod parser;
 mod runner;
 
 #[cfg(not(target_arch = "wasm32"))]
-use clap::{Arg, App};
+use clap::{App, Arg};
 #[cfg(not(target_arch = "wasm32"))]
 use std::fs::File;
 #[cfg(not(target_arch = "wasm32"))]
@@ -49,14 +50,13 @@ fn main() -> common::Result<()> {
                 .help("Sets the input file to use")
                 .required(true)
                 .index(1),
-        )
-        .get_matches();
+        ).get_matches();
     let mut f = File::open(matches.value_of("INPUT").unwrap())?;
     let mut buffer = String::new();
     f.read_to_string(&mut buffer)?;
 
     let program = parser::parse(&buffer)?;
-    runner::run(program, &mut io::stdout())?;
+    runner::run(&program, &mut io::stdout())?;
     Ok(())
 }
 
@@ -87,7 +87,7 @@ mod tests {
         let program = parser::parse(code).unwrap();
         info!("Commands: {:?}", program.commands);
         let mut writer = Cursor::new(Vec::new());
-        let variables = runner::run(program, &mut writer).unwrap();
+        let variables = runner::run(&program, &mut writer).unwrap();
         writer.set_position(0);
         let res = std::str::from_utf8(writer.get_ref()).unwrap();
         if res != "" {
@@ -119,8 +119,7 @@ mod tests {
     Until Counter is Limit
         Build Counter up
     End";
-        let end_variables =
-            hashmap! {
+        let end_variables = hashmap! {
             "buzz" => Expression::Integer(5),
             "limit" => Expression::Integer(100),
             "counter" => Expression::Integer(100),
@@ -138,8 +137,7 @@ mod tests {
     Until my world is Desire,
     Build my world up
     And around we go";
-        let end_variables =
-            hashmap! {
+        let end_variables = hashmap! {
             "my world" => Expression::Integer(100),
             "fire" => Expression::Integer(3),
             "hate" => Expression::Integer(5),
@@ -176,8 +174,7 @@ mod tests {
 
     Whisper my world
     And around we go";
-        let end_variables =
-            hashmap! {
+        let end_variables = hashmap! {
             "my world" => Expression::Integer(100),
             "fire" => Expression::Integer(3),
             "hate" => Expression::Integer(5),
@@ -209,8 +206,7 @@ mod tests {
 
     #[test]
     fn multiple_uppercase_proper_variable() {
-        let end_variables =
-            hashmap! {
+        let end_variables = hashmap! {
             "id" => Expression::Integer(3),
         };
         test_program("put foo into ID", end_variables, "");
@@ -220,7 +216,7 @@ mod tests {
         pretty_env_logger::try_init().unwrap_or(());
         let program = parser::parse(input).unwrap();
         let mut writer = Cursor::new(Vec::new());
-        runner::run(program, &mut writer).err().unwrap().0
+        runner::run(&program, &mut writer).err().unwrap().0
     }
 
     #[test]
