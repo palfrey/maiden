@@ -801,7 +801,7 @@ pub fn parse(input: &str) -> Result<Program> {
                         commands.push(CommandLine {
                             cmd: Command::Increment {
                                 target: name.to_string(),
-                                count: count,
+                                count,
                             },
                             line: current_line,
                         });
@@ -833,7 +833,7 @@ pub fn parse(input: &str) -> Result<Program> {
                         commands.push(CommandLine {
                             cmd: Command::Decrement {
                                 target: name.to_string(),
-                                count: count,
+                                count,
                             },
                             line: current_line,
                         });

@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn double_increment() {
         let end_variables = hashmap!{
-        "my world" => Expression::Integer(2),
+            "my world" => Expression::Integer(2),
         };
         test_program(
             "Put 0 into my world\nBuild my world up, up",
@@ -227,7 +227,7 @@ mod tests {
     #[test]
     fn double_decrement() {
         let end_variables = hashmap!{
-        "the walls" => Expression::Integer(-2),
+            "the walls" => Expression::Integer(-2),
         };
         test_program(
             "Put 0 into the walls\nKnock the walls down, down",
