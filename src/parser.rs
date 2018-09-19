@@ -551,22 +551,6 @@ pub fn parse(input: &str) -> Result<Program> {
         last_line = current_line;
         let symbols: Vec<SymbolType> = symbols.into_iter().map(|t| t.symbol).collect();
         match symbols.as_slice() {
-            [SymbolType::Build, SymbolType::Variable(target), SymbolType::Up] => {
-                commands.push(CommandLine {
-                    cmd: Command::Increment {
-                        target: target.to_string(),
-                    },
-                    line: current_line,
-                });
-            }
-            [SymbolType::Knock, SymbolType::Variable(target), SymbolType::Down] => {
-                commands.push(CommandLine {
-                    cmd: Command::Decrement {
-                        target: target.to_string(),
-                    },
-                    line: current_line,
-                });
-            }
             [SymbolType::Next] => {
                 let command = build_next(&mut commands, &mut loop_starts);
                 commands.push(CommandLine {
@@ -791,6 +775,70 @@ pub fn parse(input: &str) -> Result<Program> {
                         },
                         line: current_line,
                     });
+                } else if symbols[0] == SymbolType::Build && symbols.len() > 2 {
+                    if let SymbolType::Variable(ref name) = symbols[1] {
+                        let mut rest = symbols.iter().skip(2);
+                        let up = rest.next().unwrap();
+                        if *up != SymbolType::Up {
+                            bail!(ErrorKind::BadIncrement(symbols.to_vec(), current_line));
+                        }
+                        let mut count = 1;
+                        loop {
+                            let comma = rest.next();
+                            if comma.is_none() {
+                                break;
+                            }
+                            let up = rest.next();
+                            if *comma.unwrap() != SymbolType::Comma
+                                || up.is_none()
+                                || *up.unwrap() != SymbolType::Up
+                            {
+                                bail!(ErrorKind::BadIncrement(symbols.to_vec(), current_line));
+                            }
+                            count += 1;
+                        }
+                        commands.push(CommandLine {
+                            cmd: Command::Increment {
+                                target: name.to_string(),
+                                count,
+                            },
+                            line: current_line,
+                        });
+                    } else {
+                        bail!(ErrorKind::BadDecrement(symbols.to_vec(), current_line));
+                    }
+                } else if symbols[0] == SymbolType::Knock && symbols.len() > 2 {
+                    if let SymbolType::Variable(ref name) = symbols[1] {
+                        let mut rest = symbols.iter().skip(2);
+                        let down = rest.next().unwrap();
+                        if *down != SymbolType::Down {
+                            bail!(ErrorKind::BadDecrement(symbols.to_vec(), current_line));
+                        }
+                        let mut count = 1;
+                        loop {
+                            let comma = rest.next();
+                            if comma.is_none() {
+                                break;
+                            }
+                            let down = rest.next();
+                            if *comma.unwrap() != SymbolType::Comma
+                                || down.is_none()
+                                || *down.unwrap() != SymbolType::Down
+                            {
+                                bail!(ErrorKind::BadDecrement(symbols.to_vec(), current_line));
+                            }
+                            count += 1;
+                        }
+                        commands.push(CommandLine {
+                            cmd: Command::Decrement {
+                                target: name.to_string(),
+                                count,
+                            },
+                            line: current_line,
+                        });
+                    } else {
+                        bail!(ErrorKind::BadDecrement(symbols.to_vec(), current_line));
+                    }
                 } else {
                     bail!(ErrorKind::BadCommandSequence(
                         symbols.to_vec(),

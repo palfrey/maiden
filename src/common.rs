@@ -92,9 +92,11 @@ pub enum Command {
     EndIf,
     Increment {
         target: String,
+        count: i128,
     },
     Decrement {
         target: String,
+        count: i128,
     },
     Next {
         loop_start: usize,
@@ -198,6 +200,12 @@ error_chain!{
         Unimplemented(description: String, line: u32) {
             display("Unimplemented: {}", description)
         }
+        BadIncrement(sequence: Vec<SymbolType>, line: u32) {
+            display("Bad 'increment' section: {:?}", sequence)
+        }
+        BadDecrement(sequence: Vec<SymbolType>, line: u32) {
+            display("Bad 'decrement' section: {:?}", sequence)
+        }
     }
 }
 
@@ -227,6 +235,8 @@ pub fn get_error_line(e: &Error) -> u32 {
             ErrorKind::NoEndLoop(line) => line.clone(),
             ErrorKind::BadBooleanResolve(_, line) => line.clone(),
             ErrorKind::BadFunctionDeclaration(_, line) => line.clone(),
+            ErrorKind::BadIncrement(_, line) => line.clone(),
+            ErrorKind::BadDecrement(_, line) => line.clone(),
             ErrorKind::Unimplemented(_, line) => line.clone(),
             _ => 0,
         },

@@ -212,6 +212,30 @@ mod tests {
         test_program("put foo into ID", end_variables, "");
     }
 
+    #[test]
+    fn double_increment() {
+        let end_variables = hashmap!{
+            "my world" => Expression::Integer(2),
+        };
+        test_program(
+            "Put 0 into my world\nBuild my world up, up",
+            end_variables,
+            "",
+        );
+    }
+
+    #[test]
+    fn double_decrement() {
+        let end_variables = hashmap!{
+            "the walls" => Expression::Integer(-2),
+        };
+        test_program(
+            "Put 0 into the walls\nKnock the walls down, down",
+            end_variables,
+            "",
+        );
+    }
+
     fn test_error(input: &str) -> common::ErrorKind {
         pretty_env_logger::try_init().unwrap_or(());
         let program = parser::parse(input).unwrap();

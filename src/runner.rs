@@ -236,11 +236,17 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 let val = run_expression(state, program, &value)?;
                 state.variables.insert(target.to_lowercase(), val);
             }
-            Command::Increment { ref target } => {
-                alter_variable(state, &target, &|x| x + 1)?;
+            Command::Increment {
+                ref target,
+                ref count,
+            } => {
+                alter_variable(state, &target, &|x| x + count)?;
             }
-            Command::Decrement { ref target } => {
-                alter_variable(state, &target, &|x| x - 1)?;
+            Command::Decrement {
+                ref target,
+                ref count,
+            } => {
+                alter_variable(state, &target, &|x| x - count)?;
             }
             Command::Until {
                 ref expression,
