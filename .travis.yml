@@ -21,16 +21,21 @@ jobs:
   include:
   - stage: test
     rust: stable
-    before_script: cargo fmt --help > /dev/null || cargo install rustfmt
-    script: cargo fmt --all -- --write-mode diff --force && cargo build --all && cargo
-      test --all
+    before_script:
+      - rustup component add rustfmt-preview
+      - rustup component add clippy-preview
+    script:
+      - cargo fmt -- --check
+      - cargo build --all
+      - cargo clippy
+      - cargo test --all
   - stage: test
     rust: beta
     script: cargo build --all && cargo test --all
   - stage: test
     name: web
     rust: nightly
-    before_script: cargo web --help > /dev/null || cargo install cargo-web
+    before_script: which cargo-web || cargo install cargo-web
     script: cargo web build
   - stage: test
     rust: nightly
@@ -38,7 +43,7 @@ jobs:
   - stage: deploy
     if: branch = master
     rust: nightly
-    before_script: cargo web --help > /dev/null || cargo install cargo-web
+    before_script: which cargo-web || cargo install cargo-web
     script: cargo web deploy && GIT_DEPLOY_DIR=./target/deploy ./deploy.sh
     env:
       - secure: wJLAtzuSafKIxyGFPCRMQ8MXFDShZHPtYDN1d1QsFyHbkfWYemwBIE3sSsB7NVLJjdZuujDVh82fLOc1G4a72u7GlEd8iQtCauXUEYkJtkB6B+iz206Obb2FwzrupywtRGTdm8Yck4BSm4L4f31LRIRjHSJWrJW8GuLbyLcvSSYR35+spha/5r1UeyY2LTRNlHXpjn36bqUOt/1+UCOiKc3WVrFVv3zOQ5K2NKiqXmSjj7HrkgtEtdmBio3Ge43ky+fm4bHjBuZju6PF55AMzlB0Bdx1qBdaB52u8RC5okk2ohPXN8Dn5d8yFF8ue/fRGttXwCNl3y1oh0tnU1gSuNdPgAQjWhHjTprw2Ok7+nKanBy7eXyp7RqdyiTlvweMOMMil7oqe/i9hnHwABh8UZP+/FaFhSDgJZSOoLiOGVd9eI4ZXxQNFq2Sj5UwRFZVXzp5hNpNqSHRUbQjAnGQDpOZtzskeap1or9Opio1FVMYQUzmNZojk161s4GA9wboVDYwPkKmNLfna8zg7eITr6xeLL7rwsL2ZNsPqGxrbse4bUmgzG8eayBSUvQaucoi/5SCSp+fAxy9Isf61hihesjhXp1sld0mQ8p0uE2Rej5SjVLOpQL2n4eL8DG0HNnhoCOqtAnABNDzRIvhO/fGqnrKf1iClI4yae7pblMev/s=

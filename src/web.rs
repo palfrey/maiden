@@ -60,7 +60,7 @@ impl Model {
                 self.program = parser::print_program(&val);
                 self.parse_error = false;
                 let mut writer = std::io::Cursor::new(Vec::new());
-                let res = runner::run(val, &mut writer);
+                let res = runner::run(&val, &mut writer);
                 self.res = "".into();
                 if let Err(err) = res {
                     self.res += &self.nicer_error(&err);

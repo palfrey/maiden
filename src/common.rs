@@ -73,7 +73,10 @@ pub static LOWEST_PRECDENCE: SymbolType = SymbolType::Dummy;
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
-    Assignment { target: String, value: Expression },
+    Assignment {
+        target: String,
+        value: Expression,
+    },
     Until {
         expression: Expression,
         loop_end: Option<usize>,
@@ -87,19 +90,36 @@ pub enum Command {
         if_end: Option<usize>,
     },
     EndIf,
-    Increment { target: String, count: i128 },
-    Decrement { target: String, count: i128 },
-    Next { loop_start: usize },
-    Continue { loop_start: usize },
-    Say { value: Expression },
+    Increment {
+        target: String,
+        count: i128,
+    },
+    Decrement {
+        target: String,
+        count: i128,
+    },
+    Next {
+        loop_start: usize,
+    },
+    Continue {
+        loop_start: usize,
+    },
+    Say {
+        value: Expression,
+    },
     FunctionDeclaration {
         name: String,
         args: Vec<String>,
         func_end: Option<usize>,
     },
-    Return { return_value: Expression },
+    Return {
+        return_value: Expression,
+    },
     EndFunction,
-    Call { name: String, args: Vec<Expression> },
+    Call {
+        name: String,
+        args: Vec<Expression>,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -199,28 +219,26 @@ impl<'a> From<::nom::Err<Span<'a>>> for Error {
 #[cfg(target_arch = "wasm32")]
 pub fn get_error_line(e: &Error) -> u32 {
     match e {
-        Error(kind, _) => {
-            match kind {
-                ErrorKind::MissingVariable(_, line) => line.clone(),
-                ErrorKind::UnparsedText(_, line) => line.clone(),
-                ErrorKind::MissingFunction(_, line) => line.clone(),
-                ErrorKind::WrongArgCount(_, _, line) => line.clone(),
-                ErrorKind::UnbalancedExpression(_, line) => line.clone(),
-                ErrorKind::NoRunner(_, line) => line.clone(),
-                ErrorKind::BadCommandSequence(_, line) => line.clone(),
-                ErrorKind::ParseIntError(_, line) => line.clone(),
-                ErrorKind::BadIs(_, line) => line.clone(),
-                ErrorKind::BadPut(_, line) => line.clone(),
-                ErrorKind::NoEndOfIf(line) => line.clone(),
-                ErrorKind::NoEndFunction(line) => line.clone(),
-                ErrorKind::NoEndLoop(line) => line.clone(),
-                ErrorKind::BadBooleanResolve(_, line) => line.clone(),
-                ErrorKind::BadFunctionDeclaration(_, line) => line.clone(),
-                ErrorKind::BadIncrement(_, line) => line.clone(),
-                ErrorKind::BadDecrement(_, line) => line.clone(),
-                ErrorKind::Unimplemented(_, line) => line.clone(),
-                _ => 0,
-            }
-        }
+        Error(kind, _) => match kind {
+            ErrorKind::MissingVariable(_, line) => line.clone(),
+            ErrorKind::UnparsedText(_, line) => line.clone(),
+            ErrorKind::MissingFunction(_, line) => line.clone(),
+            ErrorKind::WrongArgCount(_, _, line) => line.clone(),
+            ErrorKind::UnbalancedExpression(_, line) => line.clone(),
+            ErrorKind::NoRunner(_, line) => line.clone(),
+            ErrorKind::BadCommandSequence(_, line) => line.clone(),
+            ErrorKind::ParseIntError(_, line) => line.clone(),
+            ErrorKind::BadIs(_, line) => line.clone(),
+            ErrorKind::BadPut(_, line) => line.clone(),
+            ErrorKind::NoEndOfIf(line) => line.clone(),
+            ErrorKind::NoEndFunction(line) => line.clone(),
+            ErrorKind::NoEndLoop(line) => line.clone(),
+            ErrorKind::BadBooleanResolve(_, line) => line.clone(),
+            ErrorKind::BadFunctionDeclaration(_, line) => line.clone(),
+            ErrorKind::BadIncrement(_, line) => line.clone(),
+            ErrorKind::BadDecrement(_, line) => line.clone(),
+            ErrorKind::Unimplemented(_, line) => line.clone(),
+            _ => 0,
+        },
     }
 }
