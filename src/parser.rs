@@ -1,6 +1,6 @@
 // because nom macros
-#![allow(double_parens)]
-#![allow(double_comparisons)]
+#![cfg_attr(feature = "cargo-clippy", allow(double_parens))]
+#![cfg_attr(feature = "cargo-clippy", allow(double_comparisons))]
 
 use common::*;
 use nom;
@@ -517,7 +517,7 @@ fn build_next(commands: &mut Vec<CommandLine>, loop_starts: &mut Vec<usize>) -> 
     return Command::Next { loop_start };
 }
 
-#[allow(cyclomatic_complexity)] // FIXME: break this up a bit
+#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
 pub fn parse(input: &str) -> Result<Program> {
     let re = Regex::new(r"'s\W+").unwrap();
     let fixed_input = re.replace_all(input, " is ").replace("'", "");
