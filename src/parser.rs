@@ -306,6 +306,9 @@ fn compact_words(line: Vec<Token>) -> Vec<Token> {
             SymbolType::Words(other) => {
                 words.extend_from_slice(&other);
             }
+            SymbolType::Comment => {
+                // strip these
+            }
             _ => {
                 if !words.is_empty() {
                     symbols.push(Token {
@@ -577,17 +580,20 @@ pub fn parse(input: &str) -> Result<Program> {
     for raw_symbols in raw_lines.1 {
         debug!("raw_symbols: {:?}", raw_symbols);
         let mut symbols = compact_words(raw_symbols);
-        if symbols[0].symbol == SymbolType::And {
-            symbols.remove(0);
-        }
-        if symbols[symbols.len() - 1].symbol == SymbolType::Comma {
-            symbols.pop();
+        if !symbols.is_empty() {
+            if symbols[0].symbol == SymbolType::And {
+                symbols.remove(0);
+            }
+            if symbols[symbols.len() - 1].symbol == SymbolType::Comma {
+                symbols.pop();
+            }
         }
         debug!("symbols: {:?}", symbols);
-        if symbols.is_empty() {
-            bail!(ErrorKind::NoSymbols(last_line + 1));
-        }
-        let current_line = symbols.first().unwrap().line;
+        let current_line = if symbols.is_empty() {
+            last_line
+        } else {
+            symbols.first().unwrap().line
+        };
         last_line = current_line;
         let symbols: Vec<SymbolType> = symbols.into_iter().map(|t| t.symbol).collect();
         match symbols.as_slice() {
@@ -607,7 +613,7 @@ pub fn parse(input: &str) -> Result<Program> {
                     line: current_line,
                 });
             }
-            [SymbolType::Newline] | [SymbolType::Comment] => {
+            [SymbolType::Newline] | [] => {
                 // Comment on it's own is newline-equivalent
                 if !if_starts.is_empty() {
                     let if_start = if_starts.pop().expect("if_starts");
@@ -625,7 +631,7 @@ pub fn parse(input: &str) -> Result<Program> {
                     }
                     commands.push(CommandLine {
                         cmd: Command::EndIf,
-                        line: if symbols[0] == SymbolType::Newline {
+                        line: if !symbols.is_empty() && symbols[0] == SymbolType::Newline {
                             current_line + 1 // Newline line is the one before this
                         } else {
                             current_line
@@ -635,7 +641,7 @@ pub fn parse(input: &str) -> Result<Program> {
                     let command = build_next(&mut commands, &mut loop_starts);
                     commands.push(CommandLine {
                         cmd: command,
-                        line: if symbols[0] == SymbolType::Newline {
+                        line: if !symbols.is_empty() && symbols[0] == SymbolType::Newline {
                             current_line + 1 // Newline line is the one before this
                         } else {
                             current_line
@@ -660,7 +666,7 @@ pub fn parse(input: &str) -> Result<Program> {
                     }
                     commands.push(CommandLine {
                         cmd: Command::EndFunction,
-                        line: if symbols[0] == SymbolType::Newline {
+                        line: if !symbols.is_empty() && symbols[0] == SymbolType::Newline {
                             current_line + 1 // Newline line is the one before this
                         } else {
                             current_line

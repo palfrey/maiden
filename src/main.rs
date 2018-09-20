@@ -236,6 +236,18 @@ mod tests {
         );
     }
 
+    #[test]
+    fn expression_comment() {
+        let end_variables = hashmap! {
+            "baz" => Expression::String("foo".to_string()),
+        };
+        test_program(
+            "Baz is \"foo\" (bar)",
+            end_variables,
+            ""
+        );
+    }
+
     fn test_error(input: &str) -> common::ErrorKind {
         pretty_env_logger::try_init().unwrap_or(());
         let program = parser::parse(input).unwrap();
