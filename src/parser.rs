@@ -13,6 +13,10 @@ fn is_space(chr: char) -> bool {
     chr == ' ' || chr == '\t' || chr == '.'
 }
 
+fn is_literal_spacing_character(chr: char) -> bool {
+    is_space(chr) || chr == ',' || chr == ';'
+}
+
 fn is_newline(chr: char) -> bool {
     chr == '\r' || chr == '\n'
 }
@@ -130,7 +134,7 @@ named!(word(Span) -> SymbolType,
             (())
         ) => {|_| SymbolType::GreaterThan} |
         alt_complete!(
-            tag_no_case!("is") | tag_no_case!("was")
+            tag!("is") | tag!("was") | tag!("are")
         ) => {|_| SymbolType::Is} |
         tag_no_case!("if") => {|_| SymbolType::If} |
         tag_no_case!("build") => {|_| SymbolType::Build} |
@@ -204,12 +208,12 @@ named!(poetic_number_literal_core<Span, (u32, String, Vec<Span>)>,
     do_parse!(
         pv: variable >>
         take_while1!(is_space) >>
-        tag!("is") >>
+        alt!(tag!("is") | tag!("are")) >>
         position: position!() >>
         peek!(not!(tuple!(take_while1!(is_space), literal_word))) >> // number literals cannot start with a literal word
         words: many1!(
             do_parse!(
-                take_while1!(is_space) >>
+                take_while1!(is_literal_spacing_character) >>
                 word: take_while1!(word_character) >>
                 (word)
             )
@@ -1088,6 +1092,24 @@ mod tests {
                 SymbolType::Words(vec!["nothing".to_string()]),
                 SymbolType::Subtract,
                 SymbolType::Variable("your love".to_string()),
+            ],
+        );
+    }
+
+    #[test]
+    fn non_alphabetic_literal() {
+        lines_tokens_check(
+            "A nightmare is decimated, destroyed; sparkling, sinuously perfected",
+            vec![
+                SymbolType::Variable("A nightmare".to_string()),
+                SymbolType::Is,
+                SymbolType::Words(vec![
+                    "decimated".to_string(),
+                    "destroyed".to_string(),
+                    "sparkling".to_string(),
+                    "sinuously".to_string(),
+                    "perfected".to_string(),
+                ]),
             ],
         );
     }
