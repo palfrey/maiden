@@ -20,6 +20,7 @@ pub enum Expression {
     Add(Box<Expression>, Box<Expression>),
     Subtract(Box<Expression>, Box<Expression>),
     Times(Box<Expression>, Box<Expression>),
+    Divide(Box<Expression>, Box<Expression>),
     And(Box<Expression>, Box<Expression>),
     GreaterThanOrEqual(Box<Expression>, Box<Expression>),
     GreaterThan(Box<Expression>, Box<Expression>),
@@ -61,6 +62,7 @@ pub enum SymbolType {
     Words(Vec<String>),
     Integer(String),
     Comment,
+    Divide
 }
 
 #[derive(Debug, PartialEq)]

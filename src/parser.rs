@@ -165,6 +165,7 @@ named!(word(Span) -> SymbolType,
         alt_complete!(
             tag_no_case!("times") | tag_no_case!("of")
         ) => {|_| SymbolType::Times } |
+        tag_no_case!("over") => {|_| SymbolType::Divide} |
         tag_no_case!("into") => {|_| SymbolType::Where} |
         tag_no_case!("put") => {|_| SymbolType::Put} |
         tag_no_case!("else") => {|_| SymbolType::Else} |
@@ -378,6 +379,7 @@ fn next_operator<'a>(
             | SymbolType::Add
             | SymbolType::Subtract
             | SymbolType::Times
+            | SymbolType::Divide
             | SymbolType::And => {
                 return Some((item, index));
             }
@@ -490,6 +492,7 @@ fn parse_expression_1(
             SymbolType::Add => Expression::Add(Box::new(lhs.clone()), Box::new(rhs)),
             SymbolType::Subtract => Expression::Subtract(Box::new(lhs.clone()), Box::new(rhs)),
             SymbolType::Times => Expression::Times(Box::new(lhs.clone()), Box::new(rhs)),
+            SymbolType::Divide => Expression::Divide(Box::new(lhs.clone()), Box::new(rhs)),
             SymbolType::And => Expression::And(Box::new(lhs.clone()), Box::new(rhs)),
             _ => {
                 bail!(ErrorKind::Unimplemented(
