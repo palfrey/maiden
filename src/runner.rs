@@ -176,11 +176,14 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
         Expression::Integer(x) => Ok(format!("{}", x)),
         Expression::String(s) => Ok(s.to_string()),
         Expression::Variable(x) => {
-            let v = state
-                .variables
-                .get(&x.to_lowercase())
-                .unwrap_or_else(|| panic!("Can't find '{}'", x))
-                .clone();
+            let v = {
+                let current_line = state.current_line;
+                let v = state.variables.get(&x.to_lowercase());
+                if v.is_none() {
+                    bail!(ErrorKind::MissingVariable(x.to_string(), current_line));
+                }
+                v.unwrap().clone()
+            };
             get_printable(&v, state)
         }
         _ => {
@@ -193,11 +196,14 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
 }
 
 fn alter_variable(state: &mut State, target: &str, f: &Fn(i128) -> i128) -> Result<()> {
-    let val = state
-        .variables
-        .get(&target.to_lowercase())
-        .unwrap_or_else(|| panic!("Can't find '{}'", target))
-        .clone();
+    let val = {
+        let current_line = state.current_line;
+        let v = state.variables.get(&target.to_lowercase());
+        if v.is_none() {
+            bail!(ErrorKind::MissingVariable(target.to_string(), current_line));
+        }
+        v.unwrap().clone()
+    };
     debug!("Value of {} is {:?}", target, val);
     match val {
         Expression::Integer(x) => {
