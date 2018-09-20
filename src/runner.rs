@@ -1,6 +1,6 @@
 use common::*;
 use std::collections::HashMap;
-use std::io::Write;
+use std::io::{self, Write};
 use std::ops::Deref;
 
 struct State<'a> {
@@ -136,6 +136,9 @@ fn run_expression(
         }
         Expression::Times(ref first, ref second) => {
             return run_mathbinop(state, program, first, second, |f, s| f * s);
+        }
+        Expression::Divide(ref first, ref second) => {
+            return run_mathbinop(state, program, first, second, |f, s| f / s);
         }
         Expression::String(_) | Expression::Integer(_) => Ok(expression.clone()),
         Expression::Variable(ref name) => match state.variables.get(&name.to_lowercase()) {
@@ -328,6 +331,14 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 call_function(state, program, &name, &args)?;
             }
             Command::EndIf => {}
+            Command::Listen { ref target } => {
+                let mut input = String::new();
+                io::stdin().read_line(&mut input)?;
+                state.variables.insert(
+                    target.to_lowercase(),
+                    Expression::String(input.trim_right_matches('\n').to_string()),
+                );
+            }
         }
         pc += 1;
     }

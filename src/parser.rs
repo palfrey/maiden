@@ -169,6 +169,7 @@ named!(word(Span) -> SymbolType,
         tag_no_case!("into") => {|_| SymbolType::Where} |
         tag_no_case!("put") => {|_| SymbolType::Put} |
         tag_no_case!("else") => {|_| SymbolType::Else} |
+        tag_no_case!("listen to") => {|_| SymbolType::Listen} |
         do_parse!(
             target: variable >>
             take_while1!(is_space) >>
@@ -687,6 +688,14 @@ pub fn parse(input: &str) -> Result<Program> {
                             .iter()
                             .map(|a| Expression::Variable(a.to_string()))
                             .collect(),
+                    },
+                    line: current_line,
+                });
+            }
+            [SymbolType::Listen, SymbolType::Variable(target)] => {
+                commands.push(CommandLine {
+                    cmd: Command::Listen {
+                        target: target.to_string(),
                     },
                     line: current_line,
                 });

@@ -241,11 +241,7 @@ mod tests {
         let end_variables = hashmap! {
             "baz" => Expression::String("foo".to_string()),
         };
-        test_program(
-            "Baz is \"foo\" (bar)",
-            end_variables,
-            ""
-        );
+        test_program("Baz is \"foo\" (bar)", end_variables, "");
     }
 
     fn test_error(input: &str) -> common::ErrorKind {

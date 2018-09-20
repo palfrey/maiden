@@ -62,7 +62,8 @@ pub enum SymbolType {
     Words(Vec<String>),
     Integer(String),
     Comment,
-    Divide
+    Listen,
+    Divide,
 }
 
 #[derive(Debug, PartialEq)]
@@ -108,6 +109,9 @@ pub enum Command {
     },
     Say {
         value: Expression,
+    },
+    Listen {
+        target: String,
     },
     FunctionDeclaration {
         name: String,
