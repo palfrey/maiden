@@ -131,14 +131,14 @@ impl Renderable<Model> for Model {
         }
         html! {
             <div class="row",>
-                <div class="col-6",>
+                <div class="col-xl-6",>
                     <textarea id="editor",
                         class="form-control",
                         value=&self.value,
                         placeholder="placeholder",>
                     </textarea>
                 </div>
-                <div class="col-6",>
+                <div class="col-xl-6",>
                     <ul class=("nav", "nav-tabs"), id="outputTabs", role="tablist",>
                         <li class="nav-item",>
                             <a class=("nav-link", "active"),
