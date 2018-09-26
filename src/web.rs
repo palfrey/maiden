@@ -17,25 +17,22 @@ pub enum Msg {
     GotInput(String),
 }
 
+fn nicer_error(err: &common::Error, full_text: &str) -> String {
+    let line = common::get_error_line(err) as usize;
+    let line_display = if line == 0 {
+        &full_text
+    } else {
+        full_text.split("\n").nth(line - 1).unwrap()
+    };
+    format!(
+        "{} at line {}: \"{}\"",
+        err.0,
+        line,
+        line_display
+    )
+}
+
 impl Model {
-    fn get_line(&self, line: usize) -> &str {
-        if line == 0 {
-            &self.value
-        } else {
-            self.value.split("\n").nth(line - 1).unwrap()
-        }
-    }
-
-    fn nicer_error(&self, err: &common::Error) -> String {
-        let line = common::get_error_line(err);
-        format!(
-            "{} at line {}: \"{}\"",
-            err.0,
-            line,
-            self.get_line(line as usize)
-        )
-    }
-
     fn ast_tab(&self) -> Html<Self> {
         if self.parse_error {
             html! {
@@ -49,30 +46,45 @@ impl Model {
     }
 
     fn run_program(&mut self) {
-        let program = parser::parse(&self.value);
+        let program = parser::parse(&self.value.clone());
         match program {
             Err(err) => {
-                self.program = self.nicer_error(&err);
+                self.program = nicer_error(&err, &self.value);
                 self.parse_error = true;
                 self.res = "".to_string()
             }
             Ok(val) => {
                 self.program = parser::print_program(&val);
                 self.parse_error = false;
-                let mut writer = std::io::Cursor::new(Vec::new());
-                let res = runner::run(&val, &mut writer);
                 self.res = "".into();
-                if let Err(err) = res {
-                    self.res += &self.nicer_error(&err);
-                    self.run_error = true;
-                } else {
-                    self.run_error = false;
-                }
-                writer.set_position(0);
-                self.res += std::str::from_utf8(writer.get_ref()).unwrap().into();
-                if self.res.is_empty() {
-                    self.res = "<No output from program>".to_string();
-                }
+                let res = std::panic::catch_unwind(|| {
+                    let mut writer = std::io::Cursor::new(Vec::new());
+                    let res = runner::run(&val, &mut writer);
+                    let mut display_result = "".to_string();
+                    let run_error;
+                    if let Err(err) = res {
+                        display_result += &nicer_error(&err, "");
+                        run_error = true;
+                    } else {
+                        run_error = false;
+                    }
+                    writer.set_position(0);
+                    display_result += std::str::from_utf8(writer.get_ref()).unwrap().into();
+                    if display_result.is_empty() {
+                        display_result = "<No output from program>".to_string();
+                    }
+                    (display_result, run_error)
+                });
+                match res {
+                    Ok((display_result, run_error)) => {
+                        self.res = display_result;
+                        self.run_error = run_error;
+                    }
+                    Err(err) => {
+                        self.res += &format!("{:?}", err);
+                        self.run_error = true;
+                    }
+                };
             }
         }
     }
