@@ -134,7 +134,7 @@ named!(word(Span) -> SymbolType,
             (())
         ) => {|_| SymbolType::GreaterThan} |
         alt_complete!(
-            tag!("is") | tag!("was") | tag!("are")
+            tag!("is") | tag!("was") | tag!("are") | tag!("were")
         ) => {|_| SymbolType::Is} |
         tag_no_case!("if") => {|_| SymbolType::If} |
         tag_no_case!("build") => {|_| SymbolType::Build} |
