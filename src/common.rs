@@ -212,6 +212,9 @@ error_chain!{
         BadDecrement(sequence: Vec<SymbolType>, line: u32) {
             display("Bad 'decrement' section: {:?}", sequence)
         }
+        InstructionLimit(line: u32) {
+            display("Hit instruction limit of 10,000,000. Infinite loop?")
+        }
     }
 }
 
@@ -244,6 +247,7 @@ pub fn get_error_line(e: &Error) -> u32 {
             ErrorKind::BadIncrement(_, line) => line.clone(),
             ErrorKind::BadDecrement(_, line) => line.clone(),
             ErrorKind::Unimplemented(_, line) => line.clone(),
+            ErrorKind::InstructionLimit(line) => line.clone(),
             _ => 0,
         },
     }
