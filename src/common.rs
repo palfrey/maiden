@@ -94,6 +94,7 @@ pub enum Command {
     If {
         expression: Expression,
         if_end: Option<usize>,
+        else_loc: Option<usize>,
     },
     EndIf,
     Increment {
@@ -128,6 +129,9 @@ pub enum Command {
     Call {
         name: String,
         args: Vec<Expression>,
+    },
+    Else {
+        if_start: usize,
     },
 }
 
@@ -200,6 +204,9 @@ error_chain!{
         NoEndOfIf(line: u32) {
             display("No end of if statement")
         }
+        ElseWithNoIf(line: u32) {
+            display("Else with no if statement")
+        }
         NoEndFunction(line: u32) {
             display("No end of function")
         }
@@ -240,6 +247,7 @@ pub fn get_error_line(e: &Error) -> u32 {
             ErrorKind::BadIs(_, line) => line.clone(),
             ErrorKind::BadPut(_, line) => line.clone(),
             ErrorKind::NoEndOfIf(line) => line.clone(),
+            ErrorKind::ElseWithNoIf(line) => line.clone(),
             ErrorKind::NoEndFunction(line) => line.clone(),
             ErrorKind::NoEndLoop(line) => line.clone(),
             ErrorKind::BadBooleanResolve(_, line) => line.clone(),

@@ -709,6 +709,37 @@ pub fn parse(input: &str) -> Result<Program> {
                     line: current_line,
                 });
             }
+            [SymbolType::Else] => {
+                if if_starts.is_empty() {
+                    bail!(ErrorKind::ElseWithNoIf(current_line));
+                }
+                let if_start = if_starts.last().expect("if_starts");
+                let if_len = commands.len();
+                match commands.index_mut(*if_start) {
+                    CommandLine {
+                        cmd:
+                            Command::If {
+                                ref mut else_loc, ..
+                            },
+                        ..
+                    } => {
+                        else_loc.get_or_insert(if_len);
+                    }
+                    _ => {
+                        panic!("return to non-if command");
+                    }
+                }
+                commands.push(CommandLine {
+                    cmd: Command::Else {
+                        if_start: *if_start,
+                    },
+                    line: if !symbols.is_empty() && symbols[0] == SymbolType::Newline {
+                        current_line + 1 // Newline line is the one before this
+                    } else {
+                        current_line
+                    },
+                });
+            }
             _ => {
                 // Better done with slice patterns once they stabilise
                 // (see https://github.com/rust-lang/rust/issues/23121)
@@ -763,6 +794,7 @@ pub fn parse(input: &str) -> Result<Program> {
                         cmd: Command::If {
                             expression,
                             if_end: None,
+                            else_loc: None,
                         },
                         line: current_line,
                     });
@@ -887,7 +919,7 @@ pub fn print_program(program: &Program) -> String {
     let mut last_line = 0;
     for command in &program.commands {
         match command.cmd {
-            Command::EndFunction | Command::EndIf | Command::Next { loop_start: _ } => {
+            Command::EndFunction | Command::Else { .. } | Command::EndIf | Command::Next { .. } => {
                 indent -= 1;
             }
             _ => {}
@@ -903,23 +935,11 @@ pub fn print_program(program: &Program) -> String {
         }
         res += &(print_command(&command.cmd) + "\n");
         match command.cmd {
-            Command::FunctionDeclaration {
-                name: _,
-                args: _,
-                func_end: _,
-            }
-            | Command::If {
-                expression: _,
-                if_end: _,
-            }
-            | Command::While {
-                expression: _,
-                loop_end: _,
-            }
-            | Command::Until {
-                expression: _,
-                loop_end: _,
-            } => {
+            Command::FunctionDeclaration { .. }
+            | Command::If { .. }
+            | Command::While { .. }
+            | Command::Else { .. }
+            | Command::Until { .. } => {
                 indent += 1;
             }
             _ => {}
@@ -995,6 +1015,7 @@ mod tests {
             cmd: Command::If {
                 expression: expression,
                 if_end: None,
+                else_loc: None,
             },
             line: 1,
         }];

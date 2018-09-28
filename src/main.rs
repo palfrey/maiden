@@ -245,6 +245,23 @@ mod tests {
     }
 
     #[test]
+    fn skip_else() {
+        let end_variables = hashmap! {
+            "foo" => Expression::String("foo".to_string()),
+        };
+        test_program(
+            "if nothing is nothing
+        Foo is \"foo\"
+        Else
+        Bar is \"bar\"
+
+        ",
+            end_variables,
+            "",
+        );
+    }
+
+    #[test]
     fn numeric_args() {
         let err = test_error("Multiply taking 3, 5");
         if let common::ErrorKind::MissingFunction(name, line) = err {
