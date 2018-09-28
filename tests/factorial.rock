@@ -1,0 +1,15 @@
+(From https://github.com/Suloch/chirp/blob/master/samplePrograms/factorial.rocks)
+(Program to calclate factorial for a number recrusively)
+(Author : Suloch)
+
+Everyone takes the bait
+If the bait is nothing
+Put nothing into the chaos
+Build the chaos up
+Else
+Put the bait without 1 into Smaller
+Put the bait of Everyone taking Smaller into the chaos
+
+Give back the chaos
+
+Say Everyone taking 6
