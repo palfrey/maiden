@@ -244,6 +244,17 @@ mod tests {
         test_program("Baz is \"foo\" (bar)", end_variables, "");
     }
 
+    #[test]
+    fn numeric_args() {
+        let err = test_error("Multiply taking 3, 5");
+        if let common::ErrorKind::MissingFunction(name, line) = err {
+            assert_eq!(name, "Multiply");
+            assert_eq!(line, 1);
+        } else {
+            assert!(false, err);
+        }
+    }
+
     fn test_error(input: &str) -> common::ErrorKind {
         pretty_env_logger::try_init().unwrap_or(());
         let program = parser::parse(input).unwrap();

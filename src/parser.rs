@@ -99,43 +99,93 @@ named!(literal_word<Span, Span>,
     )
 );
 
+named!(expression(Span) -> SymbolType,
+ alt_complete!(
+    do_parse!(
+        tag_no_case!("is") >>
+        take_while1!(is_space) >>
+        tag_no_case!("as") >>
+        take_while1!(is_space) >>
+        alt_complete!(
+            tag_no_case!("high") | tag_no_case!("strong") | tag_no_case!("big")
+        ) >>
+        take_while1!(is_space) >>
+        tag_no_case!("as") >>
+        (())
+    ) => {|_| SymbolType::GreaterThanOrEqual} |
+    do_parse!(
+        tag_no_case!("is") >>
+        take_while1!(is_space) >>
+        alt_complete!(
+            tag_no_case!("less") | tag_no_case!("weaker") | tag_no_case!("lower") | tag_no_case!("smaller")
+        ) >>
+        take_while1!(is_space) >>
+        tag_no_case!("than") >>
+        (())
+    ) => {|_| SymbolType::LessThan} |
+    do_parse!(
+        tag_no_case!("is") >>
+        take_while1!(is_space) >>
+        alt_complete!(
+            tag_no_case!("higher") | tag_no_case!("stronger") | tag_no_case!("bigger") | tag_no_case!("greater")
+        ) >>
+        take_while1!(is_space) >>
+        tag_no_case!("than") >>
+        (())
+    ) => {|_| SymbolType::GreaterThan} |
+    alt_complete!(
+        tag!("is") | tag!("was") | tag!("are")
+    ) => {|_| SymbolType::Is} |
+    tag_no_case!("and") => {|_| SymbolType::And} |
+    tag_no_case!("takes") => {|_| SymbolType::Takes} |
+    alt_complete!(
+        tag_no_case!("without") | tag_no_case!("minus")
+    ) => {|_| SymbolType::Subtract} |
+    alt_complete!(
+        tag_no_case!("with") | tag_no_case!("plus")
+    ) => {|_| SymbolType::Add} |
+    alt_complete!(
+        tag_no_case!("times") | tag_no_case!("of")
+    ) => {|_| SymbolType::Times } |
+    tag_no_case!("over") => {|_| SymbolType::Divide} |
+    do_parse!(
+        target: variable >>
+        take_while1!(is_space) >>
+        tag_no_case!("taking") >>
+        take_while1!(is_space) >>
+        first_arg: many1!(expression) >>
+        other_args: many0!(
+            do_parse!(
+                take_while!(is_space) >>
+                alt!(tag!(",") | tag_no_case!("and")) >>
+                take_while!(is_space) >>
+                var: many1!(expression) >>
+                (var)
+            )) >>
+        (target, first_arg, other_args)
+    ) => {|(target, first_arg, mut other_args): (String, Vec<SymbolType>, Vec<Vec<SymbolType>>)| {
+        other_args.insert(0, first_arg);
+        SymbolType::Taking{target, args: other_args}
+    }} |
+    take_while1!(char::is_numeric) => {|n: Span| SymbolType::Integer(n.fragment.to_string())} |
+    variable => {|s| SymbolType::Variable(s) } |
+    do_parse!(
+        tag!("\"") >>
+        phrase: take_while!(string_character) >>
+        tag!("\"") >>
+        (phrase)
+    ) => {|p: Span| SymbolType::String(p.to_string())} |
+    do_parse!(
+        tag!("(") >>
+        take_until!(")") >>
+        tag!(")") >>
+        ()
+    ) => {|_| SymbolType::Comment } |
+    take_while1!(word_character) => {|word: Span| SymbolType::Words(vec![word.to_string()])}
+));
+
 named!(word(Span) -> SymbolType,
     alt_complete!(
-        do_parse!(
-            tag_no_case!("is") >>
-            take_while1!(is_space) >>
-            tag_no_case!("as") >>
-            take_while1!(is_space) >>
-            alt_complete!(
-                tag_no_case!("high") | tag_no_case!("strong") | tag_no_case!("big")
-            ) >>
-            take_while1!(is_space) >>
-            tag_no_case!("as") >>
-            (())
-        ) => {|_| SymbolType::GreaterThanOrEqual} |
-        do_parse!(
-            tag_no_case!("is") >>
-            take_while1!(is_space) >>
-            alt_complete!(
-                tag_no_case!("less") | tag_no_case!("weaker") | tag_no_case!("lower") | tag_no_case!("smaller")
-            ) >>
-            take_while1!(is_space) >>
-            tag_no_case!("than") >>
-            (())
-        ) => {|_| SymbolType::LessThan} |
-        do_parse!(
-            tag_no_case!("is") >>
-            take_while1!(is_space) >>
-            alt_complete!(
-                tag_no_case!("higher") | tag_no_case!("stronger") | tag_no_case!("bigger") | tag_no_case!("greater")
-            ) >>
-            take_while1!(is_space) >>
-            tag_no_case!("than") >>
-            (())
-        ) => {|_| SymbolType::GreaterThan} |
-        alt_complete!(
-            tag!("is") | tag!("was") | tag!("are")
-        ) => {|_| SymbolType::Is} |
         tag_no_case!("if") => {|_| SymbolType::If} |
         tag_no_case!("build") => {|_| SymbolType::Build} |
         tag_no_case!("up") => {|_| SymbolType::Up} |
@@ -145,7 +195,6 @@ named!(word(Span) -> SymbolType,
         alt_complete!(
             tag_no_case!("say") | tag_no_case!("shout") | tag_no_case!("whisper") | tag_no_case!("scream")
         ) => {|_| SymbolType::Say} |
-        tag_no_case!("and") => {|_| SymbolType::And} |
         tag_no_case!("while") => {|_| SymbolType::While} |
         tag_no_case!("until") => {|_| SymbolType::Until} |
         alt_complete!(
@@ -155,55 +204,11 @@ named!(word(Span) -> SymbolType,
             tag_no_case!("take it to the top") | tag_no_case!("continue")
         ) => {|_| SymbolType::Continue} |
         tag_no_case!("give back") => {|_| SymbolType::Return} |
-        tag_no_case!("takes") => {|_| SymbolType::Takes} |
-        alt_complete!(
-            tag_no_case!("without") | tag_no_case!("minus")
-        ) => {|_| SymbolType::Subtract} |
-        alt_complete!(
-            tag_no_case!("with") | tag_no_case!("plus")
-        ) => {|_| SymbolType::Add} |
-        alt_complete!(
-            tag_no_case!("times") | tag_no_case!("of")
-        ) => {|_| SymbolType::Times } |
-        tag_no_case!("over") => {|_| SymbolType::Divide} |
         tag_no_case!("into") => {|_| SymbolType::Where} |
         tag_no_case!("put") => {|_| SymbolType::Put} |
         tag_no_case!("else") => {|_| SymbolType::Else} |
         tag_no_case!("listen to") => {|_| SymbolType::Listen} |
-        do_parse!(
-            target: variable >>
-            take_while1!(is_space) >>
-            tag_no_case!("taking") >>
-            take_while1!(is_space) >>
-            first_arg: variable >>
-            other_args: many0!(
-                do_parse!(
-                    take_while!(is_space) >>
-                    alt!(tag!(",") | tag_no_case!("and")) >>
-                    take_while!(is_space) >>
-                    var: variable >>
-                    (var)
-                )) >>
-            (target, first_arg, other_args)
-        ) => {|(target, first_arg, mut other_args): (String, String, Vec<String>)| {
-            other_args.insert(0, first_arg);
-            SymbolType::Taking{target, args: other_args}
-        }} |
-        take_while1!(char::is_numeric) => {|n: Span| SymbolType::Integer(n.fragment.to_string())} |
-        variable => {|s| SymbolType::Variable(s) } |
-        do_parse!(
-            tag!("\"") >>
-            phrase: take_while!(string_character) >>
-            tag!("\"") >>
-            (phrase)
-        ) => {|p: Span| SymbolType::String(p.to_string())} |
-        do_parse!(
-            tag!("(") >>
-            take_until!(")") >>
-            tag!(")") >>
-            ()
-        ) => {|_| SymbolType::Comment } |
-        take_while1!(word_character) => {|word: Span| SymbolType::Words(vec![word.to_string()])}
+        expression => {|s| s}
     ));
 
 named!(poetic_number_literal_core<Span, (u32, String, Vec<Span>)>,
@@ -407,7 +412,7 @@ fn single_symbol_to_expression(sym: &SymbolType, line: u32) -> Result<Expression
         } => Ok(Expression::Call(
             target.to_string(),
             args.iter()
-                .map(|s| Expression::Variable(s.to_string()))
+                .map(|a| parse_expression(&a.iter().collect::<Vec<&SymbolType>>(), line).unwrap())
                 .collect(),
         )),
         _ => {
@@ -686,8 +691,12 @@ pub fn parse(input: &str) -> Result<Program> {
                         name: target.to_string(),
                         args: args
                             .iter()
-                            .map(|a| Expression::Variable(a.to_string()))
-                            .collect(),
+                            .map(|a| {
+                                parse_expression(
+                                    &a.iter().collect::<Vec<&SymbolType>>(),
+                                    current_line,
+                                ).unwrap()
+                            }).collect(),
                     },
                     line: current_line,
                 });
@@ -1021,14 +1030,14 @@ mod tests {
                 SymbolType::If,
                 SymbolType::Taking {
                     target: "Midnight".to_string(),
-                    args: vec!["my world".to_string(), "Fire".to_string()],
+                    args: vec![vec![SymbolType::Variable("my world".to_string())], vec![SymbolType::Variable("Fire".to_string())]],
                 },
                 SymbolType::Is,
                 SymbolType::Words(vec!["nothing".to_string()]),
                 SymbolType::And,
                 SymbolType::Taking {
                     target: "Midnight".to_string(),
-                    args: vec!["my world".to_string(), "Hate".to_string()],
+                    args: vec![vec![SymbolType::Variable("my world".to_string())], vec![SymbolType::Variable("Hate".to_string())]],
                 },
                 SymbolType::Is,
                 SymbolType::Words(vec!["nothing".to_string()]),
