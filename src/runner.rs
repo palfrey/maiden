@@ -7,6 +7,7 @@ struct State<'a> {
     writer: &'a mut Write,
     variables: &'a mut HashMap<String, Expression>,
     current_line: u32,
+    depth: u32,
 }
 
 fn run_binop(
@@ -87,10 +88,14 @@ fn call_function(
     }
 
     let mut new_variables = state.variables.clone();
+    if state.depth == 100 {
+        bail!(ErrorKind::StackOverflow(state.depth, state.current_line));
+    }
     let mut new_state = State {
         writer: state.writer,
         variables: &mut new_variables,
         current_line: state.current_line,
+        depth: state.depth + 1,
     };
     for (i, arg) in args.iter().enumerate() {
         let value = run_expression(&mut new_state, program, &arg)?;
@@ -168,6 +173,7 @@ pub fn run(program: &Program, writer: &mut Write) -> Result<HashMap<String, Expr
             variables: &mut variables,
             writer,
             current_line: 0,
+            depth: 0,
         };
         run_core(&mut state, program, pc)?;
     } // FIXME: Drop once NLL is merged

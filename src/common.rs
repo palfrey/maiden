@@ -222,6 +222,9 @@ error_chain!{
         BadDecrement(sequence: Vec<SymbolType>, line: u32) {
             display("Bad 'decrement' section: {:?}", sequence)
         }
+        StackOverflow(depth: u32, line: u32) {
+            display("Exceeded maximum allowed stack depth of {}", depth)
+        }
     }
 }
 
@@ -255,6 +258,7 @@ pub fn get_error_line(e: &Error) -> u32 {
             ErrorKind::BadIncrement(_, line) => line.clone(),
             ErrorKind::BadDecrement(_, line) => line.clone(),
             ErrorKind::Unimplemented(_, line) => line.clone(),
+            ErrorKind::StackOverflow(_, line) => line.clone(),
             _ => 0,
         },
     }
