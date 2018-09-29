@@ -140,7 +140,7 @@ named!(expression(Span) -> SymbolType,
             (())
         ) => {|_| SymbolType::GreaterThan} |
         alt_complete!(
-            tag!("is") | tag!("was") | tag!("are")
+            tag!("is") | tag!("was") | tag!("are") | tag!("were")
         ) => {|_| SymbolType::Is} |
         tag_no_case!("and") => {|_| SymbolType::And} |
         tag_no_case!("takes") => {|_| SymbolType::Takes} |

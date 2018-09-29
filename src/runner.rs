@@ -234,8 +234,8 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
     let mut total_instr = 0;
     loop {
         total_instr += 1;
-        if total_instr > 100_000 {
-            panic!("Ran out of instr");
+        if total_instr > 1_000_000 {
+            bail!(ErrorKind::InstructionLimit(state.current_line));
         }
         let command_line = match program.commands.get(pc) {
             Some(c) => c,

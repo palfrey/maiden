@@ -222,6 +222,9 @@ error_chain!{
         StackOverflow(depth: u32, line: u32) {
             display("Exceeded maximum allowed stack depth of {}", depth)
         }
+        InstructionLimit(line: u32) {
+            display("Hit instruction limit of 10,000,000. Infinite loop?")
+        }
     }
 }
 
@@ -256,6 +259,7 @@ pub fn get_error_line(e: &Error) -> u32 {
             ErrorKind::BadDecrement(_, line) => line.clone(),
             ErrorKind::Unimplemented(_, line) => line.clone(),
             ErrorKind::StackOverflow(_, line) => line.clone(),
+            ErrorKind::InstructionLimit(line) => line.clone(),
             _ => 0,
         },
     }
