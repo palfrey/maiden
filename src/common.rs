@@ -43,10 +43,7 @@ pub enum SymbolType {
     Return,
     Say,
     If,
-    Taking {
-        target: String,
-        args: Vec<Vec<SymbolType>>,
-    },
+    Taking { target: String },
     Takes,
     Comma,
     GreaterThanOrEqual,

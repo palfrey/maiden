@@ -100,89 +100,77 @@ named!(literal_word<Span, Span>,
 );
 
 named!(expression(Span) -> SymbolType,
- alt_complete!(
-    do_parse!(
-        tag_no_case!("is") >>
-        take_while1!(is_space) >>
-        tag_no_case!("as") >>
-        take_while1!(is_space) >>
+    alt_complete!(
+        do_parse!(
+            target: variable >>
+            take_while1!(is_space) >>
+            tag_no_case!("taking") >>
+            (target)
+        ) => {|name| SymbolType::Taking{target: name}} |
+        do_parse!(
+            tag_no_case!("is") >>
+            take_while1!(is_space) >>
+            tag_no_case!("as") >>
+            take_while1!(is_space) >>
+            alt_complete!(
+                tag_no_case!("high") | tag_no_case!("strong") | tag_no_case!("big")
+            ) >>
+            take_while1!(is_space) >>
+            tag_no_case!("as") >>
+            (())
+        ) => {|_| SymbolType::GreaterThanOrEqual} |
+        do_parse!(
+            tag_no_case!("is") >>
+            take_while1!(is_space) >>
+            alt_complete!(
+                tag_no_case!("less") | tag_no_case!("weaker") | tag_no_case!("lower") | tag_no_case!("smaller")
+            ) >>
+            take_while1!(is_space) >>
+            tag_no_case!("than") >>
+            (())
+        ) => {|_| SymbolType::LessThan} |
+        do_parse!(
+            tag_no_case!("is") >>
+            take_while1!(is_space) >>
+            alt_complete!(
+                tag_no_case!("higher") | tag_no_case!("stronger") | tag_no_case!("bigger") | tag_no_case!("greater")
+            ) >>
+            take_while1!(is_space) >>
+            tag_no_case!("than") >>
+            (())
+        ) => {|_| SymbolType::GreaterThan} |
         alt_complete!(
-            tag_no_case!("high") | tag_no_case!("strong") | tag_no_case!("big")
-        ) >>
-        take_while1!(is_space) >>
-        tag_no_case!("as") >>
-        (())
-    ) => {|_| SymbolType::GreaterThanOrEqual} |
-    do_parse!(
-        tag_no_case!("is") >>
-        take_while1!(is_space) >>
+            tag!("is") | tag!("was") | tag!("are")
+        ) => {|_| SymbolType::Is} |
+        tag_no_case!("and") => {|_| SymbolType::And} |
+        tag_no_case!("takes") => {|_| SymbolType::Takes} |
         alt_complete!(
-            tag_no_case!("less") | tag_no_case!("weaker") | tag_no_case!("lower") | tag_no_case!("smaller")
-        ) >>
-        take_while1!(is_space) >>
-        tag_no_case!("than") >>
-        (())
-    ) => {|_| SymbolType::LessThan} |
-    do_parse!(
-        tag_no_case!("is") >>
-        take_while1!(is_space) >>
+            tag_no_case!("without") | tag_no_case!("minus")
+        ) => {|_| SymbolType::Subtract} |
         alt_complete!(
-            tag_no_case!("higher") | tag_no_case!("stronger") | tag_no_case!("bigger") | tag_no_case!("greater")
-        ) >>
-        take_while1!(is_space) >>
-        tag_no_case!("than") >>
-        (())
-    ) => {|_| SymbolType::GreaterThan} |
-    alt_complete!(
-        tag!("is") | tag!("was") | tag!("are")
-    ) => {|_| SymbolType::Is} |
-    tag_no_case!("and") => {|_| SymbolType::And} |
-    tag_no_case!("takes") => {|_| SymbolType::Takes} |
-    alt_complete!(
-        tag_no_case!("without") | tag_no_case!("minus")
-    ) => {|_| SymbolType::Subtract} |
-    alt_complete!(
-        tag_no_case!("with") | tag_no_case!("plus")
-    ) => {|_| SymbolType::Add} |
-    alt_complete!(
-        tag_no_case!("times") | tag_no_case!("of")
-    ) => {|_| SymbolType::Times } |
-    tag_no_case!("over") => {|_| SymbolType::Divide} |
-    do_parse!(
-        target: variable >>
-        take_while1!(is_space) >>
-        tag_no_case!("taking") >>
-        take_while1!(is_space) >>
-        first_arg: many1!(expression) >>
-        other_args: many0!(
-            do_parse!(
-                take_while!(is_space) >>
-                alt!(tag!(",") | tag_no_case!("and")) >>
-                take_while!(is_space) >>
-                var: many1!(expression) >>
-                (var)
-            )) >>
-        (target, first_arg, other_args)
-    ) => {|(target, first_arg, mut other_args): (String, Vec<SymbolType>, Vec<Vec<SymbolType>>)| {
-        other_args.insert(0, first_arg);
-        SymbolType::Taking{target, args: other_args}
-    }} |
-    take_while1!(char::is_numeric) => {|n: Span| SymbolType::Integer(n.fragment.to_string())} |
-    variable => {|s| SymbolType::Variable(s) } |
-    do_parse!(
-        tag!("\"") >>
-        phrase: take_while!(string_character) >>
-        tag!("\"") >>
-        (phrase)
-    ) => {|p: Span| SymbolType::String(p.to_string())} |
-    do_parse!(
-        tag!("(") >>
-        take_until!(")") >>
-        tag!(")") >>
-        ()
-    ) => {|_| SymbolType::Comment } |
-    take_while1!(word_character) => {|word: Span| SymbolType::Words(vec![word.to_string()])}
-));
+            tag_no_case!("with") | tag_no_case!("plus")
+        ) => {|_| SymbolType::Add} |
+        alt_complete!(
+            tag_no_case!("times") | tag_no_case!("of")
+        ) => {|_| SymbolType::Times } |
+        tag_no_case!("over") => {|_| SymbolType::Divide} |
+        take_while1!(char::is_numeric) => {|n: Span| SymbolType::Integer(n.fragment.to_string())} |
+        variable => {|s| SymbolType::Variable(s) } |
+        do_parse!(
+            tag!("\"") >>
+            phrase: take_while!(string_character) >>
+            tag!("\"") >>
+            (phrase)
+        ) => {|p: Span| SymbolType::String(p.to_string())} |
+        do_parse!(
+            tag!("(") >>
+            take_until!(")") >>
+            tag!(")") >>
+            ()
+        ) => {|_| SymbolType::Comment } |
+        take_while1!(word_character) => {|word: Span| SymbolType::Words(vec![word.to_string()])}
+    )
+);
 
 named!(word(Span) -> SymbolType,
     alt_complete!(
@@ -395,26 +383,74 @@ fn next_operator<'a>(
     }
 }
 
-fn single_symbol_to_expression(sym: &SymbolType, line: u32) -> Result<Expression> {
+fn get_function_args(
+    items: &[&SymbolType],
+    mut index: usize,
+    line: u32,
+) -> Result<(Vec<Expression>, usize)> {
+    // Step 1: Find either lower precedence than Taking operator, or end of sequence
+    let compare = SymbolType::Taking {
+        target: "".to_string(),
+    };
+    let mut end_op = next_operator(items, index);
+    loop {
+        if end_op.is_none() || end_op.unwrap().0 < &compare {
+            break;
+        }
+        end_op = next_operator(items, end_op.unwrap().1 + 1);
+    }
+    // Step 2: Chunk up the subsections of the sequence into lists of symbols
+    let end_index = match end_op {
+        Some((_, end_index)) => end_index,
+        None => items.len(),
+    };
+    let mut expression_args = vec![];
+    let mut current_arg: Vec<&SymbolType> = vec![];
+    while index < end_index {
+        match items[index] {
+            SymbolType::Comma => {
+                expression_args.push(current_arg.clone());
+                current_arg.clear();
+            }
+            _ => {
+                current_arg.push(items[index]);
+            }
+        }
+        index += 1
+    }
+    if !current_arg.is_empty() {
+        expression_args.push(current_arg);
+    }
+    // Step 3: Make args into expressions
+    return Ok((
+        expression_args
+            .iter()
+            .map(|arg| parse_expression(arg, line).unwrap())
+            .collect::<Vec<Expression>>(),
+        index - 1,
+    ));
+}
+
+fn symbol_to_expression(
+    items: &[&SymbolType],
+    index: usize,
+    line: u32,
+) -> Result<(Expression, usize)> {
+    let sym = items[index];
     return match *sym {
-        SymbolType::Words(_) => evaluate(sym, line),
-        SymbolType::Variable(ref name) => Ok(Expression::Variable(name.clone())),
-        SymbolType::String(ref phrase) => Ok(Expression::String(phrase.clone())),
+        SymbolType::Taking { ref target } => {
+            let (args, index) = get_function_args(items, index + 1, line)?;
+            Ok((Expression::Call(target.clone(), args), index))
+        }
+        SymbolType::Words(_) => evaluate(sym, line).map(|e| (e, index)),
+        SymbolType::Variable(ref name) => Ok((Expression::Variable(name.clone()), index)),
+        SymbolType::String(ref phrase) => Ok((Expression::String(phrase.clone()), index)),
         SymbolType::Integer(ref val) => {
             return match val.parse::<i128>() {
-                Ok(i) => Ok(Expression::Integer(i)),
+                Ok(i) => Ok((Expression::Integer(i), index)),
                 Err(_) => bail!(ErrorKind::ParseIntError(val.to_string(), line)),
             };
         }
-        SymbolType::Taking {
-            ref target,
-            ref args,
-        } => Ok(Expression::Call(
-            target.to_string(),
-            args.iter()
-                .map(|a| parse_expression(&a.iter().collect::<Vec<&SymbolType>>(), line).unwrap())
-                .collect(),
-        )),
         _ => {
             bail!(ErrorKind::Unimplemented(
                 format!("Single symbol to expression: {:?}", sym),
@@ -431,13 +467,8 @@ fn parse_expression(items: &[&SymbolType], line: u32) -> Result<Expression> {
         bail!(ErrorKind::UnbalancedExpression(describe, line));
     }
     debug!("Begin parse: {}", describe);
-    let res = parse_expression_1(
-        &items,
-        0,
-        single_symbol_to_expression(items[0], line)?,
-        &LOWEST_PRECDENCE,
-        line,
-    )?;
+    let (lhs, index) = symbol_to_expression(items, 0, line)?;
+    let res = parse_expression_1(&items, index, lhs, &LOWEST_PRECDENCE, line)?;
     if res.1 != items.len() - 1 {
         bail!(ErrorKind::UnbalancedExpression(describe, line));
     }
@@ -470,7 +501,9 @@ fn parse_expression_1(
                 line
             ));
         }
-        let mut rhs = single_symbol_to_expression(items[index], line)?;
+        let res = symbol_to_expression(items, index, line)?;
+        let mut rhs = res.0;
+        index = res.1;
         lookahead = next_operator(items, index);
         while lookahead.is_some() && lookahead.unwrap().0 > op {
             let l = lookahead.unwrap().1;
@@ -685,22 +718,6 @@ pub fn parse(input: &str) -> Result<Program> {
                     debug!("Double newline that doesn't end anything");
                 }
             }
-            [SymbolType::Taking { target, args }] => {
-                commands.push(CommandLine {
-                    cmd: Command::Call {
-                        name: target.to_string(),
-                        args: args
-                            .iter()
-                            .map(|a| {
-                                parse_expression(
-                                    &a.iter().collect::<Vec<&SymbolType>>(),
-                                    current_line,
-                                ).unwrap()
-                            }).collect(),
-                    },
-                    line: current_line,
-                });
-            }
             [SymbolType::Listen, SymbolType::Variable(target)] => {
                 commands.push(CommandLine {
                     cmd: Command::Listen {
@@ -892,6 +909,25 @@ pub fn parse(input: &str) -> Result<Program> {
                         symbols,
                         commands
                     );
+                } else if let SymbolType::Taking { ref target } = symbols[0] {
+                    let (args, index) = get_function_args(
+                        &symbols.iter().collect::<Vec<&SymbolType>>(),
+                        1,
+                        current_line,
+                    )?;
+                    if index != symbols.len() - 1 {
+                        bail!(ErrorKind::UnbalancedExpression(
+                            format!("Bad taking: {} != {}", index, symbols.len()),
+                            current_line
+                        ));
+                    }
+                    commands.push(CommandLine {
+                        cmd: Command::Call {
+                            name: target.to_string(),
+                            args,
+                        },
+                        line: current_line,
+                    });
                 } else {
                     bail!(ErrorKind::BadCommandSequence(
                         symbols.to_vec(),
@@ -1049,17 +1085,17 @@ mod tests {
             "If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing",
             vec![
                 SymbolType::If,
-                SymbolType::Taking {
-                    target: "Midnight".to_string(),
-                    args: vec![vec![SymbolType::Variable("my world".to_string())], vec![SymbolType::Variable("Fire".to_string())]],
-                },
+                SymbolType::Taking{target:"Midnight".to_string()},
+                SymbolType::Variable("my world".to_string()),
+                SymbolType::Comma,
+                SymbolType::Variable("Fire".to_string()),
                 SymbolType::Is,
                 SymbolType::Words(vec!["nothing".to_string()]),
                 SymbolType::And,
-                SymbolType::Taking {
-                    target: "Midnight".to_string(),
-                    args: vec![vec![SymbolType::Variable("my world".to_string())], vec![SymbolType::Variable("Hate".to_string())]],
-                },
+                SymbolType::Taking{target:"Midnight".to_string()},
+                SymbolType::Variable("my world".to_string()),
+                SymbolType::Comma,
+                SymbolType::Variable("Hate".to_string()),
                 SymbolType::Is,
                 SymbolType::Words(vec!["nothing".to_string()]),
             ],
@@ -1179,6 +1215,29 @@ mod tests {
         let functions = HashMap::new();
         assert_eq!(
             parse("While Davy ain't Greatness").unwrap(),
+            Program {
+                commands,
+                functions
+            }
+        );
+    }
+
+    #[test]
+    fn everyone_taking_the_bait() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let commands = vec![CommandLine {
+            cmd: Command::Call {
+                name: "Everyone".to_string(),
+                args: vec![Expression::Subtract(
+                    Box::new(Expression::Variable("the bait".to_string())),
+                    Box::new(Expression::Integer(1)),
+                )],
+            },
+            line: 1,
+        }];
+        let functions = HashMap::new();
+        assert_eq!(
+            parse("Everyone taking the bait without 1").unwrap(),
             Program {
                 commands,
                 functions
