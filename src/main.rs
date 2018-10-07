@@ -237,23 +237,15 @@ mod tests {
     }
 
     #[test]
-    fn expression_comment() {
-        let end_variables = hashmap! {
-            "baz" => Expression::String("foo".to_string()),
-        };
-        test_program("Baz is \"foo\" (bar)", end_variables, "");
-    }
-
-    #[test]
     fn skip_else() {
         let end_variables = hashmap! {
             "foo" => Expression::String("foo".to_string()),
         };
         test_program(
             "if nothing is nothing
-        Foo is \"foo\"
+        Foo says foo
         Else
-        Bar is \"bar\"
+        Bar says bar
 
         ",
             end_variables,

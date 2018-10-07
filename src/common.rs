@@ -13,6 +13,8 @@ pub enum Expression {
     False,
     Call(String, Vec<Expression>),
     Nothing,
+    Null,
+    Mysterious,
 
     // binary operators
     Is(Box<Expression>, Box<Expression>),
@@ -64,6 +66,10 @@ pub enum SymbolType {
     Comment,
     Listen,
     Divide,
+    True,
+    False,
+    Null,
+    Mysterious
 }
 
 #[derive(Debug, PartialEq)]

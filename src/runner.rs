@@ -63,6 +63,12 @@ fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
         } else {
             Ok(true)
         }
+    } else if let Expression::String(ref val) = *expression {
+        if val.is_empty() {
+            Ok(false)
+        } else {
+            Ok(true)
+        }
     } else {
         bail!(ErrorKind::BadBooleanResolve(
             format!("{:?}", expression),
@@ -162,12 +168,17 @@ fn run_expression(
             }
         },
         Expression::Call(ref target, ref args) => call_function(state, program, target, args),
-        _ => {
-            bail!(ErrorKind::NoRunner(
-                format!("{:?}", expression),
-                state.current_line,
-            ));
-        }
+        Expression::Nothing => Ok(Expression::Nothing),
+        Expression::True => Ok(Expression::True),
+        Expression::False => Ok(Expression::False),
+        Expression::Null => Ok(Expression::Null),
+        Expression::Mysterious => Ok(Expression::Mysterious),
+        // _ => {
+        //     bail!(ErrorKind::NoRunner(
+        //         format!("{:?}", expression),
+        //         state.current_line,
+        //     ));
+        // }
     };
 }
 
@@ -187,10 +198,10 @@ pub fn run(program: &Program, writer: &mut Write) -> Result<HashMap<String, Expr
 }
 
 fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
-    match value {
-        Expression::Integer(x) => Ok(format!("{}", x)),
-        Expression::String(s) => Ok(s.to_string()),
-        Expression::Variable(x) => {
+    match *value {
+        Expression::Integer(ref x) => Ok(format!("{}", x)),
+        Expression::String(ref s) => Ok(s.to_string()),
+        Expression::Variable(ref x) => {
             let v = {
                 let current_line = state.current_line;
                 let v = state.variables.get(&x.to_lowercase());
@@ -201,6 +212,10 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
             };
             get_printable(&v, state)
         }
+        Expression::True => Ok("true".to_string()),
+        Expression::False => Ok("false".to_string()),
+        Expression::Mysterious => Ok("mysterious".to_string()),
+        Expression::Null => Ok("null".to_string()),
         _ => {
             bail!(ErrorKind::Unimplemented(
                 format!("Say '{:?}'", value),
@@ -302,15 +317,8 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
             }
             Command::Say { ref value } => {
                 let resolve = run_expression(state, program, &value)?;
-                match get_printable(&resolve, state) {
-                    Ok(x) => writeln!(state.writer, "{}", x)?,
-                    Err(_) => {
-                        bail!(ErrorKind::Unimplemented(
-                            format!("Say '{:?}'", value),
-                            state.current_line,
-                        ));
-                    }
-                };
+                let x = get_printable(&resolve, state)?;
+                writeln!(state.writer, "{}", x)?;
             }
             Command::FunctionDeclaration { func_end, .. } => match func_end {
                 Some(val) => {

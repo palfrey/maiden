@@ -14,11 +14,15 @@ fn is_space(chr: char) -> bool {
 }
 
 fn is_literal_spacing_character(chr: char) -> bool {
-    is_space(chr) || chr == ',' || chr == ';'
+    !is_newline(chr) && !word_character(chr)
 }
 
 fn is_newline(chr: char) -> bool {
     chr == '\r' || chr == '\n'
+}
+
+fn is_not_newline(chr: char) -> bool {
+    !is_newline(chr)
 }
 
 fn is_quote(chr: char) -> bool {
@@ -29,15 +33,19 @@ fn string_character(chr: char) -> bool {
     !is_newline(chr) && !is_quote(chr)
 }
 
-fn word_character(chr: char) -> bool {
+fn variable_character(chr: char) -> bool {
     (chr >= 'A' && chr <= 'Z') || (chr >= 'a' && chr <= 'z')
+}
+
+fn word_character(chr: char) -> bool {
+    variable_character(chr) || char::is_numeric(chr) || chr == '\''
 }
 
 named!(title_case<Span, String>,
     do_parse!(
         not!(keyword) >> // to shortcut the "Until Counter" case
         first: take_while_m_n!(1, 1, char::is_uppercase) >>
-        rest: take_while!(word_character) >>
+        rest: take_while!(variable_character) >>
         (format!("{}{}", first.fragment, rest.fragment))
     ));
 
@@ -154,7 +162,18 @@ named!(expression(Span) -> SymbolType,
             tag_no_case!("times") | tag_no_case!("of")
         ) => {|_| SymbolType::Times } |
         tag_no_case!("over") => {|_| SymbolType::Divide} |
-        take_while1!(char::is_numeric) => {|n: Span| SymbolType::Integer(n.fragment.to_string())} |
+        tag_no_case!("true") => {|_| SymbolType::True} |
+        tag_no_case!("false") => {|_| SymbolType::False} |
+        do_parse!(
+            minus: opt!(tag!("-")) >>
+            val: take_while1!(char::is_numeric) >>
+            (minus, val)
+        ) => {|(minus, val):(Option<Span>, Span)|
+            if minus.is_some() {
+                SymbolType::Integer(format!("-{}", val.fragment))
+            } else {
+                SymbolType::Integer(val.fragment.to_string())
+            }}|
         variable => {|s| SymbolType::Variable(s) } |
         do_parse!(
             tag!("\"") >>
@@ -179,7 +198,7 @@ named!(word(Span) -> SymbolType,
         tag_no_case!("up") => {|_| SymbolType::Up} |
         tag_no_case!("knock") => {|_| SymbolType::Knock} |
         tag_no_case!("down") => {|_| SymbolType::Down} |
-        tag_no_case!("aint") => {|_| SymbolType::Aint} |
+        tag_no_case!("ain't") => {|_| SymbolType::Aint} |
         alt_complete!(
             tag_no_case!("say") | tag_no_case!("shout") | tag_no_case!("whisper") | tag_no_case!("scream")
         ) => {|_| SymbolType::Say} |
@@ -202,8 +221,14 @@ named!(word(Span) -> SymbolType,
 named!(poetic_number_literal_core<Span, (u32, String, Vec<Span>)>,
     do_parse!(
         pv: variable >>
-        take_while1!(is_space) >>
-        alt!(tag!("is") | tag!("are")) >>
+        alt!(
+            tag!("'s") => {|_| (())} |
+            do_parse!(
+                take_while1!(is_space) >>
+                alt!(tag!("is") | tag!("are") | tag!("was") | tag!("were")) >>
+                (())
+            )
+        ) >>
         position: position!() >>
         peek!(not!(tuple!(take_while1!(is_space), literal_word))) >> // number literals cannot start with a literal word
         words: many1!(
@@ -229,8 +254,51 @@ fn poetic_number_literal(input: Span) -> nom::IResult<Span, Vec<Token>> {
     ));
 }
 
+named!(poetic_string_literal_core<Span, (u32, String, Span)>,
+    do_parse!(
+        pv: variable >>
+        take_while1!(is_space) >>
+        tag!("says") >>
+        take_while1!(is_space) >>
+        position: position!() >>
+        words: take_while1!(is_not_newline) >>
+        (position.line, pv, words)
+    )
+);
+
+fn poetic_string_literal(input: Span) -> nom::IResult<Span, Vec<Token>> {
+    let (rest, (line, target, words)) = poetic_string_literal_core(input)?;
+    let literal = SymbolType::String(words.to_string());
+    return Ok((
+        rest,
+        vec![SymbolType::Variable(target), SymbolType::Is, literal]
+            .into_iter()
+            .map(|x| Token { line, symbol: x })
+            .collect(),
+    ));
+}
+
 named!(pub line<Span, Vec<Token>>, alt_complete!(
+    do_parse!(
+        position: position!() >>
+        variable: variable >>
+        take_while1!(is_space) >>
+        tag!("is") >>
+        take_while1!(is_space) >>
+        kind: alt!(
+            alt!(tag!("true") | tag!("yes")) => {|_| SymbolType::True } |
+            alt!(tag!("false") | tag!("lies")) => {|_| SymbolType::False } |
+            tag!("mysterious") => {|_| SymbolType::Mysterious } |
+            alt!(tag!("null") | tag!("gone")) => {|_| SymbolType::Null }
+        ) >>
+        (position, variable, kind)
+    ) => {|(p,v,k): (Span, String, SymbolType)| vec![
+            Token{line: p.line, symbol: SymbolType::Variable(v)},
+            Token{line: p.line, symbol: SymbolType::Is},
+            Token{line: p.line, symbol: k}
+    ]} |
     poetic_number_literal => {|s| s } |
+    poetic_string_literal => {|s| s } |
     do_parse!(
         position: position!() >>
         first_word: word >>
@@ -340,7 +408,7 @@ fn evaluate(value: &SymbolType, line: u32) -> Result<Expression> {
             let mut number = 0i128;
             for word in words {
                 number *= 10;
-                let len: i128 = (word.len() % 10) as i128;
+                let len: i128 = (word.replace("'", "").len() % 10) as i128;
                 number += len;
             }
             return Ok(Expression::Integer(number));
@@ -450,7 +518,11 @@ fn symbol_to_expression(
                 Ok(i) => Ok((Expression::Integer(i), index)),
                 Err(_) => bail!(ErrorKind::ParseIntError(val.to_string(), line)),
             };
-        }
+        },
+        SymbolType::True => Ok((Expression::True, index)),
+        SymbolType::False => Ok((Expression::False, index)),
+        SymbolType::Null => Ok((Expression::Null, index)),
+        SymbolType::Mysterious => Ok((Expression::Mysterious, index)),
         _ => {
             bail!(ErrorKind::Unimplemented(
                 format!("Single symbol to expression: {:?}", sym),
@@ -603,8 +675,9 @@ macro_rules! incdec_command {
 
 #[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
 pub fn parse(input: &str) -> Result<Program> {
-    let re = Regex::new(r"'s\W+").unwrap();
-    let fixed_input = re.replace_all(input, " is ").replace("'", "");
+    //let re = Regex::new(r"'s\W+").unwrap();
+    let re = Regex::new(r"dsgflgfndlgfdgfdgfd").unwrap();
+    let fixed_input = re.replace_all(input, " is "); //.replace("'", "");
     let raw_lines = lines(&fixed_input)?;
     if !raw_lines.0.fragment.is_empty() && raw_lines.0.fragment.chars().any(|c| !c.is_whitespace())
     {
@@ -1103,6 +1176,11 @@ mod tests {
     }
 
     #[test]
+    fn negative_numbers() {
+        lines_tokens_check("-3", vec![SymbolType::Integer("-3".to_string())]);
+    }
+
+    #[test]
     fn comment_parsing() {
         lines_tokens_check("(foo bar baz)", vec![SymbolType::Comment]);
     }
@@ -1275,7 +1353,7 @@ mod tests {
     #[test]
     fn too_long_int() {
         pretty_env_logger::try_init().unwrap_or(());
-        let err = parse("the loneliest is 340282366920938463463374607431768211455")
+        let err = parse("put 340282366920938463463374607431768211455 into the loneliest")
             .err()
             .unwrap()
             .0;
