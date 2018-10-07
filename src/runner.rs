@@ -57,6 +57,12 @@ fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
         Ok(false)
     } else if let Expression::True = *expression {
         Ok(true)
+    } else if let Expression::Integer(ref val) = *expression {
+        if *val == 0 {
+            Ok(false)
+        } else {
+            Ok(true)
+        }
     } else {
         bail!(ErrorKind::BadBooleanResolve(
             format!("{:?}", expression),

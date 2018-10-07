@@ -301,17 +301,6 @@ mod tests {
     }
 
     #[test]
-    fn bad_boolean() {
-        let err = test_error("if t");
-        if let common::ErrorKind::BadBooleanResolve(name, line) = err {
-            assert_eq!(name, "Integer(1)");
-            assert_eq!(line, 1);
-        } else {
-            assert!(false, err);
-        }
-    }
-
-    #[test]
     fn no_end_func() {
         let err = test_error("What Remains takes the fighters and a war");
         if let common::ErrorKind::NoEndFunction(line) = err {
