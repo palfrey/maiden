@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::ops::IndexMut;
 
 fn is_space(chr: char) -> bool {
-    chr == ' ' || chr == '\t' || chr == '.'
+    chr == ' ' || chr == '\t'
 }
 
 fn is_literal_spacing_character(chr: char) -> bool {
@@ -39,6 +39,10 @@ fn variable_character(chr: char) -> bool {
 
 fn word_character(chr: char) -> bool {
     variable_character(chr) || char::is_numeric(chr) || chr == '\''
+}
+
+fn is_digit(chr: char) -> bool {
+    chr.is_digit(10)
 }
 
 named!(title_case<Span, String>,
@@ -140,6 +144,18 @@ named!(expression(Span) -> SymbolType,
         do_parse!(
             tag_no_case!("is") >>
             take_while1!(is_space) >>
+            tag_no_case!("as") >>
+            take_while1!(is_space) >>
+            alt_complete!(
+                tag_no_case!("low") | tag_no_case!("little") | tag_no_case!("small") | tag_no_case!("weak")
+            ) >>
+            take_while1!(is_space) >>
+            tag_no_case!("as") >>
+            (())
+        ) => {|_| SymbolType::LessThanOrEqual} |
+        do_parse!(
+            tag_no_case!("is") >>
+            take_while1!(is_space) >>
             alt_complete!(
                 tag_no_case!("higher") | tag_no_case!("stronger") | tag_no_case!("bigger") | tag_no_case!("greater")
             ) >>
@@ -166,7 +182,19 @@ named!(expression(Span) -> SymbolType,
         tag_no_case!("false") => {|_| SymbolType::False} |
         do_parse!(
             minus: opt!(tag!("-")) >>
-            val: take_while1!(char::is_numeric) >>
+            before: take_while!(is_digit) >>
+            tag!(".") >>
+            after: take_while1!(is_digit) >>
+            (minus, before, after)
+        ) => {|(minus, before, after):(Option<Span>, Span, Span)|
+            if minus.is_some() {
+                SymbolType::Floating(format!("-{}.{}", before.fragment, after.fragment))
+            } else {
+                SymbolType::Floating(format!("{}.{}", before.fragment, after.fragment))
+            }}|
+        do_parse!(
+            minus: opt!(tag!("-")) >>
+            val: take_while1!(is_digit) >>
             (minus, val)
         ) => {|(minus, val):(Option<Span>, Span)|
             if minus.is_some() {
@@ -398,20 +426,20 @@ fn evaluate(value: &SymbolType, line: u32) -> Result<Expression> {
         SymbolType::Words(words) => {
             if words.len() == 1 {
                 if words[0] == "nothing" {
-                    return Ok(Expression::Integer(0));
+                    return Ok(Expression::Floating(0f64));
                 }
-                let as_int = words[0].parse::<i128>();
-                if let Ok(int) = as_int {
-                    return Ok(Expression::Integer(int));
+                let as_float = words[0].parse::<f64>();
+                if let Ok(float) = as_float {
+                    return Ok(Expression::Floating(float));
                 }
             }
-            let mut number = 0i128;
+            let mut number = 0f64;
             for word in words {
-                number *= 10;
-                let len: i128 = (word.replace("'", "").len() % 10) as i128;
+                number *= 10f64;
+                let len: f64 = (word.replace("'", "").len() % 10) as f64;
                 number += len;
             }
-            return Ok(Expression::Integer(number));
+            return Ok(Expression::Floating(number));
         }
         SymbolType::String(phrase) => {
             return Ok(Expression::String(phrase.to_string()));
@@ -438,6 +466,7 @@ fn next_operator<'a>(
             | SymbolType::GreaterThanOrEqual
             | SymbolType::GreaterThan
             | SymbolType::LessThan
+            | SymbolType::LessThanOrEqual
             | SymbolType::Add
             | SymbolType::Subtract
             | SymbolType::Times
@@ -514,9 +543,15 @@ fn symbol_to_expression(
         SymbolType::Variable(ref name) => Ok((Expression::Variable(name.clone()), index)),
         SymbolType::String(ref phrase) => Ok((Expression::String(phrase.clone()), index)),
         SymbolType::Integer(ref val) => {
-            return match val.parse::<i128>() {
-                Ok(i) => Ok((Expression::Integer(i), index)),
-                Err(_) => bail!(ErrorKind::ParseIntError(val.to_string(), line)),
+            return match val.parse::<f64>() {
+                Ok(i) => Ok((Expression::Floating(i), index)),
+                Err(_) => bail!(ErrorKind::ParseNumberError(val.to_string(), line)),
+            };
+        },
+        SymbolType::Floating(ref val) => {
+            return match val.parse::<f64>() {
+                Ok(i) => Ok((Expression::Floating(i), index)),
+                Err(_) => bail!(ErrorKind::ParseNumberError(val.to_string(), line)),
             };
         },
         SymbolType::True => Ok((Expression::True, index)),
@@ -600,6 +635,7 @@ fn parse_expression_1(
                 Expression::GreaterThan(Box::new(lhs.clone()), Box::new(rhs))
             }
             SymbolType::LessThan => Expression::LessThan(Box::new(lhs.clone()), Box::new(rhs)),
+            SymbolType::LessThanOrEqual => Expression::LessThanOrEqual(Box::new(lhs.clone()), Box::new(rhs)),
             SymbolType::Add => Expression::Add(Box::new(lhs.clone()), Box::new(rhs)),
             SymbolType::Subtract => Expression::Subtract(Box::new(lhs.clone()), Box::new(rhs)),
             SymbolType::Times => Expression::Times(Box::new(lhs.clone()), Box::new(rhs)),
@@ -645,7 +681,7 @@ macro_rules! incdec_command {
             if *up != $good_symbol {
                 bail!($err($symbols.to_vec(), $current_line));
             }
-            let mut count = 1;
+            let mut count = 1f64;
             loop {
                 let comma = rest.next();
                 if comma.is_none() {
@@ -658,7 +694,7 @@ macro_rules! incdec_command {
                 {
                     bail!($err($symbols.to_vec(), $current_line));
                 }
-                count += 1;
+                count += 1f64;
             }
             $commands.push(CommandLine {
                 cmd: Command::$command {
@@ -1087,11 +1123,11 @@ mod tests {
                 ]),
                 0
             ).unwrap(),
-            Expression::Integer(100)
+            Expression::Floating(100f64)
         );
         assert_eq!(
             evaluate(&SymbolType::Words(vec!["nothing".to_string()]), 0).unwrap(),
-            Expression::Integer(0)
+            Expression::Floating(0f64)
         );
     }
 
@@ -1107,7 +1143,7 @@ mod tests {
                         Expression::Variable("Fire".to_string()),
                     ],
                 )),
-                Box::new(Expression::Integer(0)),
+                Box::new(Expression::Floating(0f64)),
             )),
             Box::new(Expression::Is(
                 Box::new(Expression::Call(
@@ -1117,7 +1153,7 @@ mod tests {
                         Expression::Variable("Hate".to_string()),
                     ],
                 )),
-                Box::new(Expression::Integer(0)),
+                Box::new(Expression::Floating(0f64)),
             )),
         );
         let commands = vec![CommandLine {
@@ -1181,6 +1217,11 @@ mod tests {
     }
 
     #[test]
+    fn floating_point_numbers() {
+        lines_tokens_check("say .5", vec![SymbolType::Say, SymbolType::Floating(".5".to_string())]);
+    }
+
+    #[test]
     fn comment_parsing() {
         lines_tokens_check("(foo bar baz)", vec![SymbolType::Comment]);
     }
@@ -1190,7 +1231,7 @@ mod tests {
         let commands = vec![CommandLine {
             cmd: Command::Assignment {
                 target: "Bar".to_string(),
-                value: Expression::Integer(4),
+                value: Expression::Floating(4f64),
             },
             line: 1,
         }];
@@ -1308,7 +1349,7 @@ mod tests {
                 name: "Everyone".to_string(),
                 args: vec![Expression::Subtract(
                     Box::new(Expression::Variable("the bait".to_string())),
-                    Box::new(Expression::Integer(1)),
+                    Box::new(Expression::Floating(1f64)),
                 )],
             },
             line: 1,
@@ -1344,21 +1385,6 @@ mod tests {
                     SymbolType::Words(vec!["a".to_string()])
                 ]
             );
-            assert_eq!(line, 1);
-        } else {
-            assert!(false, err);
-        }
-    }
-
-    #[test]
-    fn too_long_int() {
-        pretty_env_logger::try_init().unwrap_or(());
-        let err = parse("put 340282366920938463463374607431768211455 into the loneliest")
-            .err()
-            .unwrap()
-            .0;
-        if let ErrorKind::ParseIntError(val, line) = err {
-            assert_eq!(val, "340282366920938463463374607431768211455");
             assert_eq!(line, 1);
         } else {
             assert!(false, err);

@@ -6,8 +6,8 @@ pub type Span<'a> = LocatedSpan<CompleteStr<'a>>;
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
 pub enum Expression {
     // Single items
-    Integer(i128),
     String(String),
+    Floating(f64),
     Variable(String),
     True,
     False,
@@ -26,6 +26,7 @@ pub enum Expression {
     And(Box<Expression>, Box<Expression>),
     GreaterThanOrEqual(Box<Expression>, Box<Expression>),
     GreaterThan(Box<Expression>, Box<Expression>),
+    LessThanOrEqual(Box<Expression>, Box<Expression>),
     LessThan(Box<Expression>, Box<Expression>),
 }
 
@@ -51,6 +52,7 @@ pub enum SymbolType {
     GreaterThanOrEqual,
     GreaterThan,
     LessThan,
+    LessThanOrEqual,
     Add,
     Subtract,
     Times,
@@ -63,6 +65,7 @@ pub enum SymbolType {
     String(String),
     Words(Vec<String>),
     Integer(String),
+    Floating(String),
     Comment,
     Listen,
     Divide,
@@ -102,11 +105,11 @@ pub enum Command {
     EndIf,
     Increment {
         target: String,
-        count: i128,
+        count: f64,
     },
     Decrement {
         target: String,
-        count: i128,
+        count: f64,
     },
     Next {
         loop_start: usize,
@@ -189,8 +192,8 @@ error_chain!{
         BadCommandSequence(sequence: Vec<SymbolType>, line: u32) {
             display("Don't recognise command sequence {:?}", sequence)
         }
-        ParseIntError(number: String, line: u32) {
-            display("Unparsable integer: '{}'", number)
+        ParseNumberError(number: String, line: u32) {
+            display("Unparsable number: '{}'", number)
         }
         NoSymbols(line: u32) {
             display("No symbols!")
@@ -252,7 +255,7 @@ pub fn get_error_line(e: &Error) -> u32 {
             ErrorKind::UnbalancedExpression(_, line) => line.clone(),
             ErrorKind::NoRunner(_, line) => line.clone(),
             ErrorKind::BadCommandSequence(_, line) => line.clone(),
-            ErrorKind::ParseIntError(_, line) => line.clone(),
+            ErrorKind::ParseNumberError(_, line) => line.clone(),
             ErrorKind::BadIs(_, line) => line.clone(),
             ErrorKind::BadPut(_, line) => line.clone(),
             ErrorKind::NoEndOfIf(line) => line.clone(),

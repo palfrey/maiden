@@ -32,24 +32,24 @@ fn run_mathbinop(
     program: &Program,
     first: &Expression,
     second: &Expression,
-    f: fn(i128, i128) -> i128,
+    f: fn(f64, f64) -> f64,
 ) -> Result<Expression> {
     let res_first = run_expression(state, program, first.deref())?;
     let res_second = run_expression(state, program, second.deref())?;
     debug!("first: {:?} second: {:?}", res_first, res_second);
-    // one if-let per if apparently, until https://github.com/rust-lang/rfcs/issues/929 gets resolved
-    if let Expression::Integer(f_i) = res_first {
-        if let Expression::Integer(s_i) = res_second {
-            return Ok(Expression::Integer(f(f_i, s_i)));
+    let first_value: f64 = match res_first {
+        Expression::Floating(ref i) => *i,
+        _ => {
+            bail!(ErrorKind::Unimplemented(format!("Math op on non-number: {:?} {:?}", res_first, res_second), state.current_line));
         }
-    }
-    bail!(ErrorKind::Unimplemented(
-        format!(
-            "Math op between non integers: {:?} {:?}",
-            res_first, res_second
-        ),
-        state.current_line,
-    ));
+    };
+    let second_value: f64 = match res_second {
+        Expression::Floating(ref i) => *i,
+        _ => {
+            bail!(ErrorKind::Unimplemented(format!("Math op on non-number: {:?} {:?}", res_first, res_second), state.current_line));
+        }
+    };
+    return Ok(Expression::Floating(f(first_value, second_value)));
 }
 
 fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
@@ -57,8 +57,8 @@ fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
         Ok(false)
     } else if let Expression::True = *expression {
         Ok(true)
-    } else if let Expression::Integer(ref val) = *expression {
-        if *val == 0 {
+    } else if let Expression::Floating(ref val) = *expression {
+        if *val == 0f64 {
             Ok(false)
         } else {
             Ok(true)
@@ -142,6 +142,9 @@ fn run_expression(
         Expression::GreaterThan(ref first, ref second) => {
             return run_binop(state, program, first, second, |_, f, s| Ok(f > s));
         }
+        Expression::LessThanOrEqual(ref first, ref second) => {
+            return run_binop(state, program, first, second, |_, f, s| Ok(f <= s));
+        }
         Expression::LessThan(ref first, ref second) => {
             return run_binop(state, program, first, second, |_, f, s| Ok(f < s));
         }
@@ -157,7 +160,7 @@ fn run_expression(
         Expression::Divide(ref first, ref second) => {
             return run_mathbinop(state, program, first, second, |f, s| f / s);
         }
-        Expression::String(_) | Expression::Integer(_) => Ok(expression.clone()),
+        Expression::String(_) | Expression::Floating(_) => Ok(expression.clone()),
         Expression::Variable(ref name) => match state.variables.get(&name.to_lowercase()) {
             Some(exp) => {
                 debug!("Got variable {} with value {:?}", &name, exp);
@@ -199,7 +202,7 @@ pub fn run(program: &Program, writer: &mut Write) -> Result<HashMap<String, Expr
 
 fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
     match *value {
-        Expression::Integer(ref x) => Ok(format!("{}", x)),
+        Expression::Floating(ref x) => Ok(format!("{}", x)),
         Expression::String(ref s) => Ok(s.to_string()),
         Expression::Variable(ref x) => {
             let v = {
@@ -225,7 +228,7 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
     }
 }
 
-fn alter_variable(state: &mut State, target: &str, f: &Fn(i128) -> i128) -> Result<()> {
+fn alter_variable(state: &mut State, target: &str, f: &Fn(f64) -> f64) -> Result<()> {
     let val = {
         let current_line = state.current_line;
         let v = state.variables.get(&target.to_lowercase());
@@ -236,10 +239,10 @@ fn alter_variable(state: &mut State, target: &str, f: &Fn(i128) -> i128) -> Resu
     };
     debug!("Value of {} is {:?}", target, val);
     match val {
-        Expression::Integer(x) => {
+        Expression::Floating(x) => {
             state
                 .variables
-                .insert(target.to_lowercase(), Expression::Integer(f(x)));
+                .insert(target.to_lowercase(), Expression::Floating(f(x)));
         }
         _ => {
             bail!(ErrorKind::Unimplemented(
