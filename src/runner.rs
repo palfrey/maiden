@@ -136,6 +136,16 @@ fn run_expression(
                 return Ok(to_boolean(st, f)? && to_boolean(st, s)?);
             });
         }
+        Expression::Or(ref first, ref second) => {
+            return run_binop(state, program, first, second, |st, f, s| {
+                return Ok(to_boolean(st, f)? || to_boolean(st, s)?);
+            });
+        }
+        Expression::Nor(ref first, ref second) => {
+            return run_binop(state, program, first, second, |st, f, s| {
+                return Ok(!(to_boolean(st, f)? || to_boolean(st, s)?));
+            });
+        }
         Expression::GreaterThanOrEqual(ref first, ref second) => {
             return run_binop(state, program, first, second, |_, f, s| Ok(f >= s));
         }

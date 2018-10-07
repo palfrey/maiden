@@ -91,7 +91,6 @@ named!(keyword<Span, Span>, // single-words only
         tag_no_case!("is") |
         tag_no_case!("minus") |
         tag_no_case!("put") |
-        tag_no_case!("say") |
         tag_no_case!("scream") |
         tag_no_case!("shout") |
         tag_no_case!("takes") |
@@ -167,6 +166,8 @@ named!(expression(Span) -> SymbolType,
             tag!("is") | tag!("was") | tag!("are") | tag!("were")
         ) => {|_| SymbolType::Is} |
         tag_no_case!("and") => {|_| SymbolType::And} |
+        tag_no_case!("or") => {|_| SymbolType::Or} |
+        tag_no_case!("nor") => {|_| SymbolType::Nor} |
         tag_no_case!("takes") => {|_| SymbolType::Takes} |
         alt_complete!(
             tag_no_case!("without") | tag_no_case!("minus")
@@ -219,30 +220,40 @@ named!(expression(Span) -> SymbolType,
     )
 );
 
+named!(statement(Span) -> SymbolType,
+    do_parse!(
+        val: alt_complete!(
+            tag_no_case!("if") => {|_| SymbolType::If} |
+            tag_no_case!("build") => {|_| SymbolType::Build} |
+            tag_no_case!("up") => {|_| SymbolType::Up} |
+            tag_no_case!("knock") => {|_| SymbolType::Knock} |
+            tag_no_case!("down") => {|_| SymbolType::Down} |
+            tag_no_case!("ain't") => {|_| SymbolType::Aint} |
+            alt_complete!(
+                tag_no_case!("say") | tag_no_case!("shout") | tag_no_case!("whisper") | tag_no_case!("scream")
+            ) => {|_| SymbolType::Say} |
+            tag_no_case!("while") => {|_| SymbolType::While} |
+            tag_no_case!("until") => {|_| SymbolType::Until} |
+            alt_complete!(
+                tag_no_case!("end") | tag_no_case!("around we go")
+            ) => {|_| SymbolType::Next} |
+            alt_complete!(
+                tag_no_case!("take it to the top") | tag_no_case!("continue")
+            ) => {|_| SymbolType::Continue} |
+            tag_no_case!("give back") => {|_| SymbolType::Return} |
+            tag_no_case!("into") => {|_| SymbolType::Where} |
+            tag_no_case!("put") => {|_| SymbolType::Put} |
+            tag_no_case!("else") => {|_| SymbolType::Else} |
+            tag_no_case!("listen to") => {|_| SymbolType::Listen}
+        ) >>
+        peek!(alt!(take_while1!(is_space) | take_while1!(is_newline) | eof!() | tag!(","))) >>
+        (val)
+    )
+);
+
 named!(word(Span) -> SymbolType,
     alt_complete!(
-        tag_no_case!("if") => {|_| SymbolType::If} |
-        tag_no_case!("build") => {|_| SymbolType::Build} |
-        tag_no_case!("up") => {|_| SymbolType::Up} |
-        tag_no_case!("knock") => {|_| SymbolType::Knock} |
-        tag_no_case!("down") => {|_| SymbolType::Down} |
-        tag_no_case!("ain't") => {|_| SymbolType::Aint} |
-        alt_complete!(
-            tag_no_case!("say") | tag_no_case!("shout") | tag_no_case!("whisper") | tag_no_case!("scream")
-        ) => {|_| SymbolType::Say} |
-        tag_no_case!("while") => {|_| SymbolType::While} |
-        tag_no_case!("until") => {|_| SymbolType::Until} |
-        alt_complete!(
-            tag_no_case!("end") | tag_no_case!("around we go")
-        ) => {|_| SymbolType::Next} |
-        alt_complete!(
-            tag_no_case!("take it to the top") | tag_no_case!("continue")
-        ) => {|_| SymbolType::Continue} |
-        tag_no_case!("give back") => {|_| SymbolType::Return} |
-        tag_no_case!("into") => {|_| SymbolType::Where} |
-        tag_no_case!("put") => {|_| SymbolType::Put} |
-        tag_no_case!("else") => {|_| SymbolType::Else} |
-        tag_no_case!("listen to") => {|_| SymbolType::Listen} |
+        statement => {|s| s} |
         expression => {|s| s}
     ));
 
@@ -471,6 +482,8 @@ fn next_operator<'a>(
             | SymbolType::Subtract
             | SymbolType::Times
             | SymbolType::Divide
+            | SymbolType::Or
+            | SymbolType::Nor
             | SymbolType::And => {
                 return Some((item, index));
             }
@@ -641,6 +654,8 @@ fn parse_expression_1(
             SymbolType::Times => Expression::Times(Box::new(lhs.clone()), Box::new(rhs)),
             SymbolType::Divide => Expression::Divide(Box::new(lhs.clone()), Box::new(rhs)),
             SymbolType::And => Expression::And(Box::new(lhs.clone()), Box::new(rhs)),
+            SymbolType::Or => Expression::Or(Box::new(lhs.clone()), Box::new(rhs)),
+            SymbolType::Nor => Expression::Nor(Box::new(lhs.clone()), Box::new(rhs)),
             _ => {
                 bail!(ErrorKind::Unimplemented(
                     format!("No operation for {:?}", op),

@@ -24,6 +24,8 @@ pub enum Expression {
     Times(Box<Expression>, Box<Expression>),
     Divide(Box<Expression>, Box<Expression>),
     And(Box<Expression>, Box<Expression>),
+    Or(Box<Expression>, Box<Expression>),
+    Nor(Box<Expression>, Box<Expression>),
     GreaterThanOrEqual(Box<Expression>, Box<Expression>),
     GreaterThan(Box<Expression>, Box<Expression>),
     LessThanOrEqual(Box<Expression>, Box<Expression>),
@@ -34,6 +36,8 @@ pub enum Expression {
 pub enum SymbolType {
     Dummy,
     And,
+    Or,
+    Nor,
     Is,
     Build,
     Up,
