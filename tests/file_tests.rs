@@ -11,7 +11,7 @@ mod integration {
     include!(concat!(env!("OUT_DIR"), "/test.rs"));
 
     fn file_test(name: &str) {
-        let mut f = File::open(&format!("./tests/{}.expected", name)).unwrap();
+        let mut f = File::open(&format!("./tests/{}.out", name)).unwrap();
         let mut expected = String::new();
         f.read_to_string(&mut expected).unwrap();
 

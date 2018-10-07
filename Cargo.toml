@@ -12,6 +12,9 @@ regex = "1"
 log = "0.4"
 pretty_env_logger = "0.2"
 
+[build-dependencies]
+walkdir = "2"
+
 [dev-dependencies]
 assert_cmd = "0.6"
 
