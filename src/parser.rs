@@ -37,7 +37,7 @@ named!(title_case<Span, String>,
     do_parse!(
         not!(keyword) >> // to shortcut the "Until Counter" case
         first: take_while_m_n!(1, 1, char::is_uppercase) >>
-        rest: take_while1!(word_character) >>
+        rest: take_while!(word_character) >>
         (format!("{}{}", first.fragment, rest.fragment))
     ));
 
