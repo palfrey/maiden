@@ -384,13 +384,15 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 call_function(state, program, &name, &args)?;
             }
             Command::EndIf => {}
-            Command::Listen { ref target } => {
+            Command::Listen { target: ref opt_target } => {
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)?;
-                state.variables.insert(
-                    target.to_lowercase(),
-                    Expression::String(input.trim_right_matches('\n').to_string()),
-                );
+                if let Some(target) = opt_target {
+                    state.variables.insert(
+                        target.to_lowercase(),
+                        Expression::String(input.trim_right_matches('\n').to_string()),
+                    );
+                }
             }
         }
         pc += 1;

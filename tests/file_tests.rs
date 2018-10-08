@@ -17,7 +17,7 @@ mod integration {
 
         let args = [&format!("./tests/{}", name)];
         let mut mb = Command::main_binary().unwrap();
-        let input = File::open(&format!("./tests/{}.input", name));
+        let input = File::open(&format!("./tests/{}.in'", name));
         let input_buffer = match input {
             Ok(mut in_f) => {
                 let mut provided = String::new();

@@ -125,7 +125,7 @@ pub enum Command {
         value: Expression,
     },
     Listen {
-        target: String,
+        target: Option<String>,
     },
     FunctionDeclaration {
         name: String,

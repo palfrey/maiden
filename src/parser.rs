@@ -244,7 +244,8 @@ named!(statement(Span) -> SymbolType,
             tag_no_case!("into") => {|_| SymbolType::Where} |
             tag_no_case!("put") => {|_| SymbolType::Put} |
             tag_no_case!("else") => {|_| SymbolType::Else} |
-            tag_no_case!("listen to") => {|_| SymbolType::Listen}
+            tag_no_case!("listen to") => {|_| SymbolType::Listen} |
+            tag_no_case!("listen") => {|_| SymbolType::Listen}
         ) >>
         peek!(alt!(take_while1!(is_space) | take_while1!(is_newline) | eof!() | tag!(","))) >>
         (val)
@@ -842,10 +843,18 @@ pub fn parse(input: &str) -> Result<Program> {
                     debug!("Double newline that doesn't end anything");
                 }
             }
+            [SymbolType::Listen] => {
+                commands.push(CommandLine {
+                    cmd: Command::Listen {
+                        target: None,
+                    },
+                    line: current_line,
+                });
+            }
             [SymbolType::Listen, SymbolType::Variable(target)] => {
                 commands.push(CommandLine {
                     cmd: Command::Listen {
-                        target: target.to_string(),
+                        target: Some(target.to_string()),
                     },
                     line: current_line,
                 });
