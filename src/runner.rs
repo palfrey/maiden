@@ -27,6 +27,22 @@ fn run_binop(
     }
 }
 
+fn run_binop_shortcut(
+    state: &mut State,
+    program: &Program,
+    first: &Expression,
+    second: &Expression,
+    f: fn(&State, &Expression, &Expression) -> Result<bool>,
+) -> Result<bool> {
+    let res_first = run_expression(state, program, first.deref())?;
+    if let Expression::True = res_first {
+        return Ok(true);
+    }
+    let res_second = run_expression(state, program, second.deref())?;
+    debug!("first: {:?} second: {:?}", res_first, res_second);
+    return Ok(f(state, &res_first, &res_second)?);
+}
+
 fn run_mathbinop(
     state: &mut State,
     program: &Program,
@@ -137,14 +153,22 @@ fn run_expression(
             });
         }
         Expression::Or(ref first, ref second) => {
-            return run_binop(state, program, first, second, |st, f, s| {
+            if run_binop_shortcut(state, program, first, second, |st, f, s| {
                 return Ok(to_boolean(st, f)? || to_boolean(st, s)?);
-            });
+            })? {
+                return Ok(Expression::True);
+            } else {
+                return Ok(Expression::False);
+            };
         }
         Expression::Nor(ref first, ref second) => {
-            return run_binop(state, program, first, second, |st, f, s| {
-                return Ok(!(to_boolean(st, f)? || to_boolean(st, s)?));
-            });
+            if run_binop_shortcut(state, program, first, second, |st, f, s| {
+                return Ok(to_boolean(st, f)? || to_boolean(st, s)?);
+            })? {
+                return Ok(Expression::False);
+            } else {
+                return Ok(Expression::True);
+            };
         }
         Expression::GreaterThanOrEqual(ref first, ref second) => {
             return run_binop(state, program, first, second, |_, f, s| Ok(f >= s));
