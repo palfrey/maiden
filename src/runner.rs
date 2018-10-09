@@ -8,6 +8,7 @@ struct State<'a> {
     variables: &'a mut HashMap<String, Expression>,
     current_line: u32,
     depth: u32,
+    pronoun: Option<String>,
 }
 
 fn run_binop(
@@ -124,6 +125,7 @@ fn call_function(
         variables: &mut new_variables,
         current_line: state.current_line,
         depth: state.depth + 1,
+        pronoun: None
     };
     for (i, arg) in args.iter().enumerate() {
         let value = run_expression(&mut new_state, program, &arg)?;
@@ -194,7 +196,6 @@ fn run_expression(
         Expression::Divide(ref first, ref second) => {
             return run_mathbinop(state, program, first, second, |f, s| f / s);
         }
-        Expression::String(_) | Expression::Floating(_) => Ok(expression.clone()),
         Expression::Variable(ref name) => match state.variables.get(&name.to_lowercase()) {
             Some(exp) => {
                 debug!("Got variable {} with value {:?}", &name, exp);
@@ -205,17 +206,25 @@ fn run_expression(
             }
         },
         Expression::Call(ref target, ref args) => call_function(state, program, target, args),
-        Expression::Nothing => Ok(Expression::Nothing),
-        Expression::True => Ok(Expression::True),
-        Expression::False => Ok(Expression::False),
-        Expression::Null => Ok(Expression::Null),
-        Expression::Mysterious => Ok(Expression::Mysterious),
-        // _ => {
-        //     bail!(ErrorKind::NoRunner(
-        //         format!("{:?}", expression),
-        //         state.current_line,
-        //     ));
-        // }
+        Expression::Pronoun => {
+            match state.pronoun {
+                Some(ref pronoun) => {
+                    match state.variables.get(&pronoun.to_lowercase()) {
+                        Some(exp) => {
+                            debug!("Got variable {} with value {:?}", &pronoun, exp);
+                            Ok(exp.clone())
+                        }
+                        None => {
+                            bail!(ErrorKind::MissingVariable(pronoun.clone(), state.current_line));
+                        }
+                    }
+                }
+                None => {
+                    bail!(ErrorKind::UndefinedPronoun(state.current_line));
+                }
+            }
+        },
+        _ => Ok(expression.clone()),
     };
 }
 
@@ -228,6 +237,7 @@ pub fn run(program: &Program, writer: &mut Write) -> Result<HashMap<String, Expr
             writer,
             current_line: 0,
             depth: 0,
+            pronoun: None,
         };
         run_core(&mut state, program, pc)?;
     } // FIXME: Drop once NLL is merged
@@ -307,6 +317,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 ref value,
             } => {
                 let val = run_expression(state, program, &value)?;
+                state.pronoun = Some(target.clone());
                 state.variables.insert(target.to_lowercase(), val);
             }
             Command::Increment {

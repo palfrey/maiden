@@ -15,6 +15,7 @@ pub enum Expression {
     Nothing,
     Null,
     Mysterious,
+    Pronoun,
 
     // binary operators
     Is(Box<Expression>, Box<Expression>),
@@ -76,7 +77,8 @@ pub enum SymbolType {
     True,
     False,
     Null,
-    Mysterious
+    Mysterious,
+    Pronoun
 }
 
 #[derive(Debug, PartialEq)]
@@ -238,6 +240,9 @@ error_chain!{
         InstructionLimit(line: u32) {
             display("Hit instruction limit of 10,000,000. Infinite loop?")
         }
+        UndefinedPronoun(line: u32) {
+            display("Got to a pronoun, but no variable defined")
+        }
     }
 }
 
@@ -273,6 +278,7 @@ pub fn get_error_line(e: &Error) -> u32 {
             ErrorKind::Unimplemented(_, line) => line.clone(),
             ErrorKind::StackOverflow(_, line) => line.clone(),
             ErrorKind::InstructionLimit(line) => line.clone(),
+            ErrorKind::UndefinedPronoun(line) => line.clone(),
             _ => 0,
         },
     }

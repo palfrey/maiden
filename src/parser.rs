@@ -181,6 +181,12 @@ named!(expression(Span) -> SymbolType,
         tag_no_case!("over") => {|_| SymbolType::Divide} |
         tag_no_case!("true") => {|_| SymbolType::True} |
         tag_no_case!("false") => {|_| SymbolType::False} |
+        alt_complete!(
+            tag_no_case!("it") | 
+            tag_no_case!("he") | tag_no_case!("she") | tag_no_case!("him") | tag_no_case!("her") | tag_no_case!("they") | tag_no_case!("them") | 
+            tag_no_case!("ze") | tag_no_case!("hir") | tag_no_case!("zie") | tag_no_case!("zir") | tag_no_case!("xe") | tag_no_case!("xem") | 
+            tag_no_case!("ve") | tag_no_case!("ver")
+        ) => {|_| SymbolType::Pronoun} |
         do_parse!(
             minus: opt!(tag!("-")) >>
             before: take_while!(is_digit) >>
@@ -572,6 +578,7 @@ fn symbol_to_expression(
         SymbolType::False => Ok((Expression::False, index)),
         SymbolType::Null => Ok((Expression::Null, index)),
         SymbolType::Mysterious => Ok((Expression::Mysterious, index)),
+        SymbolType::Pronoun => Ok((Expression::Pronoun, index)),
         _ => {
             bail!(ErrorKind::Unimplemented(
                 format!("Single symbol to expression: {:?}", sym),
@@ -744,6 +751,7 @@ pub fn parse(input: &str) -> Result<Program> {
     let mut func_starts: Vec<usize> = Vec::new();
     let mut if_starts: Vec<usize> = Vec::new();
     let mut last_line = 0;
+    let mut pronoun: Option<String> = None;
     for raw_symbols in raw_lines.1 {
         debug!("raw_symbols: {:?}", raw_symbols);
         let mut symbols = compact_words(raw_symbols);
@@ -901,19 +909,28 @@ pub fn parse(input: &str) -> Result<Program> {
                         line: current_line,
                     });
                 } else if symbols.len() > 1 && symbols[1] == SymbolType::Is {
-                    if let SymbolType::Variable(ref target) = symbols[0] {
-                        let expression_seq: Vec<&SymbolType> = symbols.iter().skip(2).collect();
-                        let expression = parse_expression(&expression_seq, current_line)?;
-                        commands.push(CommandLine {
-                            cmd: Command::Assignment {
-                                target: target.to_string(),
-                                value: expression,
-                            },
-                            line: current_line,
-                        });
-                    } else {
-                        bail!(ErrorKind::BadIs(symbols.to_vec(), current_line));
-                    }
+                    let target = match symbols[0] {
+                        SymbolType::Variable(ref target) => target.to_string(),
+                        SymbolType::Pronoun => {
+                            if pronoun.is_none() {
+                                bail!(ErrorKind::UndefinedPronoun(current_line));
+                            }
+                            pronoun.clone().unwrap()
+                        }
+                        _ => {
+                            bail!(ErrorKind::BadIs(symbols.to_vec(), current_line));
+                        }
+                    };
+                    let expression_seq: Vec<&SymbolType> = symbols.iter().skip(2).collect();
+                    let expression = parse_expression(&expression_seq, current_line)?;
+                    pronoun = Some(target.clone());
+                    commands.push(CommandLine {
+                        cmd: Command::Assignment {
+                            target: target,
+                            value: expression,
+                        },
+                        line: current_line,
+                    });
                 } else if symbols[0] == SymbolType::Until && symbols.len() > 1 {
                     loop_starts.push(commands.len());
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
@@ -952,20 +969,29 @@ pub fn parse(input: &str) -> Result<Program> {
                     && symbols[0] == SymbolType::Put
                     && symbols[symbols.len() - 2] == SymbolType::Where
                 {
-                    if let SymbolType::Variable(ref target) = symbols[symbols.len() - 1] {
-                        let expression_seq: Vec<&SymbolType> =
-                            symbols.iter().skip(1).take(symbols.len() - 3).collect();
-                        let expression = parse_expression(&expression_seq, current_line)?;
-                        commands.push(CommandLine {
-                            cmd: Command::Assignment {
-                                target: target.to_string(),
-                                value: expression,
-                            },
-                            line: current_line,
-                        });
-                    } else {
-                        bail!(ErrorKind::BadPut(symbols.to_vec(), current_line));
-                    }
+                    let target = match symbols[symbols.len() - 1] {
+                        SymbolType::Variable(ref target) => target.to_string(),
+                        SymbolType::Pronoun => {
+                            if pronoun.is_none() {
+                                bail!(ErrorKind::UndefinedPronoun(current_line));
+                            }
+                            pronoun.clone().unwrap()
+                        }
+                        _ => {
+                            bail!(ErrorKind::BadPut(symbols.to_vec(), current_line));
+                        }
+                    };
+                    let expression_seq: Vec<&SymbolType> =
+                        symbols.iter().skip(1).take(symbols.len() - 3).collect();
+                    let expression = parse_expression(&expression_seq, current_line)?;
+                    pronoun = Some(target.clone());
+                    commands.push(CommandLine {
+                        cmd: Command::Assignment {
+                            target: target,
+                            value: expression,
+                        },
+                        line: current_line,
+                    });
                 } else if symbols.len() > 2 && symbols[1] == SymbolType::Takes {
                     if let SymbolType::Variable(ref name) = symbols[0] {
                         let mut var_seq = symbols.iter().skip(2);
