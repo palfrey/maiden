@@ -38,7 +38,7 @@ fn variable_character(chr: char) -> bool {
 }
 
 fn word_character(chr: char) -> bool {
-    variable_character(chr) || char::is_numeric(chr) || chr == '\''
+    variable_character(chr) || char::is_numeric(chr) || chr == '\'' || chr == '.'
 }
 
 fn is_digit(chr: char) -> bool {
@@ -439,6 +439,16 @@ fn compact_words(line: Vec<Token>) -> Vec<Token> {
     return symbols;
 }
 
+fn parse_words(words: &Vec<String>) -> usize {
+    let mut number = 0;
+    for word in words {
+        number *= 10;
+        let len = word.replace("'", "").len() % 10;
+        number += len;
+    }
+    return number;
+}
+
 fn evaluate(value: &SymbolType, line: u32) -> Result<Expression> {
     match value {
         SymbolType::Words(words) => {
@@ -451,12 +461,19 @@ fn evaluate(value: &SymbolType, line: u32) -> Result<Expression> {
                     return Ok(Expression::Floating(float));
                 }
             }
-            let mut number = 0f64;
-            for word in words {
-                number *= 10f64;
-                let len: f64 = (word.replace("'", "").len() % 10) as f64;
-                number += len;
+            let fullstop = words.iter().position(|s| s.contains('.'));
+            let number = if let Some(fullstop_pos) = fullstop {
+                let mut editable_words = words.clone();
+                let after = editable_words.split_off(fullstop_pos + 1);
+                let first = parse_words(&editable_words) as f64;
+                let second = parse_words(&after) as f64;
+                let divisor = 10f64.powf(second.log10().ceil());
+                debug!("first: {}, second: {}, divisor: {}", first, second, divisor);
+                (first-1f64) + (second/divisor)
             }
+            else {
+                parse_words(&words) as f64
+            };
             return Ok(Expression::Floating(number));
         }
         SymbolType::String(phrase) => {
