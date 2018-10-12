@@ -18,10 +18,8 @@ fn run_binop(
     second: &Expression,
     f: fn(&State, &Expression, &Expression) -> Result<bool>,
 ) -> Result<Expression> {
-    let res_first = run_expression(state, program, first.deref())?;
-    let res_second = run_expression(state, program, second.deref())?;
-    debug!("first: {:?} second: {:?}", res_first, res_second);
-    if f(state, &res_first, &res_second)? {
+    let res = run_binop_shortcut(state, program, first, second, None, false, f);
+    if res? {
         Ok(Expression::True)
     } else {
         Ok(Expression::False)
