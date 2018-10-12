@@ -80,6 +80,7 @@ pub enum SymbolType {
     Mysterious,
     Pronoun,
     Not,
+    Break,
 }
 
 #[derive(Debug, PartialEq)]

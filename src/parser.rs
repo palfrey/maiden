@@ -249,7 +249,8 @@ named!(statement(Span) -> SymbolType,
             tag_no_case!("put") => {|_| SymbolType::Put} |
             tag_no_case!("else") => {|_| SymbolType::Else} |
             tag_no_case!("listen to") => {|_| SymbolType::Listen} |
-            tag_no_case!("listen") => {|_| SymbolType::Listen}
+            tag_no_case!("listen") => {|_| SymbolType::Listen} |
+            tag_no_case!("break it down") => {|_| SymbolType::Break}
         ) >>
         peek!(alt!(take_while1!(is_space) | take_while1!(is_newline) | eof!() | tag!(","))) >>
         (val)
