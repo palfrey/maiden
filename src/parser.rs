@@ -208,7 +208,6 @@ named!(expression(Span) -> SymbolType,
             } else {
                 SymbolType::Integer(val.fragment.to_string())
             }}|
-        variable => {|s| SymbolType::Variable(s) } |
         do_parse!(
             tag!("\"") >>
             phrase: take_while!(string_character) >>
@@ -220,8 +219,7 @@ named!(expression(Span) -> SymbolType,
             take_until!(")") >>
             tag!(")") >>
             ()
-        ) => {|_| SymbolType::Comment } |
-        take_while1!(word_character) => {|word: Span| SymbolType::Words(vec![word.to_string()])}
+        ) => {|_| SymbolType::Comment }
     )
 );
 
@@ -260,7 +258,13 @@ named!(statement(Span) -> SymbolType,
 named!(word(Span) -> SymbolType,
     alt_complete!(
         statement => {|s| s} |
-        expression => {|s| s}
+        do_parse!(
+            e: expression >>
+            peek!(alt!(tag!(" ") | tag!(",") | eof!() | tag!("\n") | tag!("\r"))) >>
+            (e)
+        ) => {|e| e} |
+        variable => {|s| SymbolType::Variable(s) } |
+        take_while1!(word_character) => {|word: Span| SymbolType::Words(vec![word.to_string()])}
     ));
 
 named!(poetic_number_literal_core<Span, (u32, String, Vec<Span>)>,
@@ -1378,6 +1382,18 @@ mod tests {
                     "sinuously".to_string(),
                     "perfected".to_string(),
                 ]),
+            ],
+        );
+    }
+
+    #[test]
+    fn keyword_named_func() {
+        lines_tokens_check(
+            "TrueFunc takes nothing",
+            vec![
+                SymbolType::Variable("TrueFunc".to_string()),
+                SymbolType::Takes,
+                SymbolType::Words(vec!["nothing".to_string()]),
             ],
         );
     }
