@@ -180,6 +180,7 @@ named!(expression(Span) -> SymbolType,
         tag_no_case!("over") => {|_| SymbolType::Divide} |
         tag_no_case!("true") => {|_| SymbolType::True} |
         tag_no_case!("false") => {|_| SymbolType::False} |
+        tag_no_case!("not") => {|_| SymbolType::Not} |
         alt_complete!(
             tag_no_case!("it") | 
             tag_no_case!("he") | tag_no_case!("she") | tag_no_case!("him") | tag_no_case!("her") | tag_no_case!("they") | tag_no_case!("them") | 
