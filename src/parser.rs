@@ -5,7 +5,6 @@
 use common::*;
 use nom;
 use nom::types::CompleteStr;
-use regex::Regex;
 use std::collections::HashMap;
 use std::ops::IndexMut;
 
@@ -439,7 +438,7 @@ fn compact_words(line: Vec<Token>) -> Vec<Token> {
     return symbols;
 }
 
-fn parse_words(words: &Vec<String>) -> usize {
+fn parse_words(words: &[String]) -> usize {
     let mut number = 0;
     for word in words {
         number *= 10;
@@ -469,9 +468,8 @@ fn evaluate(value: &SymbolType, line: u32) -> Result<Expression> {
                 let second = parse_words(&after) as f64;
                 let divisor = 10f64.powf(second.log10().ceil());
                 debug!("first: {}, second: {}, divisor: {}", first, second, divisor);
-                (first-1f64) + (second/divisor)
-            }
-            else {
+                (first - 1f64) + (second / divisor)
+            } else {
                 parse_words(&words) as f64
             };
             return Ok(Expression::Floating(number));
@@ -584,13 +582,13 @@ fn symbol_to_expression(
                 Ok(i) => Ok((Expression::Floating(i), index)),
                 Err(_) => bail!(ErrorKind::ParseNumberError(val.to_string(), line)),
             };
-        },
+        }
         SymbolType::Floating(ref val) => {
             return match val.parse::<f64>() {
                 Ok(i) => Ok((Expression::Floating(i), index)),
                 Err(_) => bail!(ErrorKind::ParseNumberError(val.to_string(), line)),
             };
-        },
+        }
         SymbolType::True => Ok((Expression::True, index)),
         SymbolType::False => Ok((Expression::False, index)),
         SymbolType::Null => Ok((Expression::Null, index)),
@@ -673,7 +671,9 @@ fn parse_expression_1(
                 Expression::GreaterThan(Box::new(lhs.clone()), Box::new(rhs))
             }
             SymbolType::LessThan => Expression::LessThan(Box::new(lhs.clone()), Box::new(rhs)),
-            SymbolType::LessThanOrEqual => Expression::LessThanOrEqual(Box::new(lhs.clone()), Box::new(rhs)),
+            SymbolType::LessThanOrEqual => {
+                Expression::LessThanOrEqual(Box::new(lhs.clone()), Box::new(rhs))
+            }
             SymbolType::Add => Expression::Add(Box::new(lhs.clone()), Box::new(rhs)),
             SymbolType::Subtract => Expression::Subtract(Box::new(lhs.clone()), Box::new(rhs)),
             SymbolType::Times => Expression::Times(Box::new(lhs.clone()), Box::new(rhs)),
@@ -751,10 +751,7 @@ macro_rules! incdec_command {
 
 #[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
 pub fn parse(input: &str) -> Result<Program> {
-    //let re = Regex::new(r"'s\W+").unwrap();
-    let re = Regex::new(r"dsgflgfndlgfdgfdgfd").unwrap();
-    let fixed_input = re.replace_all(input, " is "); //.replace("'", "");
-    let raw_lines = lines(&fixed_input)?;
+    let raw_lines = lines(&input)?;
     if !raw_lines.0.fragment.is_empty() && raw_lines.0.fragment.chars().any(|c| !c.is_whitespace())
     {
         // ignore empty and all-whitespace blocks
@@ -870,9 +867,7 @@ pub fn parse(input: &str) -> Result<Program> {
             }
             [SymbolType::Listen] => {
                 commands.push(CommandLine {
-                    cmd: Command::Listen {
-                        target: None,
-                    },
+                    cmd: Command::Listen { target: None },
                     line: current_line,
                 });
             }
@@ -943,7 +938,7 @@ pub fn parse(input: &str) -> Result<Program> {
                     pronoun = Some(target.clone());
                     commands.push(CommandLine {
                         cmd: Command::Assignment {
-                            target: target,
+                            target,
                             value: expression,
                         },
                         line: current_line,
@@ -1004,7 +999,7 @@ pub fn parse(input: &str) -> Result<Program> {
                     pronoun = Some(target.clone());
                     commands.push(CommandLine {
                         cmd: Command::Assignment {
-                            target: target,
+                            target,
                             value: expression,
                         },
                         line: current_line,
@@ -1285,7 +1280,10 @@ mod tests {
 
     #[test]
     fn floating_point_numbers() {
-        lines_tokens_check("say .5", vec![SymbolType::Say, SymbolType::Floating(".5".to_string())]);
+        lines_tokens_check(
+            "say .5",
+            vec![SymbolType::Say, SymbolType::Floating(".5".to_string())],
+        );
     }
 
     #[test]

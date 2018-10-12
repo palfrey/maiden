@@ -8,7 +8,13 @@ fn main() {
     let mut f = std::fs::File::create(&destination).unwrap();
 
     for entry in WalkDir::new("tests").follow_links(true) {
-        let name = entry.unwrap().path().to_str().unwrap().to_string().replace("tests/", "");
+        let name = entry
+            .unwrap()
+            .path()
+            .to_str()
+            .unwrap()
+            .to_string()
+            .replace("tests/", "");
         if name.ends_with(".rock") {
             let test_name = name.replace(".", "_").replace("-", "_").replace("/", "_");
             write!(

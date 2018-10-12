@@ -78,7 +78,7 @@ pub enum SymbolType {
     False,
     Null,
     Mysterious,
-    Pronoun
+    Pronoun,
 }
 
 #[derive(Debug, PartialEq)]

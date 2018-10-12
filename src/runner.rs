@@ -57,13 +57,19 @@ fn run_mathbinop(
     let first_value: f64 = match res_first {
         Expression::Floating(ref i) => *i,
         _ => {
-            bail!(ErrorKind::Unimplemented(format!("Math op on non-number: {:?} {:?}", res_first, res_second), state.current_line));
+            bail!(ErrorKind::Unimplemented(
+                format!("Math op on non-number: {:?} {:?}", res_first, res_second),
+                state.current_line
+            ));
         }
     };
     let second_value: f64 = match res_second {
         Expression::Floating(ref i) => *i,
         _ => {
-            bail!(ErrorKind::Unimplemented(format!("Math op on non-number: {:?} {:?}", res_first, res_second), state.current_line));
+            bail!(ErrorKind::Unimplemented(
+                format!("Math op on non-number: {:?} {:?}", res_first, res_second),
+                state.current_line
+            ));
         }
     };
     return Ok(Expression::Floating(f(first_value, second_value)));
@@ -125,7 +131,7 @@ fn call_function(
         variables: &mut new_variables,
         current_line: state.current_line,
         depth: state.depth + 1,
-        pronoun: None
+        pronoun: None,
     };
     for (i, arg) in args.iter().enumerate() {
         let value = run_expression(&mut new_state, program, &arg)?;
@@ -136,6 +142,7 @@ fn call_function(
     return run_core(&mut new_state, program, func.location + 1);
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
 fn run_expression(
     state: &mut State,
     program: &Program,
@@ -155,18 +162,20 @@ fn run_expression(
             });
         }
         Expression::Or(ref first, ref second) => {
-            if run_binop_shortcut(state, program, first, second, |st, f, s| {
+            let res = run_binop_shortcut(state, program, first, second, |st, f, s| {
                 return Ok(to_boolean(st, f)? || to_boolean(st, s)?);
-            })? {
+            })?;
+            if res {
                 return Ok(Expression::True);
             } else {
                 return Ok(Expression::False);
             };
         }
         Expression::Nor(ref first, ref second) => {
-            if run_binop_shortcut(state, program, first, second, |st, f, s| {
+            let res = run_binop_shortcut(state, program, first, second, |st, f, s| {
                 return Ok(to_boolean(st, f)? || to_boolean(st, s)?);
-            })? {
+            })?;
+            if res {
                 return Ok(Expression::False);
             } else {
                 return Ok(Expression::True);
@@ -206,22 +215,21 @@ fn run_expression(
             }
         },
         Expression::Call(ref target, ref args) => call_function(state, program, target, args),
-        Expression::Pronoun => {
-            match state.pronoun {
-                Some(ref pronoun) => {
-                    match state.variables.get(&pronoun.to_lowercase()) {
-                        Some(exp) => {
-                            debug!("Got variable {} with value {:?}", &pronoun, exp);
-                            Ok(exp.clone())
-                        }
-                        None => {
-                            bail!(ErrorKind::MissingVariable(pronoun.clone(), state.current_line));
-                        }
-                    }
+        Expression::Pronoun => match state.pronoun {
+            Some(ref pronoun) => match state.variables.get(&pronoun.to_lowercase()) {
+                Some(exp) => {
+                    debug!("Got variable {} with value {:?}", &pronoun, exp);
+                    Ok(exp.clone())
                 }
                 None => {
-                    bail!(ErrorKind::UndefinedPronoun(state.current_line));
+                    bail!(ErrorKind::MissingVariable(
+                        pronoun.clone(),
+                        state.current_line
+                    ));
                 }
+            },
+            None => {
+                bail!(ErrorKind::UndefinedPronoun(state.current_line));
             }
         },
         _ => Ok(expression.clone()),
@@ -419,7 +427,9 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 call_function(state, program, &name, &args)?;
             }
             Command::EndIf => {}
-            Command::Listen { target: ref opt_target } => {
+            Command::Listen {
+                target: ref opt_target,
+            } => {
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)?;
                 if let Some(target) = opt_target {
