@@ -125,6 +125,9 @@ pub enum Command {
     Continue {
         loop_start: usize,
     },
+    Break {
+        loop_start: usize,
+    },
     Say {
         value: Expression,
     },

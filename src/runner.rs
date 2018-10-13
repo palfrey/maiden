@@ -501,6 +501,20 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
             Command::Next { loop_start } | Command::Continue { loop_start } => {
                 pc = loop_start - 1;
             }
+            Command::Break { loop_start } => {
+                let loop_cmd = &program.commands[loop_start];
+                match loop_cmd.cmd {
+                    Command::While { loop_end, .. } => match loop_end {
+                        Some(val) => {
+                            pc = val;
+                        }
+                        None => bail!(ErrorKind::NoEndLoop(state.current_line)),
+                    },
+                    _ => {
+                        panic!("Matched break with non-while");
+                    }
+                }
+            }
             Command::Say { ref value } => {
                 let resolve = run_expression(state, program, &value)?;
                 let x = get_printable(&resolve, state)?;
