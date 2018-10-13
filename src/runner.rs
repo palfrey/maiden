@@ -161,28 +161,30 @@ fn run_mathbinop(
 }
 
 fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
-    if let Expression::False = *expression {
-        Ok(false)
-    } else if let Expression::True = *expression {
-        Ok(true)
-    } else if let Expression::Floating(ref val) = *expression {
-        if *val == 0f64 {
-            Ok(false)
-        } else {
-            Ok(true)
+    return match *expression {
+        Expression::False | Expression::Mysterious | Expression::Null => Ok(false),
+        Expression::True => Ok(true),
+        Expression::Floating(ref val) => {
+            if *val == 0f64 {
+                Ok(false)
+            } else {
+                Ok(true)
+            }
         }
-    } else if let Expression::String(ref val) = *expression {
-        if val.is_empty() {
-            Ok(false)
-        } else {
-            Ok(true)
+        Expression::String(ref val) => {
+            if val.is_empty() {
+                Ok(false)
+            } else {
+                Ok(true)
+            }
         }
-    } else {
-        bail!(ErrorKind::BadBooleanResolve(
-            format!("{:?}", expression),
-            state.current_line,
-        ));
-    }
+        _ => {
+            bail!(ErrorKind::BadBooleanResolve(
+                format!("{:?}", expression),
+                state.current_line,
+            ));
+        }
+    };
 }
 
 fn call_function(
