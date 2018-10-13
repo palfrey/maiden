@@ -752,15 +752,17 @@ macro_rules! incdec_command {
             }
             let mut count = 1f64;
             loop {
-                let comma = rest.next();
-                if comma.is_none() {
+                let mut next = rest.next();
+                if next.is_none() {
                     break;
                 }
-                let up = rest.next();
-                if *comma.unwrap() != SymbolType::Comma
-                    || up.is_none()
-                    || *up.unwrap() != $good_symbol
-                {
+                if *next.unwrap() == SymbolType::Comma {
+                    next = rest.next();
+                    if next.is_none() {
+                        bail!($err($symbols.to_vec(), $current_line));
+                    }
+                }
+                if next.is_none() || *next.unwrap() != $good_symbol {
                     bail!($err($symbols.to_vec(), $current_line));
                 }
                 count += 1f64;
