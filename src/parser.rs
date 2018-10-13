@@ -519,7 +519,11 @@ fn evaluate(value: &SymbolType, line: u32) -> Result<Expression> {
                 let second = parse_words(&after) as f64;
                 let divisor = 10f64.powf(second.log10().ceil());
                 debug!("first: {}, second: {}, divisor: {}", first, second, divisor);
-                first + (second / divisor)
+                if second == 0.0 && divisor == 0.0 {
+                    first
+                } else {
+                    first + (second / divisor)
+                }
             } else {
                 parse_words(&words) as f64
             };
