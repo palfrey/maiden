@@ -30,6 +30,10 @@ fn expression_to_number(inp: Expression) -> Expression {
     return match inp {
         Expression::Floating(_) => inp,
         Expression::Null => Expression::Floating(0.0),
+        Expression::String(ref s) => {
+            let as_float = s.parse::<f64>().unwrap();
+            return Expression::Floating(as_float);
+        }
         _ => {
             panic!("Can't convert {:?} to number", inp);
         }
