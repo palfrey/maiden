@@ -104,6 +104,9 @@ fn run_mathbinop(
                     }
                     _ => {}
                 },
+                Expression::Null => {
+                    return Ok(Expression::Floating(f(first_value, 0f64)));
+                }
                 _ => {}
             };
         }
@@ -137,6 +140,12 @@ fn run_mathbinop(
                     let second_value = *i;
                     return Ok(Expression::Floating(f(0f64, second_value)));
                 }
+                Expression::String(ref s_s) => match op {
+                    Expression::Add(_, _) => {
+                        return Ok(Expression::String(format!("null{}", s_s)));
+                    }
+                    _ => {}
+                },
                 _ => {}
             };
         }
