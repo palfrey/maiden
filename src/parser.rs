@@ -454,9 +454,11 @@ fn compact_words(line: Vec<Token>) -> Vec<Token> {
 fn parse_words(words: &[String]) -> usize {
     let mut number = 0;
     for word in words {
-        number *= 10;
-        let len = word.replace("'", "").len() % 10;
-        number += len;
+        let len = word.chars().filter(|c| char::is_alphabetic(*c)).count();
+        if len > 0 {
+            number *= 10;
+            number += len % 10;
+        }
     }
     return number;
 }
@@ -478,7 +480,7 @@ fn evaluate(value: &SymbolType, line: u32) -> Result<Expression> {
                 let second = parse_words(&after) as f64;
                 let divisor = 10f64.powf(second.log10().ceil());
                 debug!("first: {}, second: {}, divisor: {}", first, second, divisor);
-                (first - 1f64) + (second / divisor)
+                first + (second / divisor)
             } else {
                 parse_words(&words) as f64
             };
