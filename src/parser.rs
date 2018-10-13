@@ -290,6 +290,7 @@ named!(poetic_number_literal_core<Span, (u32, String, Vec<Span>)>,
         ) >>
         position: position!() >>
         peek!(not!(tuple!(take_while1!(is_space), literal_word))) >> // number literals cannot start with a literal word
+        peek!(tuple!(take_while1!(is_space), take_while1!(word_character))) >> // make sure it starts with a word character
         words: many1!(
             do_parse!(
                 take_while1!(is_literal_spacing_character) >>
