@@ -33,7 +33,7 @@ fn string_character(chr: char) -> bool {
 }
 
 fn variable_character(chr: char) -> bool {
-    (chr >= 'A' && chr <= 'Z') || (chr >= 'a' && chr <= 'z')
+    chr.is_alphabetic()
 }
 
 fn word_character(chr: char) -> bool {
@@ -47,7 +47,7 @@ fn is_digit(chr: char) -> bool {
 named!(title_case<Span, String>,
     do_parse!(
         not!(keyword) >> // to shortcut the "Until Counter" case
-        first: take_while_m_n!(1, 1, char::is_uppercase) >>
+        first: verify!(take!(1), |val: Span| val.fragment.chars().all(|c| c.is_uppercase())) >>
         rest: take_while!(variable_character) >>
         (format!("{}{}", first.fragment, rest.fragment))
     ));
