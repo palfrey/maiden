@@ -161,37 +161,20 @@ named!(compare(Span) -> SymbolType,
     )
 );
 
-named!(expression(Span) -> SymbolType,
+named!(pronoun(Span) -> SymbolType,
+    value!(SymbolType::Pronoun,
+        alt_complete!(
+            tag_no_case!("it") |
+            tag_no_case!("he") | tag_no_case!("she") | tag_no_case!("him") | tag_no_case!("her") | tag_no_case!("they") | tag_no_case!("them") | 
+            tag_no_case!("ze") | tag_no_case!("hir") | tag_no_case!("zie") | tag_no_case!("zir") | tag_no_case!("xe") | tag_no_case!("xem") | 
+            tag_no_case!("ve") | tag_no_case!("ver")
+        )
+    )
+);
+
+named!(literal(Span) -> SymbolType,
     alt_complete!(
-        do_parse!(
-            target: variable >>
-            take_while1!(is_space) >>
-            tag_no_case!("taking") >>
-            (target)
-        ) => {|name| SymbolType::Taking{target: name}} |
-        do_parse!(
-            tag!("is") >> 
-            take_while1!(is_space) >>
-            comp: compare >>
-            (comp)
-        ) => {|s| s} |
-        alt_complete!(
-            tag!("is") | tag!("was") | tag!("are") | tag!("were")
-        ) => {|_| SymbolType::Is} |
-        tag_no_case!("and") => {|_| SymbolType::And} |
-        tag_no_case!("or") => {|_| SymbolType::Or} |
-        tag_no_case!("nor") => {|_| SymbolType::Nor} |
-        tag_no_case!("takes") => {|_| SymbolType::Takes} |
-        alt_complete!(
-            tag_no_case!("without") | tag_no_case!("minus")
-        ) => {|_| SymbolType::Subtract} |
-        alt_complete!(
-            tag_no_case!("with") | tag_no_case!("plus")
-        ) => {|_| SymbolType::Add} |
-        alt_complete!(
-            tag_no_case!("times") | tag_no_case!("of")
-        ) => {|_| SymbolType::Times } |
-        tag_no_case!("over") => {|_| SymbolType::Divide} |
+        tag_no_case!("mysterious") => {|_| SymbolType::Mysterious} |
         null => {|_| SymbolType::Null} |
         alt_complete!(
             tag_no_case!("true") |
@@ -199,20 +182,12 @@ named!(expression(Span) -> SymbolType,
             tag_no_case!("yes") |
             tag_no_case!("ok")
         ) => {|_| SymbolType::True} |
-        tag_no_case!("not") => {|_| SymbolType::Not} |
         alt_complete!(
             tag_no_case!("false") |
             tag_no_case!("lies") |
             tag_no_case!("wrong") |
             tag_no_case!("no")
         ) => {|_| SymbolType::False} |
-        tag_no_case!("mysterious") => {|_| SymbolType::Mysterious} |
-        alt_complete!(
-            tag_no_case!("it") | 
-            tag_no_case!("he") | tag_no_case!("she") | tag_no_case!("him") | tag_no_case!("her") | tag_no_case!("they") | tag_no_case!("them") | 
-            tag_no_case!("ze") | tag_no_case!("hir") | tag_no_case!("zie") | tag_no_case!("zir") | tag_no_case!("xe") | tag_no_case!("xem") | 
-            tag_no_case!("ve") | tag_no_case!("ver")
-        ) => {|_| SymbolType::Pronoun} |
         do_parse!(
             minus: opt!(tag!("-")) >>
             before: take_while!(is_digit) >>
@@ -240,7 +215,65 @@ named!(expression(Span) -> SymbolType,
             phrase: take_while!(string_character) >>
             tag!("\"") >>
             (phrase)
-        ) => {|p: Span| SymbolType::String(p.to_string())} |
+        ) => {|p: Span| SymbolType::String(p.to_string())}
+    )
+);
+
+named!(value_provider(Span) -> SymbolType,
+    alt!(
+        literal => {|s| s} |
+        variable => {|s| SymbolType::Variable(s)}
+    )
+);
+
+named!(expression(Span) -> SymbolType,
+    alt_complete!(
+        do_parse!(
+            target: variable >>
+            take_while1!(is_space) >>
+            tag_no_case!("taking") >>
+            take_while1!(is_space) >>
+            first: value_provider >>
+            rest: many0!(do_parse!(
+                alt!(
+                    tag!(",") => {|_|()} |
+                    tuple!(take_while1!(is_space), tag!("and")) => {|_|()}
+                ) >>
+                take_while1!(is_space) >>
+                value: value_provider >>
+                (value)
+            )) >>
+            (target, first, rest)
+        ) => {|(name, first, mut rest): (String, SymbolType, Vec<SymbolType>)| {
+            rest.insert(0, first);
+            SymbolType::Taking{target: name, args: rest}
+        }} |
+        do_parse!(
+            tag!("is") >>
+            take_while1!(is_space) >>
+            comp: compare >>
+            (comp)
+        ) => {|s| s} |
+        alt_complete!(
+            tag!("is") | tag!("was") | tag!("are") | tag!("were")
+        ) => {|_| SymbolType::Is} |
+        tag_no_case!("and") => {|_| SymbolType::And} |
+        tag_no_case!("or") => {|_| SymbolType::Or} |
+        tag_no_case!("nor") => {|_| SymbolType::Nor} |
+        tag_no_case!("takes") => {|_| SymbolType::Takes} |
+        alt_complete!(
+            tag_no_case!("without") | tag_no_case!("minus")
+        ) => {|_| SymbolType::Subtract} |
+        alt_complete!(
+            tag_no_case!("with") | tag_no_case!("plus")
+        ) => {|_| SymbolType::Add} |
+        alt_complete!(
+            tag_no_case!("times") | tag_no_case!("of")
+        ) => {|_| SymbolType::Times } |
+        tag_no_case!("over") => {|_| SymbolType::Divide} |
+        pronoun => {|s| s} |
+        literal => {|s| s} |
+        tag_no_case!("not") => {|_| SymbolType::Not} |
         do_parse!(
             tag!("(") >>
             take_until!(")") >>
@@ -254,10 +287,34 @@ named!(statement(Span) -> SymbolType,
     do_parse!(
         val: alt_complete!(
             tag_no_case!("if") => {|_| SymbolType::If} |
-            tag_no_case!("build") => {|_| SymbolType::Build} |
-            tag_no_case!("up") => {|_| SymbolType::Up} |
-            tag_no_case!("knock") => {|_| SymbolType::Knock} |
-            tag_no_case!("down") => {|_| SymbolType::Down} |
+            do_parse!(
+                tag_no_case!("build") >>
+                take_while1!(is_space) >>
+                target: variable >>
+                take_while1!(is_space) >>
+                tag_no_case!("up") >>
+                rest: many0!(do_parse!(
+                    opt!(tag!(",")) >>
+                    take_while1!(is_space) >>
+                    tag_no_case!("up") >>
+                    (())
+                )) >>
+                (target, rest.len())
+            ) => {|(target, rest)| SymbolType::Build { target, count: rest + 1}} |
+            do_parse!(
+                tag_no_case!("knock") >>
+                take_while1!(is_space) >>
+                target: variable >>
+                take_while1!(is_space) >>
+                tag_no_case!("down") >>
+                rest: many0!(do_parse!(
+                    opt!(tag!(",")) >>
+                    take_while1!(is_space) >>
+                    tag_no_case!("down") >>
+                    (())
+                )) >>
+                (target, rest.len())
+            ) => {|(target, rest)| SymbolType::Knock { target, count: rest + 1}} |
             tag_no_case!("ain't") => {|_| SymbolType::Aint} |
             alt_complete!(
                 tag_no_case!("say") | tag_no_case!("shout") | tag_no_case!("whisper") | tag_no_case!("scream")
@@ -279,7 +336,7 @@ named!(statement(Span) -> SymbolType,
             tag_no_case!("break it down") => {|_| SymbolType::Break} |
             tag_no_case!("break") => {|_| SymbolType::Break}
         ) >>
-        peek!(alt!(take_while1!(is_space) | take_while1!(is_newline) | eof!() | tag!(","))) >>
+        peek!(alt!(take_while1!(is_space) | take_while1!(is_newline) | eof!())) >>
         (val)
     )
 );
@@ -296,7 +353,7 @@ named!(word(Span) -> Vec<SymbolType>,
         ) => {|(pv, comp):(String, SymbolType)| vec![SymbolType::Variable(pv), comp]} |
         do_parse!(
             e: expression >>
-            peek!(alt!(take_while1!(is_space) | take_while1!(is_newline) | eof!() | tag!(","))) >>
+            peek!(alt!(take_while1!(is_space) | take_while1!(is_newline) | eof!())) >>
             (e)
         ) => {|e: SymbolType| vec![e]} |
         variable => {|s| vec![SymbolType::Variable(s)] } |
@@ -570,54 +627,6 @@ fn next_operator<'a>(
     }
 }
 
-fn get_function_args(
-    items: &[&SymbolType],
-    mut index: usize,
-    line: u32,
-) -> Result<(Vec<Expression>, usize)> {
-    // Step 1: Find either lower precedence than Taking operator, or end of sequence
-    let compare = SymbolType::Taking {
-        target: "".to_string(),
-    };
-    let mut end_op = next_operator(items, index);
-    loop {
-        if end_op.is_none() || end_op.unwrap().0 < &compare {
-            break;
-        }
-        end_op = next_operator(items, end_op.unwrap().1 + 1);
-    }
-    // Step 2: Chunk up the subsections of the sequence into lists of symbols
-    let end_index = match end_op {
-        Some((_, end_index)) => end_index,
-        None => items.len(),
-    };
-    let mut expression_args = vec![];
-    let mut current_arg: Vec<&SymbolType> = vec![];
-    while index < end_index {
-        match items[index] {
-            SymbolType::Comma => {
-                expression_args.push(current_arg.clone());
-                current_arg.clear();
-            }
-            _ => {
-                current_arg.push(items[index]);
-            }
-        }
-        index += 1
-    }
-    if !current_arg.is_empty() {
-        expression_args.push(current_arg);
-    }
-    // Step 3: Make args into expressions
-    return Ok((
-        expression_args
-            .iter()
-            .map(|arg| parse_expression(arg, line).unwrap())
-            .collect::<Vec<Expression>>(),
-        index - 1,
-    ));
-}
-
 fn symbol_to_expression(
     items: &[&SymbolType],
     index: usize,
@@ -625,10 +634,18 @@ fn symbol_to_expression(
 ) -> Result<(Expression, usize)> {
     let sym = items[index];
     return match *sym {
-        SymbolType::Taking { ref target } => {
-            let (args, index) = get_function_args(items, index + 1, line)?;
-            Ok((Expression::Call(target.clone(), args), index))
-        }
+        SymbolType::Taking {
+            ref target,
+            ref args,
+        } => Ok((
+            Expression::Call(
+                target.clone(),
+                args.iter()
+                    .map(|arg| symbol_to_expression(&vec![arg], 0, line).unwrap().0)
+                    .collect::<Vec<Expression>>(),
+            ),
+            index,
+        )),
         SymbolType::Words(_) => evaluate(sym, line).map(|e| (e, index)),
         SymbolType::Variable(ref name) => Ok((Expression::Variable(name.clone()), index)),
         SymbolType::String(ref phrase) => Ok((Expression::String(phrase.clone()), index)),
@@ -766,44 +783,6 @@ fn build_next(commands: &mut Vec<CommandLine>, loop_starts: &mut Vec<usize>) -> 
         }
     }
     return Command::Next { loop_start };
-}
-
-macro_rules! incdec_command {
-    ($good_symbol:expr, $err:expr, $command:ident, $current_line: expr, $symbols: ident, $commands: ident) => {
-        if let SymbolType::Variable(ref name) = $symbols[1] {
-            let mut rest = $symbols.iter().skip(2);
-            let up = rest.next().unwrap();
-            if *up != $good_symbol {
-                bail!($err($symbols.to_vec(), $current_line));
-            }
-            let mut count = 1f64;
-            loop {
-                let mut next = rest.next();
-                if next.is_none() {
-                    break;
-                }
-                if *next.unwrap() == SymbolType::Comma {
-                    next = rest.next();
-                    if next.is_none() {
-                        bail!($err($symbols.to_vec(), $current_line));
-                    }
-                }
-                if next.is_none() || *next.unwrap() != $good_symbol {
-                    bail!($err($symbols.to_vec(), $current_line));
-                }
-                count += 1f64;
-            }
-            $commands.push(CommandLine {
-                cmd: Command::$command {
-                    target: name.to_string(),
-                    count,
-                },
-                line: $current_line,
-            });
-        } else {
-            bail!($err($symbols.to_vec(), $current_line));
-        }
-    };
 }
 
 #[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
@@ -976,6 +955,45 @@ pub fn parse(input: &str) -> Result<Program> {
                     line: current_line,
                 });
             }
+            [SymbolType::Taking {
+                ref target,
+                ref args,
+            }] => {
+                commands.push(CommandLine {
+                    cmd: Command::Call {
+                        name: target.to_string(),
+                        args: args
+                            .iter()
+                            .map(|arg| symbol_to_expression(&vec![arg], 0, current_line).unwrap().0)
+                            .collect::<Vec<Expression>>(),
+                    },
+                    line: current_line,
+                });
+            }
+            [SymbolType::Build {
+                ref target,
+                ref count,
+            }] => {
+                commands.push(CommandLine {
+                    cmd: Command::Increment {
+                        target: target.to_string(),
+                        count: *count as f64,
+                    },
+                    line: current_line,
+                });
+            }
+            [SymbolType::Knock {
+                ref target,
+                ref count,
+            }] => {
+                commands.push(CommandLine {
+                    cmd: Command::Decrement {
+                        target: target.to_string(),
+                        count: *count as f64,
+                    },
+                    line: current_line,
+                });
+            }
             _ => {
                 // Better done with slice patterns once they stabilise
                 // (see https://github.com/rust-lang/rust/issues/23121)
@@ -1125,43 +1143,6 @@ pub fn parse(input: &str) -> Result<Program> {
                     commands.push(CommandLine {
                         cmd: Command::Return {
                             return_value: expression,
-                        },
-                        line: current_line,
-                    });
-                } else if symbols[0] == SymbolType::Build && symbols.len() > 2 {
-                    incdec_command!(
-                        SymbolType::Up,
-                        ErrorKind::BadIncrement,
-                        Increment,
-                        current_line,
-                        symbols,
-                        commands
-                    );
-                } else if symbols[0] == SymbolType::Knock && symbols.len() > 2 {
-                    incdec_command!(
-                        SymbolType::Down,
-                        ErrorKind::BadDecrement,
-                        Decrement,
-                        current_line,
-                        symbols,
-                        commands
-                    );
-                } else if let SymbolType::Taking { ref target } = symbols[0] {
-                    let (args, index) = get_function_args(
-                        &symbols.iter().collect::<Vec<&SymbolType>>(),
-                        1,
-                        current_line,
-                    )?;
-                    if index != symbols.len() - 1 {
-                        bail!(ErrorKind::UnbalancedExpression(
-                            format!("Bad taking: {} != {}", index, symbols.len()),
-                            current_line
-                        ));
-                    }
-                    commands.push(CommandLine {
-                        cmd: Command::Call {
-                            name: target.to_string(),
-                            args,
                         },
                         line: current_line,
                     });
@@ -1318,17 +1299,11 @@ mod tests {
             "If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing",
             vec![
                 SymbolType::If,
-                SymbolType::Taking{target:"Midnight".to_string()},
-                SymbolType::Variable("my world".to_string()),
-                SymbolType::Comma,
-                SymbolType::Variable("Fire".to_string()),
+                SymbolType::Taking{target:"Midnight".to_string(), args: vec![SymbolType::Variable("my world".to_string()), SymbolType::Variable("Fire".to_string())]},
                 SymbolType::Is,
                 SymbolType::Null,
                 SymbolType::And,
-                SymbolType::Taking{target:"Midnight".to_string()},
-                SymbolType::Variable("my world".to_string()),
-                SymbolType::Comma,
-                SymbolType::Variable("Hate".to_string()),
+                SymbolType::Taking{target:"Midnight".to_string(), args: vec![SymbolType::Variable("my world".to_string()), SymbolType::Variable("Hate".to_string())]},
                 SymbolType::Is,
                 SymbolType::Null,
             ],
@@ -1484,18 +1459,21 @@ mod tests {
     fn everyone_taking_the_bait() {
         pretty_env_logger::try_init().unwrap_or(());
         let commands = vec![CommandLine {
-            cmd: Command::Call {
-                name: "Everyone".to_string(),
-                args: vec![Expression::Subtract(
-                    Box::new(Expression::Variable("the bait".to_string())),
+            cmd: Command::Assignment {
+                target: "Foo".to_string(),
+                value: Expression::Subtract(
+                    Box::new(Expression::Call(
+                        "Everyone".to_string(),
+                        vec![Expression::Variable("the bait".to_string())],
+                    )),
                     Box::new(Expression::Floating(1f64)),
-                )],
+                ),
             },
             line: 1,
         }];
         let functions = HashMap::new();
         assert_eq!(
-            parse("Everyone taking the bait without 1").unwrap(),
+            parse("Put Everyone taking the bait without 1 into Foo").unwrap(),
             Program {
                 commands,
                 functions
