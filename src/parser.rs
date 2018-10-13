@@ -120,17 +120,9 @@ named!(literal_word<Span, Span>,
     )
 );
 
-named!(expression(Span) -> SymbolType,
+named!(compare(Span) -> SymbolType,
     alt_complete!(
         do_parse!(
-            target: variable >>
-            take_while1!(is_space) >>
-            tag_no_case!("taking") >>
-            (target)
-        ) => {|name| SymbolType::Taking{target: name}} |
-        do_parse!(
-            tag_no_case!("is") >>
-            take_while1!(is_space) >>
             tag_no_case!("as") >>
             take_while1!(is_space) >>
             alt_complete!(
@@ -141,8 +133,6 @@ named!(expression(Span) -> SymbolType,
             (())
         ) => {|_| SymbolType::GreaterThanOrEqual} |
         do_parse!(
-            tag_no_case!("is") >>
-            take_while1!(is_space) >>
             alt_complete!(
                 tag_no_case!("less") | tag_no_case!("weaker") | tag_no_case!("lower") | tag_no_case!("smaller")
             ) >>
@@ -151,8 +141,6 @@ named!(expression(Span) -> SymbolType,
             (())
         ) => {|_| SymbolType::LessThan} |
         do_parse!(
-            tag_no_case!("is") >>
-            take_while1!(is_space) >>
             tag_no_case!("as") >>
             take_while1!(is_space) >>
             alt_complete!(
@@ -163,15 +151,30 @@ named!(expression(Span) -> SymbolType,
             (())
         ) => {|_| SymbolType::LessThanOrEqual} |
         do_parse!(
-            tag_no_case!("is") >>
-            take_while1!(is_space) >>
             alt_complete!(
                 tag_no_case!("higher") | tag_no_case!("stronger") | tag_no_case!("bigger") | tag_no_case!("greater")
             ) >>
             take_while1!(is_space) >>
             tag_no_case!("than") >>
             (())
-        ) => {|_| SymbolType::GreaterThan} |
+        ) => {|_| SymbolType::GreaterThan}
+    )
+);
+
+named!(expression(Span) -> SymbolType,
+    alt_complete!(
+        do_parse!(
+            target: variable >>
+            take_while1!(is_space) >>
+            tag_no_case!("taking") >>
+            (target)
+        ) => {|name| SymbolType::Taking{target: name}} |
+        do_parse!(
+            tag!("is") >> 
+            take_while1!(is_space) >>
+            comp: compare >>
+            (comp)
+        ) => {|s| s} |
         alt_complete!(
             tag!("is") | tag!("was") | tag!("are") | tag!("were")
         ) => {|_| SymbolType::Is} |
@@ -281,17 +284,25 @@ named!(statement(Span) -> SymbolType,
     )
 );
 
-named!(word(Span) -> SymbolType,
+named!(word(Span) -> Vec<SymbolType>,
     alt_complete!(
-        statement => {|s| s} |
+        statement => {|s: SymbolType| vec![s]} |
+        do_parse!(
+            pv: variable >>
+            tag!("'s") >>
+            take_while1!(is_space) >>
+            comp: compare >>
+            (pv, comp)
+        ) => {|(pv, comp):(String, SymbolType)| vec![SymbolType::Variable(pv), comp]} |
         do_parse!(
             e: expression >>
             peek!(alt!(take_while1!(is_space) | take_while1!(is_newline) | eof!() | tag!(","))) >>
             (e)
-        ) => {|e| e} |
-        variable => {|s| SymbolType::Variable(s) } |
-        take_while1!(word_character) => {|word: Span| SymbolType::Words(vec![word.to_string()])}
-    ));
+        ) => {|e: SymbolType| vec![e]} |
+        variable => {|s| vec![SymbolType::Variable(s)] } |
+        take_while1!(word_character) => {|word: Span| vec![SymbolType::Words(vec![word.to_string()])]}
+    )
+);
 
 named!(poetic_number_literal_core<Span, (u32, String, Vec<Span>)>,
     do_parse!(
@@ -318,15 +329,15 @@ named!(poetic_number_literal_core<Span, (u32, String, Vec<Span>)>,
     )
 );
 
-fn poetic_number_literal(input: Span) -> nom::IResult<Span, Vec<Token>> {
+fn poetic_number_literal(input: Span) -> nom::IResult<Span, (u32, Vec<SymbolType>)> {
     let (rest, (line, target, words)) = poetic_number_literal_core(input)?;
     let literal = SymbolType::Words(words.iter().map(|s| s.to_string()).collect());
     return Ok((
         rest,
-        vec![SymbolType::Variable(target), SymbolType::Is, literal]
-            .into_iter()
-            .map(|x| Token { line, symbol: x })
-            .collect(),
+        (
+            line,
+            vec![SymbolType::Variable(target), SymbolType::Is, literal],
+        ),
     ));
 }
 
@@ -342,19 +353,19 @@ named!(poetic_string_literal_core<Span, (u32, String, Span)>,
     )
 );
 
-fn poetic_string_literal(input: Span) -> nom::IResult<Span, Vec<Token>> {
+fn poetic_string_literal(input: Span) -> nom::IResult<Span, (u32, Vec<SymbolType>)> {
     let (rest, (line, target, words)) = poetic_string_literal_core(input)?;
     let literal = SymbolType::String(words.to_string());
     return Ok((
         rest,
-        vec![SymbolType::Variable(target), SymbolType::Is, literal]
-            .into_iter()
-            .map(|x| Token { line, symbol: x })
-            .collect(),
+        (
+            line,
+            vec![SymbolType::Variable(target), SymbolType::Is, literal],
+        ),
     ));
 }
 
-named!(pub line<Span, Vec<Token>>, alt_complete!(
+named!(pub line_core<Span, (u32, Vec<Vec<SymbolType>>)>, alt_complete!(
     do_parse!(
         position: position!() >>
         variable: variable >>
@@ -367,31 +378,42 @@ named!(pub line<Span, Vec<Token>>, alt_complete!(
             tag_no_case!("mysterious") => {|_| SymbolType::Mysterious }
         ) >>
         (position, variable, kind)
-    ) => {|(p,v,k): (Span, String, SymbolType)| vec![
-            Token{line: p.line, symbol: SymbolType::Variable(v)},
-            Token{line: p.line, symbol: SymbolType::Is},
-            Token{line: p.line, symbol: k}
-    ]} |
-    poetic_number_literal => {|s| s } |
-    poetic_string_literal => {|s| s } |
+    ) => {|(p,v,k): (Span, String, SymbolType)|
+        (p.line, vec![vec![
+            SymbolType::Variable(v),
+            SymbolType::Is,
+            k]])} |
+    poetic_number_literal => {|(line, s)| (line, vec![s]) } |
+    poetic_string_literal => {|(line, s)| (line, vec![s]) } |
     do_parse!(
         position: position!() >>
-        first_word: word >>
+        first_words: word >>
         other_words: many0!(
             alt_complete!(
-                tag!(",") => {|_| Token{line: position.line, symbol: SymbolType::Comma}} |
+                tag!(",") => {|_| vec![SymbolType::Comma]}|
                 do_parse!(
                     take_while1!(is_space) >>
-                    word: word >>
-                    (Token{line: position.line, symbol: word})
+                    words: word >>
+                    (words)
                 ) => {|t| t}
         )) >>
-        (Token{line: position.line, symbol: first_word}, other_words)
-    ) => {|(first, mut other):(Token, Vec<Token>)| {
+        (position, first_words, other_words)
+    ) => {|(pos, first, mut other):(Span, Vec<SymbolType>, Vec<Vec<SymbolType>>)| {
         other.insert(0, first);
-        other
+        (pos.line, other)
          }}
 ));
+
+fn line(input: Span) -> nom::IResult<Span, Vec<Token>> {
+    let (rest, (line, words)) = line_core(input)?;
+    let mut res = vec![];
+    for wordset in words {
+        for word in wordset {
+            res.push(Token { line, symbol: word });
+        }
+    }
+    return Ok((rest, res));
+}
 
 named!(blank_line<Span, Vec<Token>>,
     do_parse!(
