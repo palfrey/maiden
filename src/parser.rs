@@ -105,7 +105,9 @@ named!(keyword<Span, Span>, // single-words only
 
 named!(literal_word<Span, Span>,
     alt_complete!(
-        tag_no_case!("nothing")
+        tag_no_case!("nothing") |
+        tag_no_case!("null") |
+        tag_no_case!("gone")
     )
 );
 
@@ -179,8 +181,14 @@ named!(expression(Span) -> SymbolType,
         ) => {|_| SymbolType::Times } |
         tag_no_case!("over") => {|_| SymbolType::Divide} |
         tag_no_case!("true") => {|_| SymbolType::True} |
-        tag_no_case!("false") => {|_| SymbolType::False} |
+        alt_complete!(
+            tag_no_case!("false") | tag_no_case!("lies")
+        ) => {|_| SymbolType::False} |
+        alt_complete!(
+            tag_no_case!("null") | tag_no_case!("nothing") | tag_no_case!("gone")
+        ) => {|_| SymbolType::Null} |
         tag_no_case!("not") => {|_| SymbolType::Not} |
+        tag_no_case!("mysterious") => {|_| SymbolType::Mysterious} |
         alt_complete!(
             tag_no_case!("it") | 
             tag_no_case!("he") | tag_no_case!("she") | tag_no_case!("him") | tag_no_case!("her") | tag_no_case!("they") | tag_no_case!("them") | 
@@ -262,7 +270,7 @@ named!(word(Span) -> SymbolType,
         statement => {|s| s} |
         do_parse!(
             e: expression >>
-            peek!(alt!(tag!(" ") | tag!(",") | eof!() | tag!("\n") | tag!("\r"))) >>
+            peek!(alt!(take_while1!(is_space) | take_while1!(is_newline) | eof!() | tag!(","))) >>
             (e)
         ) => {|e| e} |
         variable => {|s| SymbolType::Variable(s) } |
@@ -337,10 +345,9 @@ named!(pub line<Span, Vec<Token>>, alt_complete!(
         tag!("is") >>
         take_while1!(is_space) >>
         kind: alt!(
-            alt!(tag!("true") | tag!("yes")) => {|_| SymbolType::True } |
-            alt!(tag!("false") | tag!("lies")) => {|_| SymbolType::False } |
-            tag!("mysterious") => {|_| SymbolType::Mysterious } |
-            alt!(tag!("null") | tag!("gone")) => {|_| SymbolType::Null }
+            alt!(tag_no_case!("true") | tag_no_case!("yes")) => {|_| SymbolType::True } |
+            alt!(tag_no_case!("false") | tag_no_case!("lies")) => {|_| SymbolType::False } |
+            tag_no_case!("mysterious") => {|_| SymbolType::Mysterious }
         ) >>
         (position, variable, kind)
     ) => {|(p,v,k): (Span, String, SymbolType)| vec![
@@ -458,9 +465,6 @@ fn evaluate(value: &SymbolType, line: u32) -> Result<Expression> {
     match value {
         SymbolType::Words(words) => {
             if words.len() == 1 {
-                if words[0] == "nothing" {
-                    return Ok(Expression::Floating(0f64));
-                }
                 let as_float = words[0].parse::<f64>();
                 if let Ok(float) = as_float {
                     return Ok(Expression::Floating(float));
@@ -1193,10 +1197,6 @@ mod tests {
             ).unwrap(),
             Expression::Floating(100f64)
         );
-        assert_eq!(
-            evaluate(&SymbolType::Words(vec!["nothing".to_string()]), 0).unwrap(),
-            Expression::Floating(0f64)
-        );
     }
 
     #[test]
@@ -1211,7 +1211,7 @@ mod tests {
                         Expression::Variable("Fire".to_string()),
                     ],
                 )),
-                Box::new(Expression::Floating(0f64)),
+                Box::new(Expression::Null),
             )),
             Box::new(Expression::Is(
                 Box::new(Expression::Call(
@@ -1221,7 +1221,7 @@ mod tests {
                         Expression::Variable("Hate".to_string()),
                     ],
                 )),
-                Box::new(Expression::Floating(0f64)),
+                Box::new(Expression::Null),
             )),
         );
         let commands = vec![CommandLine {
@@ -1243,7 +1243,7 @@ mod tests {
     fn lines_tokens_check(input: &str, tokens: Vec<SymbolType>) {
         pretty_env_logger::try_init().unwrap_or(());
         let mut raw_lines = lines(input).unwrap();
-        assert_eq!(raw_lines.0.fragment, CompleteStr(""));
+        assert_eq!(raw_lines.0.fragment, CompleteStr(""), "{:?}", raw_lines);
         assert_eq!(raw_lines.1.len(), 1, "{:?}", raw_lines.1);
         assert_eq!(
             raw_lines
@@ -1267,14 +1267,14 @@ mod tests {
                 SymbolType::Comma,
                 SymbolType::Variable("Fire".to_string()),
                 SymbolType::Is,
-                SymbolType::Words(vec!["nothing".to_string()]),
+                SymbolType::Null,
                 SymbolType::And,
                 SymbolType::Taking{target:"Midnight".to_string()},
                 SymbolType::Variable("my world".to_string()),
                 SymbolType::Comma,
                 SymbolType::Variable("Hate".to_string()),
                 SymbolType::Is,
-                SymbolType::Words(vec!["nothing".to_string()]),
+                SymbolType::Null,
             ],
         );
     }
@@ -1363,7 +1363,7 @@ mod tests {
             vec![
                 SymbolType::Variable("My world".to_string()),
                 SymbolType::Is,
-                SymbolType::Words(vec!["nothing".to_string()]),
+                SymbolType::Null,
                 SymbolType::Subtract,
                 SymbolType::Variable("your love".to_string()),
             ],
@@ -1395,7 +1395,7 @@ mod tests {
             vec![
                 SymbolType::Variable("TrueFunc".to_string()),
                 SymbolType::Takes,
-                SymbolType::Words(vec!["nothing".to_string()]),
+                SymbolType::Null,
             ],
         );
     }

@@ -26,6 +26,16 @@ fn run_binop(
     }
 }
 
+fn expression_to_number(inp: Expression) -> Expression {
+    return match inp {
+        Expression::Floating(_) => inp,
+        Expression::Null => Expression::Floating(0.0),
+        _ => {
+            panic!("Can't convert {:?} to number", inp);
+        }
+    };
+}
+
 fn run_binop_shortcut(
     state: &mut State,
     program: &Program,
@@ -41,7 +51,30 @@ fn run_binop_shortcut(
     }
     let res_second = run_expression(state, program, second.deref())?;
     debug!("first: {:?} second: {:?}", res_first, res_second);
-    return Ok(f(state, &res_first, &res_second)?);
+
+    // Check for same types comparison first
+    match res_first {
+        Expression::True | Expression::False => match res_second {
+            Expression::True | Expression::False => {
+                return Ok(f(state, &res_first, &res_second)?);
+            }
+            _ => {}
+        },
+        Expression::String(_) => match res_second {
+            Expression::String(_) => {
+                return Ok(f(state, &res_first, &res_second)?);
+            }
+            _ => {}
+        },
+        _ => {}
+    }
+
+    // Try numeric conversion instead
+    return Ok(f(
+        state,
+        &expression_to_number(res_first),
+        &expression_to_number(res_second),
+    )?);
 }
 
 fn run_mathbinop(
@@ -49,30 +82,82 @@ fn run_mathbinop(
     program: &Program,
     first: &Expression,
     second: &Expression,
+    op: &Expression,
     f: fn(f64, f64) -> f64,
 ) -> Result<Expression> {
     let res_first = run_expression(state, program, first.deref())?;
     let res_second = run_expression(state, program, second.deref())?;
-    debug!("first: {:?} second: {:?}", res_first, res_second);
-    let first_value: f64 = match res_first {
-        Expression::Floating(ref i) => *i,
+    match res_first {
+        Expression::Floating(ref i) => {
+            let first_value = *i;
+            match res_second {
+                Expression::Floating(ref i) => {
+                    let second_value = *i;
+                    return Ok(Expression::Floating(f(first_value, second_value)));
+                }
+                Expression::String(ref s_s) => match op {
+                    Expression::Add(_, _) => {
+                        return Ok(Expression::String(format!("{}{}", first_value, s_s)));
+                    }
+                    Expression::Times(_, _) => {
+                        return Ok(Expression::String(s_s.repeat(first_value as usize)));
+                    }
+                    _ => {}
+                },
+                _ => {}
+            };
+        }
+        Expression::String(ref s_f) => match op {
+            Expression::Add(_, _) => match res_second {
+                Expression::String(ref s_s) => {
+                    return Ok(Expression::String(s_f.clone() + s_s));
+                }
+                _ => {
+                    let printed_second = get_printable(&res_second, state);
+                    if let Ok(p_s) = printed_second {
+                        return Ok(Expression::String(format!("{}{}", s_f, p_s)));
+                    }
+                }
+            },
+            Expression::Times(_, _) => match res_second {
+                Expression::Floating(ref i) => {
+                    let second_value = *i;
+                    return Ok(Expression::String(s_f.repeat(second_value as usize)));
+                }
+                Expression::Null => {
+                    return Ok(Expression::String("".to_string()));
+                }
+                _ => {}
+            },
+            _ => {}
+        },
+        Expression::Null => {
+            match res_second {
+                Expression::Floating(ref i) => {
+                    let second_value = *i;
+                    return Ok(Expression::Floating(f(0f64, second_value)));
+                }
+                _ => {}
+            };
+        }
         _ => {
-            bail!(ErrorKind::Unimplemented(
-                format!("Math op on non-number: {:?} {:?}", res_first, res_second),
-                state.current_line
-            ));
+            if let Expression::Add(_, _) = op {
+                match res_second {
+                    Expression::String(ref s_s) => {
+                        let printed_first = get_printable(&res_first, state);
+                        if let Ok(p_f) = printed_first {
+                            return Ok(Expression::String(format!("{}{}", p_f, s_s)));
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
     };
-    let second_value: f64 = match res_second {
-        Expression::Floating(ref i) => *i,
-        _ => {
-            bail!(ErrorKind::Unimplemented(
-                format!("Math op on non-number: {:?} {:?}", res_first, res_second),
-                state.current_line
-            ));
-        }
-    };
-    return Ok(Expression::Floating(f(first_value, second_value)));
+    bail!(ErrorKind::Unimplemented(
+        format!("Math op ({:?}) on values we can't apply", op),
+        state.current_line
+    ));
 }
 
 fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
@@ -223,16 +308,16 @@ fn run_expression(
             return run_binop(state, program, first, second, |_, f, s| Ok(f < s));
         }
         Expression::Subtract(ref first, ref second) => {
-            return run_mathbinop(state, program, first, second, |f, s| f - s);
+            return run_mathbinop(state, program, first, second, expression, |f, s| f - s);
         }
         Expression::Add(ref first, ref second) => {
-            return run_mathbinop(state, program, first, second, |f, s| f + s);
+            return run_mathbinop(state, program, first, second, expression, |f, s| f + s);
         }
         Expression::Times(ref first, ref second) => {
-            return run_mathbinop(state, program, first, second, |f, s| f * s);
+            return run_mathbinop(state, program, first, second, expression, |f, s| f * s);
         }
         Expression::Divide(ref first, ref second) => {
-            return run_mathbinop(state, program, first, second, |f, s| f / s);
+            return run_mathbinop(state, program, first, second, expression, |f, s| f / s);
         }
         Expression::Variable(ref name) => match state.variables.get(&name.to_lowercase()) {
             Some(exp) => {
@@ -324,6 +409,11 @@ fn alter_variable(state: &mut State, target: &str, f: &Fn(f64) -> f64) -> Result
             state
                 .variables
                 .insert(target.to_lowercase(), Expression::Floating(f(x)));
+        }
+        Expression::Null => {
+            state
+                .variables
+                .insert(target.to_lowercase(), Expression::Floating(f(0f64)));
         }
         _ => {
             bail!(ErrorKind::Unimplemented(
