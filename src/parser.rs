@@ -103,11 +103,20 @@ named!(keyword<Span, Span>, // single-words only
     )
 );
 
-named!(literal_word<Span, Span>,
+named!(null<Span, Span>,
     alt_complete!(
         tag_no_case!("nothing") |
         tag_no_case!("null") |
-        tag_no_case!("gone")
+        tag_no_case!("gone") |
+        tag_no_case!("nobody") |
+        tag_no_case!("nowhere") |
+        tag_no_case!("empty")
+    )
+);
+
+named!(literal_word<Span, Span>,
+    alt_complete!(
+        null
     )
 );
 
@@ -180,14 +189,20 @@ named!(expression(Span) -> SymbolType,
             tag_no_case!("times") | tag_no_case!("of")
         ) => {|_| SymbolType::Times } |
         tag_no_case!("over") => {|_| SymbolType::Divide} |
-        tag_no_case!("true") => {|_| SymbolType::True} |
+        null => {|_| SymbolType::Null} |
         alt_complete!(
-            tag_no_case!("false") | tag_no_case!("lies")
-        ) => {|_| SymbolType::False} |
-        alt_complete!(
-            tag_no_case!("null") | tag_no_case!("nothing") | tag_no_case!("gone")
-        ) => {|_| SymbolType::Null} |
+            tag_no_case!("true") |
+            tag_no_case!("right") |
+            tag_no_case!("yes") |
+            tag_no_case!("ok")
+        ) => {|_| SymbolType::True} |
         tag_no_case!("not") => {|_| SymbolType::Not} |
+        alt_complete!(
+            tag_no_case!("false") |
+            tag_no_case!("lies") |
+            tag_no_case!("wrong") |
+            tag_no_case!("no")
+        ) => {|_| SymbolType::False} |
         tag_no_case!("mysterious") => {|_| SymbolType::Mysterious} |
         alt_complete!(
             tag_no_case!("it") | 
