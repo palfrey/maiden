@@ -226,7 +226,7 @@ named!(value_provider(Span) -> SymbolType,
     )
 );
 
-named!(expression(Span) -> SymbolType,
+named!(function_call_expr(Span) -> SymbolType,
     alt_complete!(
         do_parse!(
             target: variable >>
@@ -248,6 +248,25 @@ named!(expression(Span) -> SymbolType,
             rest.insert(0, first);
             SymbolType::Taking{target: name, args: rest}
         }} |
+        value_provider => {|s| s}
+    )
+);
+
+named!(not_expr(Span) -> SymbolType,
+    alt_complete!(
+        do_parse!(
+            tag_no_case!("not") >>
+            take_while1!(is_space) >>
+            func: not_expr >>
+            (func)
+        ) => {|f| SymbolType::Not(Box::new(f))} |
+        function_call_expr => {|s| s}
+    )
+);
+
+named!(expression(Span) -> SymbolType,
+    alt_complete!(
+        not_expr => {|s| s} |
         do_parse!(
             tag!("is") >>
             take_while1!(is_space) >>
@@ -272,8 +291,6 @@ named!(expression(Span) -> SymbolType,
         ) => {|_| SymbolType::Times } |
         tag_no_case!("over") => {|_| SymbolType::Divide} |
         pronoun => {|s| s} |
-        literal => {|s| s} |
-        tag_no_case!("not") => {|_| SymbolType::Not} |
         do_parse!(
             tag!("(") >>
             take_until!(")") >>
@@ -315,7 +332,9 @@ named!(statement(Span) -> SymbolType,
                 )) >>
                 (target, rest.len())
             ) => {|(target, rest)| SymbolType::Knock { target, count: rest + 1}} |
-            tag_no_case!("ain't") => {|_| SymbolType::Aint} |
+            alt_complete!(
+                tag_no_case!("ain't") | tag_no_case!("aint")
+            ) => {|_| SymbolType::Aint} |
             alt_complete!(
                 tag_no_case!("say") | tag_no_case!("shout") | tag_no_case!("whisper") | tag_no_case!("scream")
             ) => {|_| SymbolType::Say} |
@@ -627,45 +646,40 @@ fn next_operator<'a>(
     }
 }
 
-fn symbol_to_expression(
-    items: &[&SymbolType],
-    index: usize,
-    line: u32,
-) -> Result<(Expression, usize)> {
-    let sym = items[index];
+fn single_symbol_to_expression(sym: &SymbolType, line: u32) -> Result<Expression> {
     return match *sym {
         SymbolType::Taking {
             ref target,
             ref args,
-        } => Ok((
-            Expression::Call(
-                target.clone(),
-                args.iter()
-                    .map(|arg| symbol_to_expression(&vec![arg], 0, line).unwrap().0)
-                    .collect::<Vec<Expression>>(),
-            ),
-            index,
+        } => Ok(Expression::Call(
+            target.clone(),
+            args.iter()
+                .map(|arg| single_symbol_to_expression(arg, line).unwrap())
+                .collect::<Vec<Expression>>(),
         )),
-        SymbolType::Words(_) => evaluate(sym, line).map(|e| (e, index)),
-        SymbolType::Variable(ref name) => Ok((Expression::Variable(name.clone()), index)),
-        SymbolType::String(ref phrase) => Ok((Expression::String(phrase.clone()), index)),
+        SymbolType::Words(_) => evaluate(sym, line),
+        SymbolType::Variable(ref name) => Ok(Expression::Variable(name.clone())),
+        SymbolType::String(ref phrase) => Ok(Expression::String(phrase.clone())),
         SymbolType::Integer(ref val) => {
             return match val.parse::<f64>() {
-                Ok(i) => Ok((Expression::Floating(i), index)),
+                Ok(i) => Ok(Expression::Floating(i)),
                 Err(_) => bail!(ErrorKind::ParseNumberError(val.to_string(), line)),
             };
         }
         SymbolType::Floating(ref val) => {
             return match val.parse::<f64>() {
-                Ok(i) => Ok((Expression::Floating(i), index)),
+                Ok(i) => Ok(Expression::Floating(i)),
                 Err(_) => bail!(ErrorKind::ParseNumberError(val.to_string(), line)),
             };
         }
-        SymbolType::True => Ok((Expression::True, index)),
-        SymbolType::False => Ok((Expression::False, index)),
-        SymbolType::Null => Ok((Expression::Null, index)),
-        SymbolType::Mysterious => Ok((Expression::Mysterious, index)),
-        SymbolType::Pronoun => Ok((Expression::Pronoun, index)),
+        SymbolType::True => Ok(Expression::True),
+        SymbolType::False => Ok(Expression::False),
+        SymbolType::Null => Ok(Expression::Null),
+        SymbolType::Mysterious => Ok(Expression::Mysterious),
+        SymbolType::Pronoun => Ok(Expression::Pronoun),
+        SymbolType::Not(ref arg) => Ok(Expression::Not(Box::new(single_symbol_to_expression(
+            &arg, line,
+        )?))),
         _ => {
             bail!(ErrorKind::Unimplemented(
                 format!("Single symbol to expression: {:?}", sym),
@@ -682,8 +696,8 @@ fn parse_expression(items: &[&SymbolType], line: u32) -> Result<Expression> {
         bail!(ErrorKind::UnbalancedExpression(describe, line));
     }
     debug!("Begin parse: {}", describe);
-    let (lhs, index) = symbol_to_expression(items, 0, line)?;
-    let res = parse_expression_1(&items, index, lhs, &LOWEST_PRECDENCE, line)?;
+    let lhs = single_symbol_to_expression(items[0], line)?;
+    let res = parse_expression_1(&items, 0, lhs, &LOWEST_PRECDENCE, line)?;
     if res.1 != items.len() - 1 {
         bail!(ErrorKind::UnbalancedExpression(describe, line));
     }
@@ -716,9 +730,7 @@ fn parse_expression_1(
                 line
             ));
         }
-        let res = symbol_to_expression(items, index, line)?;
-        let mut rhs = res.0;
-        index = res.1;
+        let mut rhs = single_symbol_to_expression(items[index], line)?;
         lookahead = next_operator(items, index);
         while lookahead.is_some() && lookahead.unwrap().0 > op {
             let l = lookahead.unwrap().1;
@@ -964,7 +976,7 @@ pub fn parse(input: &str) -> Result<Program> {
                         name: target.to_string(),
                         args: args
                             .iter()
-                            .map(|arg| symbol_to_expression(&vec![arg], 0, current_line).unwrap().0)
+                            .map(|arg| single_symbol_to_expression(&arg, current_line).unwrap())
                             .collect::<Vec<Expression>>(),
                     },
                     line: current_line,

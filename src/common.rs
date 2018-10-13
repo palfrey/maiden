@@ -16,6 +16,7 @@ pub enum Expression {
     Null,
     Mysterious,
     Pronoun,
+    Not(Box<Expression>),
 
     // binary operators
     Is(Box<Expression>, Box<Expression>),
@@ -86,7 +87,7 @@ pub enum SymbolType {
     Null,
     Mysterious,
     Pronoun,
-    Not,
+    Not(Box<SymbolType>),
     Break,
 }
 

@@ -367,6 +367,14 @@ fn run_expression(
                 bail!(ErrorKind::UndefinedPronoun(state.current_line));
             }
         },
+        Expression::Not(ref arg) => {
+            let res = run_expression(state, program, arg)?;
+            if to_boolean(state, &res)? {
+                return Ok(Expression::False);
+            } else {
+                return Ok(Expression::True);
+            }
+        }
         _ => Ok(expression.clone()),
     };
 }
