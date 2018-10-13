@@ -405,7 +405,29 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
     }
 }
 
-fn alter_variable(state: &mut State, target: &str, f: &Fn(f64) -> f64) -> Result<()> {
+fn flip_boolean(state: &mut State, target: &str, val: Expression, count: usize) -> Result<()> {
+    if (count & 0x1) == 0 {
+        // double-flips do nothing, so just look at the low bit
+        return Ok(());
+    }
+    match val {
+        Expression::True => state
+            .variables
+            .insert(target.to_lowercase(), Expression::False),
+        Expression::False => state
+            .variables
+            .insert(target.to_lowercase(), Expression::True),
+        _ => {
+            bail!(ErrorKind::Unimplemented(
+                format!("Attempt to flip non-boolean '{}'", target),
+                state.current_line,
+            ));
+        }
+    };
+    return Ok(());
+}
+
+fn alter_variable(state: &mut State, target: &str, f: &Fn(f64) -> f64, count: usize) -> Result<()> {
     let val = {
         let current_line = state.current_line;
         let v = state.variables.get(&target.to_lowercase());
@@ -425,6 +447,9 @@ fn alter_variable(state: &mut State, target: &str, f: &Fn(f64) -> f64) -> Result
             state
                 .variables
                 .insert(target.to_lowercase(), Expression::Floating(f(0f64)));
+        }
+        Expression::False | Expression::True => {
+            return flip_boolean(state, target, val, count);
         }
         _ => {
             bail!(ErrorKind::Unimplemented(
@@ -462,13 +487,13 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 ref target,
                 ref count,
             } => {
-                alter_variable(state, &target, &|x| x + count)?;
+                alter_variable(state, &target, &|x| x + count, *count as usize)?;
             }
             Command::Decrement {
                 ref target,
                 ref count,
             } => {
-                alter_variable(state, &target, &|x| x - count)?;
+                alter_variable(state, &target, &|x| x - count, *count as usize)?;
             }
             Command::Until {
                 ref expression,
