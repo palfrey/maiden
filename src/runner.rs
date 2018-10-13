@@ -150,6 +150,9 @@ fn run_mathbinop(
                     }
                     _ => {}
                 },
+                Expression::Null => {
+                    return Ok(Expression::Floating(f(0f64, 0f64)));
+                }
                 _ => {}
             };
         }
@@ -168,7 +171,10 @@ fn run_mathbinop(
         }
     };
     bail!(ErrorKind::Unimplemented(
-        format!("Math op ({:?}) on values we can't apply", op),
+        format!(
+            "Math op ({:?}) on values we can't apply: {:?} {:?}",
+            op, res_first, res_second
+        ),
         state.current_line
     ));
 }
