@@ -26,16 +26,23 @@ fn run_binop(
     }
 }
 
-fn expression_to_number(inp: Expression) -> Expression {
+fn expression_to_number(inp: Expression, line: u32) -> Result<Expression> {
     return match inp {
-        Expression::Floating(_) => inp,
-        Expression::Null => Expression::Floating(0.0),
+        Expression::Floating(_) => Ok(inp),
+        Expression::Null => Ok(Expression::Floating(0.0)),
         Expression::String(ref s) => {
-            let as_float = s.parse::<f64>().unwrap();
-            return Expression::Floating(as_float);
+            let as_float = s.parse::<f64>();
+            if let Ok(float) = as_float {
+                return Ok(Expression::Floating(float));
+            } else {
+                bail!(ErrorKind::ParseNumberError(s.to_string(), line));
+            }
         }
         _ => {
-            panic!("Can't convert {:?} to number", inp);
+            bail!(ErrorKind::Unimplemented(
+                format!("Can't convert {:?} to number", inp),
+                line
+            ));
         }
     };
 }
@@ -70,14 +77,34 @@ fn run_binop_shortcut(
             }
             _ => {}
         },
+        Expression::Mysterious => {
+            if let Expression::Mysterious = res_second {
+                return Ok(true);
+            } else {
+                return Ok(false);
+            }
+        }
+        _ => {}
+    }
+    match res_second {
+        Expression::True | Expression::False => {
+            let val = to_boolean(state, &res_first);
+            if let Ok(b) = val {
+                if b {
+                    return Ok(f(state, &Expression::True, &res_second)?);
+                } else {
+                    return Ok(f(state, &Expression::False, &res_second)?);
+                }
+            }
+        }
         _ => {}
     }
 
     // Try numeric conversion instead
     return Ok(f(
         state,
-        &expression_to_number(res_first),
-        &expression_to_number(res_second),
+        &expression_to_number(res_first, state.current_line)?,
+        &expression_to_number(res_second, state.current_line)?,
     )?);
 }
 
