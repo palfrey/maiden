@@ -412,6 +412,7 @@ named!(word(Span) -> Vec<SymbolType>,
             comp: compare >>
             (pv, comp)
         ) => {|(pv, comp):(String, SymbolType)| vec![SymbolType::Variable(pv), comp]} |
+        tag_no_case!("nor") => {|_| vec![SymbolType::Nor]} | // FIXME: hacked in, because doesn't work in expression...
         do_parse!(
             e: expression >>
             peek!(alt!(take_while1!(is_space) | take_while1!(is_newline) | eof!())) >>
@@ -1451,6 +1452,19 @@ mod tests {
                 name: "TrueFunc".to_string(),
                 args: vec!["Ignored".to_string()],
             }],
+        );
+    }
+
+    #[test]
+    fn nor_usage() {
+        lines_tokens_check(
+            "Say true nor true",
+            vec![
+                SymbolType::Say,
+                SymbolType::True,
+                SymbolType::Nor,
+                SymbolType::True,
+            ],
         );
     }
 
