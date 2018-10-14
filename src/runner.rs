@@ -245,6 +245,7 @@ fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
                 // ));
             }
         },
+        Expression::Object(_) => Ok(true),
         _ => {
             bail!(ErrorKind::BadBooleanResolve(
                 format!("{:?}", expression),
@@ -398,6 +399,9 @@ fn run_expression(
                 Ok(exp.clone())
             }
             None => {
+                if let Some(_) = program.functions.get(name) {
+                    return Ok(Expression::Object(name.clone()));
+                }
                 bail!(ErrorKind::MissingVariable(name.clone(), state.current_line));
             }
         },

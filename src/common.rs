@@ -9,6 +9,7 @@ pub enum Expression {
     String(String),
     Floating(f64),
     Variable(String),
+    Object(String), // currently just functions
     True,
     False,
     Call(String, Vec<Expression>),
