@@ -80,11 +80,8 @@ fn run_binop_shortcut(
                 }
             }
         },
-        Expression::String(_) => match res_second {
-            Expression::String(_) => {
-                return Ok(f(state, &res_first, &res_second)?);
-            }
-            _ => {}
+        Expression::String(_) => if let Expression::String(_) = res_second {
+            return Ok(f(state, &res_first, &res_second)?);
         },
         Expression::Mysterious => {
             if let Expression::Mysterious = res_second {
@@ -184,11 +181,8 @@ fn run_mathbinop(
                     let second_value = *i;
                     return Ok(Expression::Floating(f(0f64, second_value)));
                 }
-                Expression::String(ref s_s) => match op {
-                    Expression::Add(_, _) => {
-                        return Ok(Expression::String(format!("null{}", s_s)));
-                    }
-                    _ => {}
+                Expression::String(ref s_s) => if let Expression::Add(_, _) = op {
+                    return Ok(Expression::String(format!("null{}", s_s)));
                 },
                 Expression::Null => {
                     return Ok(Expression::Floating(f(0f64, 0f64)));
@@ -198,14 +192,11 @@ fn run_mathbinop(
         }
         _ => {
             if let Expression::Add(_, _) = op {
-                match res_second {
-                    Expression::String(ref s_s) => {
-                        let printed_first = get_printable(&res_first, state);
-                        if let Ok(p_f) = printed_first {
-                            return Ok(Expression::String(format!("{}{}", p_f, s_s)));
-                        }
+                if let Expression::String(ref s_s) = res_second {
+                    let printed_first = get_printable(&res_first, state);
+                    if let Ok(p_f) = printed_first {
+                        return Ok(Expression::String(format!("{}{}", p_f, s_s)));
                     }
-                    _ => {}
                 }
             }
         }
@@ -399,7 +390,7 @@ fn run_expression(
                 Ok(exp.clone())
             }
             None => {
-                if let Some(_) = program.functions.get(name) {
+                if program.functions.get(name).is_some() {
                     return Ok(Expression::Object(name.clone()));
                 }
                 bail!(ErrorKind::MissingVariable(name.clone(), state.current_line));
@@ -484,7 +475,7 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
     }
 }
 
-fn flip_boolean(state: &mut State, target: &str, val: Expression, count: usize) -> Result<()> {
+fn flip_boolean(state: &mut State, target: &str, val: &Expression, count: usize) -> Result<()> {
     if (count & 0x1) == 0 {
         // double-flips do nothing, so just look at the low bit
         return Ok(());
@@ -528,7 +519,7 @@ fn alter_variable(state: &mut State, target: &str, f: &Fn(f64) -> f64, count: us
                 .insert(target.to_lowercase(), Expression::Floating(f(0f64)));
         }
         Expression::False | Expression::True => {
-            return flip_boolean(state, target, val, count);
+            return flip_boolean(state, target, &val, count);
         }
         _ => {
             bail!(ErrorKind::Unimplemented(
