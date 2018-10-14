@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn rocking_fizzbuzz() {
-        let program = "Midnight takes your heart and your soul
+        let program = "Midnight takes your heart & your soul
     While your heart is as high as your soul
     Put your heart without your soul into your heart
 
@@ -294,7 +294,7 @@ mod tests {
 
     #[test]
     fn no_end_func() {
-        let err = test_error("What Remains takes the fighters and a war");
+        let err = test_error("What Remains takes the fighters, and a war");
         if let common::ErrorKind::NoEndFunction(line) = err {
             assert_eq!(line, 1);
         } else {

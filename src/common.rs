@@ -60,7 +60,10 @@ pub enum SymbolType {
         target: String,
         args: Vec<SymbolType>,
     },
-    Takes,
+    Takes {
+        name: String,
+        args: Vec<String>,
+    },
     Comma,
     GreaterThanOrEqual,
     GreaterThan,

@@ -236,10 +236,18 @@ named!(function_call_expr(Span) -> SymbolType,
             first: value_provider >>
             rest: many0!(do_parse!(
                 alt!(
-                    tag!(",") => {|_|()} |
-                    tuple!(take_while1!(is_space), tag!("and")) => {|_|()}
+                    tag!("'n'") => {|_|()} |
+                    tuple!(
+                        alt!(
+                            tuple!(
+                                tag!(","),
+                                opt!(tuple!(take_while1!(is_space), tag!("and")))
+                            ) => {|_|()} |
+                            tuple!(take_while1!(is_space), tag!("&")) => {|_|()}
+                        ),
+                        take_while1!(is_space)
+                    ) => {|_|()}
                 ) >>
-                take_while1!(is_space) >>
                 value: value_provider >>
                 (value)
             )) >>
@@ -249,6 +257,40 @@ named!(function_call_expr(Span) -> SymbolType,
             SymbolType::Taking{target: name, args: rest}
         }} |
         value_provider => {|s| s}
+    )
+);
+
+named!(function_signature(Span) -> SymbolType,
+    alt_complete!(
+        do_parse!(
+            target: variable >>
+            take_while1!(is_space) >>
+            tag_no_case!("takes") >>
+            take_while1!(is_space) >>
+            first: variable >>
+            rest: many0!(do_parse!(
+                alt!(
+                    tag!("'n'") => {|_|()} |
+                    tuple!(
+                        alt!(
+                            tuple!(
+                                tag!(","),
+                                opt!(tuple!(take_while1!(is_space), tag!("and")))
+                            ) => {|_|()} |
+                            tuple!(take_while1!(is_space), tag!("and")) => {|_|()} |
+                            tuple!(take_while1!(is_space), tag!("&")) => {|_|()}
+                        ),
+                        take_while1!(is_space)
+                    ) => {|_|()}
+                ) >>
+                value: variable >>
+                (value)
+            )) >>
+            (target, first, rest)
+        ) => {|(name, first, mut rest): (String, String, Vec<String>)| {
+            rest.insert(0, first);
+            SymbolType::Takes{name, args: rest}
+        }}
     )
 );
 
@@ -279,7 +321,6 @@ named!(expression(Span) -> SymbolType,
         tag_no_case!("and") => {|_| SymbolType::And} |
         tag_no_case!("or") => {|_| SymbolType::Or} |
         tag_no_case!("nor") => {|_| SymbolType::Nor} |
-        tag_no_case!("takes") => {|_| SymbolType::Takes} |
         alt_complete!(
             tag_no_case!("without") | tag_no_case!("minus")
         ) => {|_| SymbolType::Subtract} |
@@ -303,6 +344,7 @@ named!(expression(Span) -> SymbolType,
 named!(statement(Span) -> SymbolType,
     do_parse!(
         val: alt_complete!(
+            function_signature => {|s| s} |
             tag_no_case!("if") => {|_| SymbolType::If} |
             do_parse!(
                 tag_no_case!("build") >>
@@ -982,6 +1024,24 @@ pub fn parse(input: &str) -> Result<Program> {
                     line: current_line,
                 });
             }
+            [SymbolType::Takes { ref name, ref args }] => {
+                func_starts.push(commands.len());
+                functions.insert(
+                    name.to_string(),
+                    Function {
+                        location: commands.len(),
+                        args: args.clone(),
+                    },
+                );
+                commands.push(CommandLine {
+                    cmd: Command::FunctionDeclaration {
+                        name: name.to_string(),
+                        args: args.clone(),
+                        func_end: None,
+                    },
+                    line: current_line,
+                });
+            }
             [SymbolType::Build {
                 ref target,
                 ref count,
@@ -1100,55 +1160,6 @@ pub fn parse(input: &str) -> Result<Program> {
                         },
                         line: current_line,
                     });
-                } else if symbols.len() > 2 && symbols[1] == SymbolType::Takes {
-                    if let SymbolType::Variable(ref name) = symbols[0] {
-                        let mut var_seq = symbols.iter().skip(2);
-                        let mut args = vec![];
-                        loop {
-                            if let Some(SymbolType::Variable(ref arg)) = var_seq.next() {
-                                args.push(arg.to_string());
-                                match var_seq.next() {
-                                    Some(sym) => {
-                                        if sym != &SymbolType::And {
-                                            bail!(ErrorKind::BadFunctionDeclaration(
-                                                symbols.to_vec(),
-                                                current_line
-                                            ));
-                                        }
-                                    }
-                                    None => {
-                                        break;
-                                    }
-                                }
-                            } else {
-                                bail!(ErrorKind::BadFunctionDeclaration(
-                                    symbols.to_vec(),
-                                    current_line
-                                ));
-                            }
-                        }
-                        func_starts.push(commands.len());
-                        functions.insert(
-                            name.to_string(),
-                            Function {
-                                location: commands.len(),
-                                args: args.clone(),
-                            },
-                        );
-                        commands.push(CommandLine {
-                            cmd: Command::FunctionDeclaration {
-                                name: name.to_string(),
-                                args,
-                                func_end: None,
-                            },
-                            line: current_line,
-                        });
-                    } else {
-                        bail!(ErrorKind::BadFunctionDeclaration(
-                            symbols.to_vec(),
-                            current_line
-                        ));
-                    }
                 } else if symbols[0] == SymbolType::Return && symbols.len() > 1 {
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
                     let expression = parse_expression(&expression_seq, current_line)?;
@@ -1364,9 +1375,10 @@ mod tests {
         lines_tokens_check(
             "Liftin High takes the spirit and greatness",
             vec![
-                SymbolType::Variable("Liftin High".to_string()),
-                SymbolType::Takes,
-                SymbolType::Variable("the spirit".to_string()),
+                SymbolType::Takes {
+                    name: "Liftin High".to_string(),
+                    args: vec!["the spirit".to_string()],
+                },
                 SymbolType::And,
                 SymbolType::Words(vec!["greatness".to_string()]),
             ],
@@ -1434,12 +1446,11 @@ mod tests {
     #[test]
     fn keyword_named_func() {
         lines_tokens_check(
-            "TrueFunc takes nothing",
-            vec![
-                SymbolType::Variable("TrueFunc".to_string()),
-                SymbolType::Takes,
-                SymbolType::Null,
-            ],
+            "TrueFunc takes Ignored",
+            vec![SymbolType::Takes {
+                name: "TrueFunc".to_string(),
+                args: vec!["Ignored".to_string()],
+            }],
         );
     }
 
