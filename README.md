@@ -10,7 +10,7 @@ Well given that Rockstar is about hard rock from the 1980s, [Iron Maiden](https:
 
 Status
 ------
-Experimental. Rockstar is still very much in active flux, and Maiden doesn't even implement the [entire current spec](https://github.com/dylanbeattie/rockstar) as of writing this, but I'm seeing what I can do.
+Rockstar is still very much in active flux, but we target the [full "correct" test suite](https://github.com/dylanbeattie/rockstar/tree/reference-implementation/tests/correct) from the reference implementation (excepting [some issues](https://github.com/dylanbeattie/rockstar/issues/168) in it)
 
 Usage
 -----
