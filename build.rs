@@ -17,6 +17,11 @@ fn main() {
             .replace("tests/", "");
         if name.ends_with(".rock") {
             let test_name = name.replace(".", "_").replace("-", "_").replace("/", "_");
+            if test_name == "upstream_correct_operators_equalityComparison_rock"
+                || test_name == "upstream_correct_truthinessTest_rock"
+            {
+                continue; // FIXME: Blocked by https://github.com/dylanbeattie/rockstar/issues/168
+            }
             write!(
                 f,
                 "
