@@ -120,10 +120,10 @@ mod tests {
         Build Counter up
     End";
         let end_variables = hashmap! {
-            "buzz" => Expression::Integer(5),
-            "limit" => Expression::Integer(100),
-            "counter" => Expression::Integer(100),
-            "fizz" => Expression::Integer(3),
+            "buzz" => Expression::Floating(5f64),
+            "limit" => Expression::Floating(100f64),
+            "counter" => Expression::Floating(100f64),
+            "fizz" => Expression::Floating(3f64),
         };
         test_program(program, end_variables, "");
     }
@@ -138,17 +138,17 @@ mod tests {
     Build my world up
     And around we go";
         let end_variables = hashmap! {
-            "my world" => Expression::Integer(100),
-            "fire" => Expression::Integer(3),
-            "hate" => Expression::Integer(5),
-            "desire" => Expression::Integer(100),
+            "my world" => Expression::Floating(100f64),
+            "fire" => Expression::Floating(3f64),
+            "hate" => Expression::Floating(5f64),
+            "desire" => Expression::Floating(100f64),
         };
         test_program(program, end_variables, "");
     }
 
     #[test]
     fn rocking_fizzbuzz() {
-        let program = "Midnight takes your heart and your soul
+        let program = "Midnight takes your heart & your soul
     While your heart is as high as your soul
     Put your heart without your soul into your heart
 
@@ -175,10 +175,10 @@ mod tests {
     Whisper my world
     And around we go";
         let end_variables = hashmap! {
-            "my world" => Expression::Integer(100),
-            "fire" => Expression::Integer(3),
-            "hate" => Expression::Integer(5),
-            "desire" => Expression::Integer(100),
+            "my world" => Expression::Floating(100f64),
+            "fire" => Expression::Floating(3f64),
+            "hate" => Expression::Floating(5f64),
+            "desire" => Expression::Floating(100f64),
         };
         test_program(
             program,
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn multiple_uppercase_proper_variable() {
         let end_variables = hashmap! {
-            "id" => Expression::Integer(3),
+            "id" => Expression::Floating(3f64),
         };
         test_program("put foo into ID", end_variables, "");
     }
@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn double_increment() {
         let end_variables = hashmap!{
-            "my world" => Expression::Integer(2),
+            "my world" => Expression::Floating(2f64),
         };
         test_program(
             "Put 0 into my world\nBuild my world up, up",
@@ -227,7 +227,7 @@ mod tests {
     #[test]
     fn double_decrement() {
         let end_variables = hashmap!{
-            "the walls" => Expression::Integer(-2),
+            "the walls" => Expression::Floating(-2f64),
         };
         test_program(
             "Put 0 into the walls\nKnock the walls down, down",
@@ -237,23 +237,15 @@ mod tests {
     }
 
     #[test]
-    fn expression_comment() {
-        let end_variables = hashmap! {
-            "baz" => Expression::String("foo".to_string()),
-        };
-        test_program("Baz is \"foo\" (bar)", end_variables, "");
-    }
-
-    #[test]
     fn skip_else() {
         let end_variables = hashmap! {
             "foo" => Expression::String("foo".to_string()),
         };
         test_program(
             "if nothing is nothing
-        Foo is \"foo\"
+        Foo says foo
         Else
-        Bar is \"bar\"
+        Bar says bar
 
         ",
             end_variables,
@@ -301,19 +293,8 @@ mod tests {
     }
 
     #[test]
-    fn bad_boolean() {
-        let err = test_error("if t");
-        if let common::ErrorKind::BadBooleanResolve(name, line) = err {
-            assert_eq!(name, "Integer(1)");
-            assert_eq!(line, 1);
-        } else {
-            assert!(false, err);
-        }
-    }
-
-    #[test]
     fn no_end_func() {
-        let err = test_error("What Remains takes the fighters and a war");
+        let err = test_error("What Remains takes the fighters, and a war");
         if let common::ErrorKind::NoEndFunction(line) = err {
             assert_eq!(line, 1);
         } else {
