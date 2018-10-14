@@ -108,12 +108,16 @@ fn run_binop_shortcut(
         }
         _ => {}
     }
+    let converted_second = expression_to_number(res_second, state.current_line);
+    if converted_second.is_err() {
+        return Ok(false);
+    }
 
     // Try numeric conversion instead
     return Ok(f(
         state,
         &expression_to_number(res_first, state.current_line)?,
-        &expression_to_number(res_second, state.current_line)?,
+        &converted_second?,
     )?);
 }
 
@@ -226,13 +230,21 @@ fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
                 Ok(true)
             }
         }
-        Expression::String(ref val) => {
-            if val.is_empty() {
-                Ok(false)
-            } else {
+        Expression::String(ref val) => match val.to_lowercase().as_str() {
+            "" => Ok(true),
+            "lies" => Ok(false),
+            "true" => Ok(true),
+            "right" => Ok(true),
+            "false" => Ok(false),
+            "wrong" => Ok(false),
+            _ => {
                 Ok(true)
+                // bail!(ErrorKind::BadBooleanResolve(
+                //     format!("{:?}", expression),
+                //     state.current_line
+                // ));
             }
-        }
+        },
         _ => {
             bail!(ErrorKind::BadBooleanResolve(
                 format!("{:?}", expression),
@@ -409,10 +421,15 @@ fn run_expression(
         },
         Expression::Not(ref arg) => {
             let res = run_expression(state, program, arg)?;
-            if to_boolean(state, &res)? {
-                return Ok(Expression::False);
+            let boolean = to_boolean(state, &res);
+            if let Ok(good_boolean) = boolean {
+                if good_boolean {
+                    return Ok(Expression::False);
+                } else {
+                    return Ok(Expression::True);
+                }
             } else {
-                return Ok(Expression::True);
+                return Ok(Expression::False);
             }
         }
         _ => Ok(expression.clone()),
