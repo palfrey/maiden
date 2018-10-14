@@ -69,7 +69,16 @@ fn run_binop_shortcut(
             Expression::True | Expression::False => {
                 return Ok(f(state, &res_first, &res_second)?);
             }
-            _ => {}
+            _ => {
+                let val = to_boolean(state, &res_second);
+                if let Ok(b) = val {
+                    if b {
+                        return Ok(f(state, &res_first, &Expression::True)?);
+                    } else {
+                        return Ok(f(state, &res_first, &Expression::False)?);
+                    }
+                }
+            }
         },
         Expression::String(_) => match res_second {
             Expression::String(_) => {
@@ -284,7 +293,11 @@ fn run_expression(
     debug!("Expression: {:?}", expression);
     return match *expression {
         Expression::Is(ref first, ref second) => {
-            return run_binop(state, program, first, second, |_, f, s| Ok(f == s));
+            if let Expression::Not(not_second) = second.deref() {
+                return run_binop(state, program, first, not_second, |_, f, s| Ok(f != s));
+            } else {
+                return run_binop(state, program, first, second, |_, f, s| Ok(f == s));
+            }
         }
         Expression::Aint(ref first, ref second) => {
             return run_binop(state, program, first, second, |_, f, s| Ok(f != s));
