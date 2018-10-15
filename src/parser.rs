@@ -418,8 +418,7 @@ named!(word(Span) -> Vec<SymbolType>,
             peek!(alt!(take_while1!(is_space) | take_while1!(is_newline) | eof!())) >>
             (e)
         ) => {|e: SymbolType| vec![e]} |
-        variable => {|s| vec![SymbolType::Variable(s)] } |
-        take_while1!(word_character) => {|word: Span| vec![SymbolType::Words(vec![word.to_string()])]}
+        variable => {|s| vec![SymbolType::Variable(s)] }
     )
 );
 
@@ -435,7 +434,11 @@ named!(poetic_number_literal_core<Span, (u32, String, Vec<Span>)>,
             )
         ) >>
         position: position!() >>
-        peek!(not!(tuple!(take_while1!(is_space), literal_word))) >> // number literals cannot start with a literal word
+        peek!(not!(tuple!(
+            take_while1!(is_space),
+            literal_word,
+            alt!(take_while1!(is_space) | take_while1!(is_newline) | eof!()))
+        )) >> // number literals cannot start with a literal word
         peek!(tuple!(take_while1!(is_space), take_while1!(word_character))) >> // make sure it starts with a word character
         words: many1!(
             do_parse!(
@@ -1374,14 +1377,14 @@ mod tests {
     #[test]
     fn multi_word_proper_variable() {
         lines_tokens_check(
-            "Liftin High takes the spirit and greatness",
+            "Liftin High takes the spirit and 8",
             vec![
                 SymbolType::Takes {
                     name: "Liftin High".to_string(),
                     args: vec!["the spirit".to_string()],
                 },
                 SymbolType::And,
-                SymbolType::Words(vec!["greatness".to_string()]),
+                SymbolType::Integer("8".to_string()),
             ],
         );
     }
@@ -1402,12 +1405,12 @@ mod tests {
     #[test]
     fn split_nothing() {
         lines_tokens_check(
-            "If a thought is greater than nothinggggggggg",
+            "If a thought is greater than Nothinggggggggg",
             vec![
                 SymbolType::If,
                 SymbolType::Variable("a thought".to_string()),
                 SymbolType::GreaterThan,
-                SymbolType::Words(vec!["nothinggggggggg".to_string()]),
+                SymbolType::Variable("Nothinggggggggg".to_string()),
             ],
         );
     }
@@ -1529,51 +1532,51 @@ mod tests {
     #[test]
     fn bad_fragment() {
         pretty_env_logger::try_init().unwrap_or(());
-        let err = parse("test is a").err().unwrap().0;
+        let err = parse("2 is 1").err().unwrap().0;
         if let ErrorKind::BadIs(symbols, line) = err {
             assert_eq!(
                 symbols,
                 vec![
-                    SymbolType::Words(vec!["test".to_string()]),
+                    SymbolType::Integer("2".to_string()),
                     SymbolType::Is,
-                    SymbolType::Words(vec!["a".to_string()])
+                    SymbolType::Integer("1".to_string()),
                 ]
             );
             assert_eq!(line, 1);
         } else {
-            assert!(false, err);
+            assert!(false, format!("{:?}", err));
         }
     }
 
     #[test]
     fn bad_expression() {
         pretty_env_logger::try_init().unwrap_or(());
-        let err = parse("if t is").err().unwrap().0;
+        let err = parse("if 1 is").err().unwrap().0;
         if let ErrorKind::UnbalancedExpression(name, line) = err {
-            assert_eq!(name, "[Words([\"t\"]), Is]");
+            assert_eq!(name, "[Integer(\"1\"), Is]");
             assert_eq!(line, 1);
         } else {
-            assert!(false, err);
+            assert!(false, format!("{:?}", err));
         }
     }
 
     #[test]
     fn bad_put() {
         pretty_env_logger::try_init().unwrap_or(());
-        let err = parse("put foo into bar").err().unwrap().0;
+        let err = parse("put 1 into 3").err().unwrap().0;
         if let ErrorKind::BadPut(expression, line) = err {
             assert_eq!(
                 expression,
                 vec![
                     SymbolType::Put,
-                    SymbolType::Words(vec!["foo".to_string()]),
+                    SymbolType::Integer("1".to_string()),
                     SymbolType::Where,
-                    SymbolType::Words(vec!["bar".to_string()])
+                    SymbolType::Integer("3".to_string())
                 ]
             );
             assert_eq!(line, 1);
         } else {
-            assert!(false, err);
+            assert!(false, format!("{:?}", err));
         }
     }
 }

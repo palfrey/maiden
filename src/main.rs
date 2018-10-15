@@ -209,7 +209,7 @@ mod tests {
         let end_variables = hashmap! {
             "id" => Expression::Floating(3f64),
         };
-        test_program("put foo into ID", end_variables, "");
+        test_program("put 3 into ID", end_variables, "");
     }
 
     #[test]
@@ -284,11 +284,11 @@ mod tests {
 
     #[test]
     fn end_of_if() {
-        let err = test_error("if this is tests");
+        let err = test_error("if 1 is 2");
         if let common::ErrorKind::NoEndOfIf(line) = err {
             assert_eq!(line, 1);
         } else {
-            assert!(false, err);
+            assert!(false, format!("{:?}", err));
         }
     }
 
@@ -298,17 +298,17 @@ mod tests {
         if let common::ErrorKind::NoEndFunction(line) = err {
             assert_eq!(line, 1);
         } else {
-            assert!(false, err);
+            assert!(false, format!("{:?}", err));
         }
     }
 
     #[test]
     fn no_end_loop() {
-        let err = test_error("until this is that");
+        let err = test_error("until 1");
         if let common::ErrorKind::NoEndLoop(line) = err {
             assert_eq!(line, 1);
         } else {
-            assert!(false, err);
+            assert!(false, format!("{:?}", err));
         }
     }
 }
