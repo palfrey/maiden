@@ -976,6 +976,9 @@ pub fn parse(input: &str) -> Result<Program> {
         let symbols: Vec<SymbolType> = symbols.into_iter().map(|t| t.symbol).collect();
         match symbols.as_slice() {
             [SymbolType::Next] => {
+                if loop_starts.is_empty() {
+                    bail!(ErrorKind::NextOutsideLoop(current_line));
+                }
                 let command = build_next(&mut commands, &mut loop_starts);
                 commands.push(CommandLine {
                     cmd: command,
@@ -983,7 +986,10 @@ pub fn parse(input: &str) -> Result<Program> {
                 });
             }
             [SymbolType::Continue] => {
-                let loop_start = loop_starts.last().expect("loop_starts");
+                if loop_starts.is_empty() {
+                    bail!(ErrorKind::ContinueOutsideLoop(current_line));
+                }
+                let loop_start = loop_starts.last().unwrap();
                 commands.push(CommandLine {
                     cmd: Command::Continue {
                         loop_start: *loop_start,
@@ -1100,6 +1106,9 @@ pub fn parse(input: &str) -> Result<Program> {
                 });
             }
             [SymbolType::Break] => {
+                if loop_starts.is_empty() {
+                    bail!(ErrorKind::BreakOutsideLoop(current_line));
+                }
                 let loop_start = loop_starts.last().expect("loop_starts");
                 commands.push(CommandLine {
                     cmd: Command::Break {

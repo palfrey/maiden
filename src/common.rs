@@ -242,6 +242,15 @@ error_chain!{
         NoEndLoop(line: u32) {
             display("No end of loop")
         }
+        ContinueOutsideLoop(line: u32) {
+            display("Continue outside of a loop")
+        }
+        BreakOutsideLoop(line: u32) {
+            display("Break outside of a loop")
+        }
+        NextOutsideLoop(line: u32) {
+            display("Next outside of a loop")
+        }
         Unimplemented(description: String, line: u32) {
             display("Unimplemented: {}", description)
         }
