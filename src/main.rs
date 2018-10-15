@@ -136,7 +136,7 @@ mod tests {
     Hate is water
     Until my world is Desire,
     Build my world up
-    And around we go";
+    ";
         let end_variables = hashmap! {
             "my world" => Expression::Floating(100f64),
             "fire" => Expression::Floating(3f64),
@@ -173,7 +173,7 @@ mod tests {
     Take it to the top
 
     Whisper my world
-    And around we go";
+    ";
         let end_variables = hashmap! {
             "my world" => Expression::Floating(100f64),
             "fire" => Expression::Floating(3f64),

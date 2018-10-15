@@ -221,7 +221,12 @@ named!(literal(Span) -> SymbolType,
 
 named!(value_provider(Span) -> SymbolType,
     alt!(
-        literal => {|s| s} |
+        do_parse!(
+            l: literal >>
+            peek!(alt!(tag!("'n'") | tag!(",") | take_while1!(is_space) | take_while1!(is_newline) | eof!())) >>
+            (l)
+        ) => {|s| s} |
+        pronoun => {|s| s} |
         variable => {|s| SymbolType::Variable(s)}
     )
 );
@@ -302,44 +307,137 @@ named!(not_expr(Span) -> SymbolType,
             func: not_expr >>
             (func)
         ) => {|f| SymbolType::Not(Box::new(f))} |
-        function_call_expr => {|s| s}
+        function_call_expr => {|s| s} |
+        value_provider => {|s| s}
     )
 );
 
-named!(expression(Span) -> SymbolType,
-    alt_complete!(
-        not_expr => {|s| s} |
-        do_parse!(
-            tag!("is") >>
-            take_while1!(is_space) >>
-            comp: compare >>
-            (comp)
-        ) => {|s| s} |
-        alt_complete!(
-            tag!("is") | tag!("was") | tag!("are") | tag!("were")
-        ) => {|_| SymbolType::Is} |
-        tag_no_case!("and") => {|_| SymbolType::And} |
-        tag_no_case!("or") => {|_| SymbolType::Or} |
-        tag_no_case!("nor") => {|_| SymbolType::Nor} |
-        alt_complete!(
-            tag_no_case!("without") | tag_no_case!("minus")
-        ) => {|_| SymbolType::Subtract} |
-        alt_complete!(
-            tag_no_case!("with") | tag_no_case!("plus")
-        ) => {|_| SymbolType::Add} |
-        alt_complete!(
-            tag_no_case!("times") | tag_no_case!("of")
-        ) => {|_| SymbolType::Times } |
-        tag_no_case!("over") => {|_| SymbolType::Divide} |
-        pronoun => {|s| s} |
-        do_parse!(
-            tag!("(") >>
-            take_until!(")") >>
-            tag!(")") >>
-            ()
-        ) => {|_| SymbolType::Comment }
-    )
-);
+#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+fn multiply_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
+    let (rest, (mut res, mut times)) = do_parse!(
+        input,
+        ne: not_expr
+            >> times:
+                many0!(do_parse!(
+                    take_while1!(is_space)
+                        >> op: alt_complete!(
+                            alt_complete!(
+                                tag_no_case!("times") | tag_no_case!("of")
+                            ) => {|_| SymbolType::Times} |
+                            tag_no_case!("over") => {|_| SymbolType::Divide}
+                        )
+                        >> take_while1!(is_space)
+                        >> other_ne: not_expr
+                        >> (vec![op, other_ne])
+                ))
+            >> (vec![ne], times)
+    )?;
+    for item in &mut times {
+        res.append(item);
+    }
+    return Ok((rest, res));
+}
+
+#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+fn add_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
+    let (rest, (mut res, mut adds)) = do_parse!(
+        input,
+        me: multiply_expr
+            >> adds: many0!(do_parse!(
+                take_while1!(is_space)
+                    >> op: alt_complete!(
+                    alt_complete!(
+                        tag_no_case!("without") | tag_no_case!("minus")
+                    ) => {|_| SymbolType::Subtract} |
+                    alt_complete!(
+                        tag_no_case!("with") | tag_no_case!("plus")
+                    ) => {|_| SymbolType::Add}
+                ) >> take_while1!(is_space)
+                    >> other_me: multiply_expr
+                    >> (op, other_me)
+            ))
+            >> (me, adds)
+    )?;
+    for (op, item) in &mut adds {
+        res.push(op.clone());
+        res.append(item);
+    }
+    return Ok((rest, res));
+}
+
+#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+fn inequality_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
+    let (rest, (mut res, mut ineqs)) = do_parse!(
+        input,
+        ae: add_expr
+            >> ineqs:
+                many0!(do_parse!(
+                    take_while1!(is_space)
+                        >> tag!("is")
+                        >> take_while1!(is_space)
+                        >> comp: compare
+                        >> take_while1!(is_space)
+                        >> other_add: add_expr
+                        >> (comp, other_add)
+                ))
+            >> (ae, ineqs)
+    )?;
+    for (comp, item) in &mut ineqs {
+        res.push(comp.clone());
+        res.append(item);
+    }
+    return Ok((rest, res));
+}
+
+#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+fn equality_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
+    let (rest, (mut res, mut eqs)) = do_parse!(
+        input,
+        ie: inequality_expr
+            >> eqs: many0!(do_parse!(
+                take_while1!(is_space)
+                    >> kind: alt_complete!(
+                    alt_complete!(
+                        tag!("is") | tag!("was") | tag!("are") | tag!("were")
+                    ) => {|_| SymbolType::Is} |
+                    alt_complete!(
+                        tag_no_case!("ain't") | tag_no_case!("aint")
+                    ) => {|_| SymbolType::Aint}
+                ) >> take_while1!(is_space)
+                    >> other_ie: inequality_expr
+                    >> (kind, other_ie)
+            ))
+            >> (ie, eqs)
+    )?;
+    for (kind, item) in &mut eqs {
+        res.push(kind.clone());
+        res.append(item);
+    }
+    return Ok((rest, res));
+}
+
+fn boolean_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
+    let (rest, (mut res, mut bqs)) = do_parse!(
+        input,
+        ee: equality_expr
+            >> bqs: many0!(do_parse!(
+                take_while1!(is_space)
+                    >> kind: alt_complete!(
+                    tag_no_case!("and") => {|_| SymbolType::And} |
+                    tag_no_case!("or") => {|_| SymbolType::Or} |
+                    tag_no_case!("nor") => {|_| SymbolType::Nor}
+                ) >> take_while1!(is_space)
+                    >> other_ee: equality_expr
+                    >> (kind, other_ee)
+            ))
+            >> (ee, bqs)
+    )?;
+    for (kind, item) in &mut bqs {
+        res.push(kind.clone());
+        res.append(item);
+    }
+    return Ok((rest, res));
+}
 
 named!(statement(Span) -> SymbolType,
     do_parse!(
@@ -375,9 +473,6 @@ named!(statement(Span) -> SymbolType,
                 (target, rest.len())
             ) => {|(target, rest)| SymbolType::Knock { target, count: rest + 1}} |
             alt_complete!(
-                tag_no_case!("ain't") | tag_no_case!("aint")
-            ) => {|_| SymbolType::Aint} |
-            alt_complete!(
                 tag_no_case!("say") | tag_no_case!("shout") | tag_no_case!("whisper") | tag_no_case!("scream")
             ) => {|_| SymbolType::Say} |
             tag_no_case!("while") => {|_| SymbolType::While} |
@@ -412,13 +507,13 @@ named!(word(Span) -> Vec<SymbolType>,
             comp: compare >>
             (pv, comp)
         ) => {|(pv, comp):(String, SymbolType)| vec![SymbolType::Variable(pv), comp]} |
-        tag_no_case!("nor") => {|_| vec![SymbolType::Nor]} | // FIXME: hacked in, because doesn't work in expression...
         do_parse!(
-            e: expression >>
-            peek!(alt!(take_while1!(is_space) | take_while1!(is_newline) | eof!())) >>
-            (e)
-        ) => {|e: SymbolType| vec![e]} |
-        variable => {|s| vec![SymbolType::Variable(s)] }
+            tag!("(") >>
+            take_until!(")") >>
+            tag!(")") >>
+            ()
+        ) => {|_| vec![SymbolType::Comment] } |
+        boolean_expr => {|e| e}
     )
 );
 
@@ -1377,15 +1472,11 @@ mod tests {
     #[test]
     fn multi_word_proper_variable() {
         lines_tokens_check(
-            "Liftin High takes the spirit and 8",
-            vec![
-                SymbolType::Takes {
-                    name: "Liftin High".to_string(),
-                    args: vec!["the spirit".to_string()],
-                },
-                SymbolType::And,
-                SymbolType::Integer("8".to_string()),
-            ],
+            "Liftin High takes the spirit and Foo",
+            vec![SymbolType::Takes {
+                name: "Liftin High".to_string(),
+                args: vec!["the spirit".to_string(), "Foo".to_string()],
+            }],
         );
     }
 
@@ -1552,8 +1643,8 @@ mod tests {
     fn bad_expression() {
         pretty_env_logger::try_init().unwrap_or(());
         let err = parse("if 1 is").err().unwrap().0;
-        if let ErrorKind::UnbalancedExpression(name, line) = err {
-            assert_eq!(name, "[Integer(\"1\"), Is]");
+        if let ErrorKind::UnparsedText(content, line) = err {
+            assert_eq!(content, " is");
             assert_eq!(line, 1);
         } else {
             assert!(false, format!("{:?}", err));
