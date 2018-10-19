@@ -272,6 +272,9 @@ error_chain!{
         UndefinedPronoun(line: u32) {
             display("Got to a pronoun, but no variable defined")
         }
+        Infinity(x: String, y: String, line: u32) {
+            display("Got infinity on divide between {} and {}", x, y)
+        }
     }
 }
 
@@ -309,6 +312,7 @@ pub fn get_error_line(e: &Error) -> u32 {
             ErrorKind::StackOverflow(_, line) => line.clone(),
             ErrorKind::InstructionLimit(line) => line.clone(),
             ErrorKind::UndefinedPronoun(line) => line.clone(),
+            ErrorKind::Infinity(.., line) => line.clone(),
             _ => 0,
         },
     }

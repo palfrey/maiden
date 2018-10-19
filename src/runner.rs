@@ -1,4 +1,5 @@
 use common::*;
+use std;
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::ops::Deref;
@@ -382,7 +383,21 @@ fn run_expression(
             return run_mathbinop(state, program, first, second, expression, |f, s| f * s);
         }
         Expression::Divide(ref first, ref second) => {
-            return run_mathbinop(state, program, first, second, expression, |f, s| f / s);
+            let res = run_mathbinop(state, program, first, second, expression, |f, s| f / s);
+            if let Ok(ok) = res {
+                if let Expression::Floating(val) = ok {
+                    if val == std::f64::INFINITY {
+                        bail!(ErrorKind::Infinity(
+                            format!("{:?}", first),
+                            format!("{:?}", second),
+                            state.current_line
+                        ));
+                    }
+                }
+                Ok(ok)
+            } else {
+                res
+            }
         }
         Expression::Variable(ref name) => match state.variables.get(&name.to_lowercase()) {
             Some(exp) => {
