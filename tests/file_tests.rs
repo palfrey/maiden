@@ -10,7 +10,7 @@ mod integration {
 
     include!(concat!(env!("OUT_DIR"), "/test.rs"));
 
-    fn file_test(name: &str) {
+    fn success_file_test(name: &str) {
         let mut f = File::open(&format!("./tests/{}.out", name)).unwrap();
         let mut expected = String::new();
         f.read_to_string(&mut expected).unwrap();
@@ -43,5 +43,18 @@ mod integration {
         assert_eq!(stderr, "");
         let stdout = std::str::from_utf8(&output.stdout).unwrap();
         assert_eq!(stdout, expected);
+    }
+
+    fn parse_fail_file_test(name: &str) {
+        let args = [&format!("./tests/{}", name)];
+        let mut mb = Command::main_binary().unwrap();
+        let output = mb.args(&args).output().unwrap();
+        assert!(!output.status.success());
+
+        let stderr = std::str::from_utf8(&output.stderr).unwrap();
+        assert!(stderr.contains("Error:"), stderr.to_string());
+
+        let stdout = std::str::from_utf8(&output.stdout).unwrap();
+        assert_eq!(stdout, "");
     }
 }

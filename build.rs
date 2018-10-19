@@ -22,16 +22,22 @@ fn main() {
             {
                 continue; // FIXME: Blocked by https://github.com/dylanbeattie/rockstar/issues/168
             }
+            let function = if name.contains("parse-errors") {
+                "parse_fail_file_test"
+            } else {
+                "success_file_test"
+            };
             write!(
                 f,
                 "
     #[test]
     #[allow(non_snake_case)]
     fn {test_name}() {{
-        file_test(\"{name}\");
+        {function}(\"{name}\");
     }}",
                 name = name,
-                test_name = test_name
+                test_name = test_name,
+                function = function
             ).unwrap();
         }
     }
