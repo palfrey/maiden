@@ -22,7 +22,7 @@ fn main() {
             {
                 continue; // FIXME: Blocked by https://github.com/dylanbeattie/rockstar/issues/168
             }
-            let function = if name.contains("parse-errors") {
+            let function = if name.contains("parse-errors") || name.contains("runtime-errors") {
                 "parse_fail_file_test"
             } else {
                 "success_file_test"
