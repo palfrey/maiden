@@ -236,6 +236,9 @@ error_chain!{
         ElseWithNoIf(line: u32) {
             display("Else with no if statement")
         }
+        MultipleElse(line: u32) {
+            display("More than one else statement")
+        }
         NoEndFunction(line: u32) {
             display("No end of function")
         }
@@ -295,6 +298,7 @@ pub fn get_error_line(e: &Error) -> u32 {
             ErrorKind::BadPut(_, line) => line.clone(),
             ErrorKind::NoEndOfIf(line) => line.clone(),
             ErrorKind::ElseWithNoIf(line) => line.clone(),
+            ErrorKind::MultipleElse(line) => line.clone(),
             ErrorKind::NoEndFunction(line) => line.clone(),
             ErrorKind::NoEndLoop(line) => line.clone(),
             ErrorKind::BadBooleanResolve(_, line) => line.clone(),

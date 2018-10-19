@@ -1088,6 +1088,9 @@ pub fn parse(input: &str) -> Result<Program> {
                             },
                         ..
                     } => {
+                        if else_loc.is_some() {
+                            bail!(ErrorKind::MultipleElse(current_line));
+                        }
                         else_loc.get_or_insert(if_len);
                     }
                     _ => {
