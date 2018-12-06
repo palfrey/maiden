@@ -2,7 +2,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(double_parens))]
 #![cfg_attr(feature = "cargo-clippy", allow(double_comparisons))]
 
-use common::*;
+use crate::common::*;
 use nom;
 use nom::types::CompleteStr;
 use std::collections::HashMap;

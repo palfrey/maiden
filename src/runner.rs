@@ -1,4 +1,4 @@
-use common::*;
+use crate::common::*;
 use std;
 use std::collections::HashMap;
 use std::io::{self, Write};
@@ -449,16 +449,14 @@ fn run_expression(
 pub fn run(program: &Program, writer: &mut Write) -> Result<HashMap<String, Expression>> {
     let pc = 0;
     let mut variables: HashMap<String, Expression> = HashMap::new();
-    {
-        let mut state = State {
-            variables: &mut variables,
-            writer,
-            current_line: 0,
-            depth: 0,
-            pronoun: None,
-        };
-        run_core(&mut state, program, pc)?;
-    } // FIXME: Drop once NLL is merged
+    let mut state = State {
+        variables: &mut variables,
+        writer,
+        current_line: 0,
+        depth: 0,
+        pronoun: None,
+    };
+    run_core(&mut state, program, pc)?;
     return Ok(variables);
 }
 

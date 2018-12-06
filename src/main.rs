@@ -78,7 +78,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use common::Expression;
+    use crate::common::Expression;
     use std::collections::HashMap;
     use std::io::Cursor;
 
