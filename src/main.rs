@@ -1,6 +1,6 @@
 #![recursion_limit = "5000"]
 #![deny(warnings)]
-#![cfg_attr(feature = "cargo-clippy", allow(needless_return))]
+#![allow(clippy::needless_return)]
 
 #[macro_use]
 extern crate nom;
@@ -50,7 +50,8 @@ fn main() -> common::Result<()> {
                 .help("Sets the input file to use")
                 .required(true)
                 .index(1),
-        ).get_matches();
+        )
+        .get_matches();
     let mut f = File::open(matches.value_of("INPUT").unwrap())?;
     let mut buffer = String::new();
     f.read_to_string(&mut buffer)?;
@@ -78,7 +79,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use common::Expression;
+    use crate::common::Expression;
     use std::collections::HashMap;
     use std::io::Cursor;
 
@@ -214,7 +215,7 @@ mod tests {
 
     #[test]
     fn double_increment() {
-        let end_variables = hashmap!{
+        let end_variables = hashmap! {
             "my world" => Expression::Floating(2f64),
         };
         test_program(
@@ -226,7 +227,7 @@ mod tests {
 
     #[test]
     fn double_decrement() {
-        let end_variables = hashmap!{
+        let end_variables = hashmap! {
             "the walls" => Expression::Floating(-2f64),
         };
         test_program(

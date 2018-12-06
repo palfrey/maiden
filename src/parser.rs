@@ -1,8 +1,8 @@
 // because nom macros
-#![cfg_attr(feature = "cargo-clippy", allow(double_parens))]
-#![cfg_attr(feature = "cargo-clippy", allow(double_comparisons))]
+#![allow(clippy::double_parens)]
+#![allow(clippy::double_comparisons)]
 
-use common::*;
+use crate::common::*;
 use nom;
 use nom::types::CompleteStr;
 use std::collections::HashMap;
@@ -312,7 +312,7 @@ named!(not_expr(Span) -> SymbolType,
     )
 );
 
-#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
 fn multiply_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     let (rest, (mut res, mut times)) = do_parse!(
         input,
@@ -338,7 +338,7 @@ fn multiply_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     return Ok((rest, res));
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
 fn add_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     let (rest, (mut res, mut adds)) = do_parse!(
         input,
@@ -346,13 +346,14 @@ fn add_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
             >> adds: many0!(do_parse!(
                 take_while1!(is_space)
                     >> op: alt_complete!(
-                    alt_complete!(
-                        tag_no_case!("without") | tag_no_case!("minus")
-                    ) => {|_| SymbolType::Subtract} |
-                    alt_complete!(
-                        tag_no_case!("with") | tag_no_case!("plus")
-                    ) => {|_| SymbolType::Add}
-                ) >> take_while1!(is_space)
+                        alt_complete!(
+                            tag_no_case!("without") | tag_no_case!("minus")
+                        ) => {|_| SymbolType::Subtract} |
+                        alt_complete!(
+                            tag_no_case!("with") | tag_no_case!("plus")
+                        ) => {|_| SymbolType::Add}
+                    )
+                    >> take_while1!(is_space)
                     >> other_me: multiply_expr
                     >> (op, other_me)
             ))
@@ -365,7 +366,7 @@ fn add_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     return Ok((rest, res));
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
 fn inequality_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     let (rest, (mut res, mut ineqs)) = do_parse!(
         input,
@@ -389,7 +390,7 @@ fn inequality_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     return Ok((rest, res));
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
 fn equality_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     let (rest, (mut res, mut eqs)) = do_parse!(
         input,
@@ -397,13 +398,14 @@ fn equality_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
             >> eqs: many0!(do_parse!(
                 take_while1!(is_space)
                     >> kind: alt_complete!(
-                    alt_complete!(
-                        tag!("is") | tag!("was") | tag!("are") | tag!("were")
-                    ) => {|_| SymbolType::Is} |
-                    alt_complete!(
-                        tag_no_case!("ain't") | tag_no_case!("aint")
-                    ) => {|_| SymbolType::Aint}
-                ) >> take_while1!(is_space)
+                        alt_complete!(
+                            tag!("is") | tag!("was") | tag!("are") | tag!("were")
+                        ) => {|_| SymbolType::Is} |
+                        alt_complete!(
+                            tag_no_case!("ain't") | tag_no_case!("aint")
+                        ) => {|_| SymbolType::Aint}
+                    )
+                    >> take_while1!(is_space)
                     >> other_ie: inequality_expr
                     >> (kind, other_ie)
             ))
@@ -423,10 +425,11 @@ fn boolean_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
             >> bqs: many0!(do_parse!(
                 take_while1!(is_space)
                     >> kind: alt_complete!(
-                    tag_no_case!("and") => {|_| SymbolType::And} |
-                    tag_no_case!("or") => {|_| SymbolType::Or} |
-                    tag_no_case!("nor") => {|_| SymbolType::Nor}
-                ) >> take_while1!(is_space)
+                        tag_no_case!("and") => {|_| SymbolType::And} |
+                        tag_no_case!("or") => {|_| SymbolType::Or} |
+                        tag_no_case!("nor") => {|_| SymbolType::Nor}
+                    )
+                    >> take_while1!(is_space)
                     >> other_ee: equality_expr
                     >> (kind, other_ee)
             ))
@@ -938,7 +941,7 @@ fn build_next(commands: &mut Vec<CommandLine>, loop_starts: &mut Vec<usize>) -> 
     return Command::Next { loop_start };
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
 pub fn parse(input: &str) -> Result<Program> {
     let raw_lines = lines(&input)?;
     if !raw_lines.0.fragment.is_empty() && raw_lines.0.fragment.chars().any(|c| !c.is_whitespace())
@@ -1365,7 +1368,8 @@ mod tests {
                     "ladykiller".to_string()
                 ]),
                 0
-            ).unwrap(),
+            )
+            .unwrap(),
             Expression::Floating(100f64)
         );
     }

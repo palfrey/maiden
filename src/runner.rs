@@ -1,4 +1,4 @@
-use common::*;
+use crate::common::*;
 use std;
 use std::collections::HashMap;
 use std::io::{self, Write};
@@ -81,9 +81,11 @@ fn run_binop_shortcut(
                 }
             }
         },
-        Expression::String(_) => if let Expression::String(_) = res_second {
-            return Ok(f(state, &res_first, &res_second)?);
-        },
+        Expression::String(_) => {
+            if let Expression::String(_) = res_second {
+                return Ok(f(state, &res_first, &res_second)?);
+            }
+        }
         Expression::Mysterious => {
             if let Expression::Mysterious = res_second {
                 return Ok(true);
@@ -182,9 +184,11 @@ fn run_mathbinop(
                     let second_value = *i;
                     return Ok(Expression::Floating(f(0f64, second_value)));
                 }
-                Expression::String(ref s_s) => if let Expression::Add(_, _) = op {
-                    return Ok(Expression::String(format!("null{}", s_s)));
-                },
+                Expression::String(ref s_s) => {
+                    if let Expression::Add(_, _) = op {
+                        return Ok(Expression::String(format!("null{}", s_s)));
+                    }
+                }
                 Expression::Null => {
                     return Ok(Expression::Floating(f(0f64, 0f64)));
                 }
@@ -289,7 +293,7 @@ fn call_function(
     return run_core(&mut new_state, program, func.location + 1);
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
 fn run_expression(
     state: &mut State,
     program: &Program,
@@ -449,16 +453,14 @@ fn run_expression(
 pub fn run(program: &Program, writer: &mut Write) -> Result<HashMap<String, Expression>> {
     let pc = 0;
     let mut variables: HashMap<String, Expression> = HashMap::new();
-    {
-        let mut state = State {
-            variables: &mut variables,
-            writer,
-            current_line: 0,
-            depth: 0,
-            pronoun: None,
-        };
-        run_core(&mut state, program, pc)?;
-    } // FIXME: Drop once NLL is merged
+    let mut state = State {
+        variables: &mut variables,
+        writer,
+        current_line: 0,
+        depth: 0,
+        pronoun: None,
+    };
+    run_core(&mut state, program, pc)?;
     return Ok(variables);
 }
 

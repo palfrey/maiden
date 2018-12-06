@@ -182,7 +182,7 @@ pub struct Program {
     pub functions: HashMap<String, Function>,
 }
 
-error_chain!{
+error_chain! {
     foreign_links {
         Io(::std::io::Error);
     }
