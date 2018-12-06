@@ -1,6 +1,6 @@
 // because nom macros
-#![cfg_attr(feature = "cargo-clippy", allow(double_parens))]
-#![cfg_attr(feature = "cargo-clippy", allow(double_comparisons))]
+#![allow(clippy::double_parens)]
+#![allow(clippy::double_comparisons)]
 
 use crate::common::*;
 use nom;
@@ -312,7 +312,7 @@ named!(not_expr(Span) -> SymbolType,
     )
 );
 
-#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
 fn multiply_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     let (rest, (mut res, mut times)) = do_parse!(
         input,
@@ -338,7 +338,7 @@ fn multiply_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     return Ok((rest, res));
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
 fn add_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     let (rest, (mut res, mut adds)) = do_parse!(
         input,
@@ -366,7 +366,7 @@ fn add_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     return Ok((rest, res));
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
 fn inequality_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     let (rest, (mut res, mut ineqs)) = do_parse!(
         input,
@@ -390,7 +390,7 @@ fn inequality_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     return Ok((rest, res));
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
 fn equality_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     let (rest, (mut res, mut eqs)) = do_parse!(
         input,
@@ -941,7 +941,7 @@ fn build_next(commands: &mut Vec<CommandLine>, loop_starts: &mut Vec<usize>) -> 
     return Command::Next { loop_start };
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
 pub fn parse(input: &str) -> Result<Program> {
     let raw_lines = lines(&input)?;
     if !raw_lines.0.fragment.is_empty() && raw_lines.0.fragment.chars().any(|c| !c.is_whitespace())

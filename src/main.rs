@@ -1,6 +1,6 @@
 #![recursion_limit = "5000"]
 #![deny(warnings)]
-#![cfg_attr(feature = "cargo-clippy", allow(needless_return))]
+#![allow(clippy::needless_return)]
 
 #[macro_use]
 extern crate nom;

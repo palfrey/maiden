@@ -293,7 +293,7 @@ fn call_function(
     return run_core(&mut new_state, program, func.location + 1);
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))] // FIXME: break this up a bit
+#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
 fn run_expression(
     state: &mut State,
     program: &Program,
