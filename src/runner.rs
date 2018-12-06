@@ -81,9 +81,11 @@ fn run_binop_shortcut(
                 }
             }
         },
-        Expression::String(_) => if let Expression::String(_) = res_second {
-            return Ok(f(state, &res_first, &res_second)?);
-        },
+        Expression::String(_) => {
+            if let Expression::String(_) = res_second {
+                return Ok(f(state, &res_first, &res_second)?);
+            }
+        }
         Expression::Mysterious => {
             if let Expression::Mysterious = res_second {
                 return Ok(true);
@@ -182,9 +184,11 @@ fn run_mathbinop(
                     let second_value = *i;
                     return Ok(Expression::Floating(f(0f64, second_value)));
                 }
-                Expression::String(ref s_s) => if let Expression::Add(_, _) = op {
-                    return Ok(Expression::String(format!("null{}", s_s)));
-                },
+                Expression::String(ref s_s) => {
+                    if let Expression::Add(_, _) = op {
+                        return Ok(Expression::String(format!("null{}", s_s)));
+                    }
+                }
                 Expression::Null => {
                     return Ok(Expression::Floating(f(0f64, 0f64)));
                 }

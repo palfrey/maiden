@@ -38,7 +38,8 @@ fn main() {
                 name = name,
                 test_name = test_name,
                 function = function
-            ).unwrap();
+            )
+            .unwrap();
         }
     }
 }

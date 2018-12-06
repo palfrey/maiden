@@ -346,13 +346,14 @@ fn add_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
             >> adds: many0!(do_parse!(
                 take_while1!(is_space)
                     >> op: alt_complete!(
-                    alt_complete!(
-                        tag_no_case!("without") | tag_no_case!("minus")
-                    ) => {|_| SymbolType::Subtract} |
-                    alt_complete!(
-                        tag_no_case!("with") | tag_no_case!("plus")
-                    ) => {|_| SymbolType::Add}
-                ) >> take_while1!(is_space)
+                        alt_complete!(
+                            tag_no_case!("without") | tag_no_case!("minus")
+                        ) => {|_| SymbolType::Subtract} |
+                        alt_complete!(
+                            tag_no_case!("with") | tag_no_case!("plus")
+                        ) => {|_| SymbolType::Add}
+                    )
+                    >> take_while1!(is_space)
                     >> other_me: multiply_expr
                     >> (op, other_me)
             ))
@@ -397,13 +398,14 @@ fn equality_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
             >> eqs: many0!(do_parse!(
                 take_while1!(is_space)
                     >> kind: alt_complete!(
-                    alt_complete!(
-                        tag!("is") | tag!("was") | tag!("are") | tag!("were")
-                    ) => {|_| SymbolType::Is} |
-                    alt_complete!(
-                        tag_no_case!("ain't") | tag_no_case!("aint")
-                    ) => {|_| SymbolType::Aint}
-                ) >> take_while1!(is_space)
+                        alt_complete!(
+                            tag!("is") | tag!("was") | tag!("are") | tag!("were")
+                        ) => {|_| SymbolType::Is} |
+                        alt_complete!(
+                            tag_no_case!("ain't") | tag_no_case!("aint")
+                        ) => {|_| SymbolType::Aint}
+                    )
+                    >> take_while1!(is_space)
                     >> other_ie: inequality_expr
                     >> (kind, other_ie)
             ))
@@ -423,10 +425,11 @@ fn boolean_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
             >> bqs: many0!(do_parse!(
                 take_while1!(is_space)
                     >> kind: alt_complete!(
-                    tag_no_case!("and") => {|_| SymbolType::And} |
-                    tag_no_case!("or") => {|_| SymbolType::Or} |
-                    tag_no_case!("nor") => {|_| SymbolType::Nor}
-                ) >> take_while1!(is_space)
+                        tag_no_case!("and") => {|_| SymbolType::And} |
+                        tag_no_case!("or") => {|_| SymbolType::Or} |
+                        tag_no_case!("nor") => {|_| SymbolType::Nor}
+                    )
+                    >> take_while1!(is_space)
                     >> other_ee: equality_expr
                     >> (kind, other_ee)
             ))
@@ -1365,7 +1368,8 @@ mod tests {
                     "ladykiller".to_string()
                 ]),
                 0
-            ).unwrap(),
+            )
+            .unwrap(),
             Expression::Floating(100f64)
         );
     }
