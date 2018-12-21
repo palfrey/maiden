@@ -13,6 +13,10 @@ cache:
 before_cache:
   - rm -rf /home/travis/.cargo/registry
 
+matrix:
+  allow_failures:
+  - rust: nightly
+
 stages:
 - test
 - name: deploy
@@ -34,7 +38,7 @@ jobs:
     script: cargo build --all && cargo test --all
   - stage: test
     name: web
-    rust: nightly
+    rust: stable
     before_script: which cargo-web || cargo install cargo-web
     script: cargo web build
   - stage: test
@@ -42,7 +46,7 @@ jobs:
     script: cargo build --all && cargo test --all
   - stage: deploy
     if: branch = master AND type != pull_request
-    rust: nightly
+    rust: stable
     before_script: which cargo-web || cargo install cargo-web
     script: cargo web deploy && GIT_DEPLOY_DIR=./target/deploy ./deploy.sh
     env:

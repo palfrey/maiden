@@ -19,7 +19,6 @@ Usage
 Web version
 -----------
 There's a deployed edition at https://palfrey.github.io/maiden/. To work with it
-1. [Install Rust nightly](https://github.com/rust-lang-nursery/rustup.rs/#working-with-nightly-rust) (to work around stdweb needing procedural macros. See also https://github.com/rust-lang/rust/issues/38356)
-2. [Install cargo web](https://github.com/koute/cargo-web#installation)
-3. Run `cargo +nightly web start --auto-reload`
-4. Goto http://localhost:8000/
+1. [Install cargo web](https://github.com/koute/cargo-web#installation)
+2. Run `cargo web start --auto-reload`
+3. Goto http://localhost:8000/
