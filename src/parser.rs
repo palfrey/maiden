@@ -24,12 +24,8 @@ fn is_not_newline(chr: char) -> bool {
     !is_newline(chr)
 }
 
-fn is_quote(chr: char) -> bool {
-    chr == '\"' || chr == '\''
-}
-
 fn string_character(chr: char) -> bool {
-    !is_newline(chr) && !is_quote(chr)
+    !is_newline(chr) && chr != '\"'
 }
 
 fn variable_character(chr: char) -> bool {
@@ -1595,6 +1591,25 @@ mod tests {
         let functions = HashMap::new();
         assert_eq!(
             parse("While Davy ain't Greatness").unwrap(),
+            Program {
+                commands,
+                functions
+            }
+        );
+    }
+
+    #[test]
+    fn permitted_apostrophes() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let functions = HashMap::new();
+        let commands = vec![CommandLine {
+            cmd: Command::Say {
+                value: Expression::String("This ain't not allowed!".to_string()),
+            },
+            line: 1,
+        }];
+        assert_eq!(
+            parse("Shout \"This ain't not allowed!\"").unwrap(),
             Program {
                 commands,
                 functions
