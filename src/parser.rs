@@ -947,19 +947,7 @@ macro_rules! last_block {
     }};
 }
 
-macro_rules! pop_block {
-    ($items:expr, $type:path) => {{
-        let location = block_location!($items, $type);
-        if let $type(x) = $items.remove(location.unwrap()) {
-            x
-        } else {
-            panic!("BlockStart without usize");
-        }
-    }};
-}
-
-fn build_next(commands: &mut Vec<CommandLine>, block_starts: &mut Vec<BlockStart>) -> Command {
-    let loop_start = pop_block!(block_starts, BlockStart::Loop);
+fn build_next(commands: &mut Vec<CommandLine>, loop_start: usize) -> Command {
     let loop_len = commands.len();
     match commands.index_mut(loop_start).cmd {
         Command::Until {
@@ -1018,7 +1006,8 @@ pub fn parse(input: &str) -> Result<Program> {
                 if next_block!(block_starts, BlockStart::Loop).is_none() {
                     bail!(ErrorKind::NextOutsideLoop(current_line));
                 }
-                let command = build_next(&mut commands, &mut block_starts);
+                let loop_start = last_block!(block_starts, BlockStart::Loop);
+                let command = build_next(&mut commands, *loop_start);
                 commands.push(CommandLine {
                     cmd: command,
                     line: current_line,
@@ -1038,65 +1027,78 @@ pub fn parse(input: &str) -> Result<Program> {
             }
             [SymbolType::Newline] | [] => {
                 // Comment on it's own is newline-equivalent
-                if next_block!(block_starts, BlockStart::If).is_some() {
-                    let if_start = pop_block!(block_starts, BlockStart::If);
-                    let if_len = commands.len();
-                    match commands.index_mut(if_start) {
-                        CommandLine {
-                            cmd: Command::If { ref mut if_end, .. },
-                            ..
-                        } => {
-                            if_end.get_or_insert(if_len);
-                        }
-                        _ => {
-                            panic!("return to non-if command");
+                match block_starts.pop() {
+                    None => {
+                        debug!("Double newline that doesn't end anything");
+                    }
+                    Some(start) => {
+                        match start {
+                            BlockStart::If(if_start) => {
+                                let if_len = commands.len();
+                                match commands.index_mut(if_start) {
+                                    CommandLine {
+                                        cmd: Command::If { ref mut if_end, .. },
+                                        ..
+                                    } => {
+                                        if_end.get_or_insert(if_len);
+                                    }
+                                    _ => {
+                                        panic!("return to non-if command");
+                                    }
+                                }
+                                commands.push(CommandLine {
+                                    cmd: Command::EndIf,
+                                    line: if !symbols.is_empty()
+                                        && symbols[0] == SymbolType::Newline
+                                    {
+                                        current_line + 1 // Newline line is the one before this
+                                    } else {
+                                        current_line
+                                    },
+                                });
+                            }
+                            BlockStart::Loop(loop_start) => {
+                                let command = build_next(&mut commands, loop_start);
+                                commands.push(CommandLine {
+                                    cmd: command,
+                                    line: if !symbols.is_empty()
+                                        && symbols[0] == SymbolType::Newline
+                                    {
+                                        current_line + 1 // Newline line is the one before this
+                                    } else {
+                                        current_line
+                                    },
+                                });
+                            }
+                            BlockStart::Func(func_start) => {
+                                let func_len = commands.len();
+                                match commands.index_mut(func_start) {
+                                    CommandLine {
+                                        cmd:
+                                            Command::FunctionDeclaration {
+                                                ref mut func_end, ..
+                                            },
+                                        ..
+                                    } => {
+                                        func_end.get_or_insert(func_len);
+                                    }
+                                    _ => {
+                                        panic!("return to non-func command");
+                                    }
+                                }
+                                commands.push(CommandLine {
+                                    cmd: Command::EndFunction,
+                                    line: if !symbols.is_empty()
+                                        && symbols[0] == SymbolType::Newline
+                                    {
+                                        current_line + 1 // Newline line is the one before this
+                                    } else {
+                                        current_line
+                                    },
+                                });
+                            }
                         }
                     }
-                    commands.push(CommandLine {
-                        cmd: Command::EndIf,
-                        line: if !symbols.is_empty() && symbols[0] == SymbolType::Newline {
-                            current_line + 1 // Newline line is the one before this
-                        } else {
-                            current_line
-                        },
-                    });
-                } else if next_block!(block_starts, BlockStart::Loop).is_some() {
-                    let command = build_next(&mut commands, &mut block_starts);
-                    commands.push(CommandLine {
-                        cmd: command,
-                        line: if !symbols.is_empty() && symbols[0] == SymbolType::Newline {
-                            current_line + 1 // Newline line is the one before this
-                        } else {
-                            current_line
-                        },
-                    });
-                } else if next_block!(block_starts, BlockStart::Func).is_some() {
-                    let func_start = pop_block!(block_starts, BlockStart::Func);
-                    let func_len = commands.len();
-                    match commands.index_mut(func_start) {
-                        CommandLine {
-                            cmd:
-                                Command::FunctionDeclaration {
-                                    ref mut func_end, ..
-                                },
-                            ..
-                        } => {
-                            func_end.get_or_insert(func_len);
-                        }
-                        _ => {
-                            panic!("return to non-func command");
-                        }
-                    }
-                    commands.push(CommandLine {
-                        cmd: Command::EndFunction,
-                        line: if !symbols.is_empty() && symbols[0] == SymbolType::Newline {
-                            current_line + 1 // Newline line is the one before this
-                        } else {
-                            current_line
-                        },
-                    });
-                } else {
-                    debug!("Double newline that doesn't end anything");
                 }
             }
             [SymbolType::Listen] => {
@@ -1741,5 +1743,60 @@ mod tests {
         } else {
             assert!(false, format!("{:?}", err));
         }
+    }
+
+    // test sequence of use of empty line between else and while
+    #[test]
+    fn if_while_exit_sequence() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let functions = HashMap::new();
+        let commands = vec![
+            CommandLine {
+                cmd: Command::If {
+                    expression: Expression::False,
+                    if_end: Some(6),
+                    else_loc: Some(2),
+                },
+                line: 1,
+            },
+            CommandLine {
+                cmd: Command::Say {
+                    value: Expression::String("bar".to_string()),
+                },
+                line: 2,
+            },
+            CommandLine {
+                cmd: Command::Else { if_start: 0 },
+                line: 3,
+            },
+            CommandLine {
+                cmd: Command::While {
+                    expression: Expression::True,
+                    loop_end: Some(5),
+                },
+                line: 4,
+            },
+            CommandLine {
+                cmd: Command::Say {
+                    value: Expression::String("foo".to_string()),
+                },
+                line: 5,
+            },
+            CommandLine {
+                cmd: Command::Next { loop_start: 3 },
+                line: 6,
+            },
+            CommandLine {
+                cmd: Command::EndIf,
+                line: 7,
+            },
+        ];
+        assert_eq!(
+            parse("if false\nsay \"bar\"\nelse\nwhile true\nsay \"foo\"\n\n").unwrap(),
+            Program {
+                commands,
+                functions
+            }
+        );
     }
 }
