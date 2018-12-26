@@ -80,6 +80,7 @@ fn main() {
 mod tests {
     use super::*;
     use crate::common::Expression;
+    use pretty_assertions::assert_eq;
     use std::collections::HashMap;
     use std::io::Cursor;
 
