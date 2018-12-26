@@ -58,8 +58,21 @@
                 var editor = document.getElementById("editor");
                 if (editor != null) {
                     window.codeMirror = CodeMirror.fromTextArea(editor,{
-                        lineNumbers: true
+                        lineNumbers: true,
+                        lineNumberFormatter: function(number) {
+                            return number.toString().padStart(window.numberLength, '0');
+                        }
                     });
+                    function setLineNumbers(cm) {
+                        const value = cm.getValue();
+                        var count = (value.match(/\n/g) || []).length + 1;
+                        window.numberLength = Math.ceil(Math.log10(count + 1));
+                        cm.refresh();
+                    }
+                    window.codeMirror.on('change', function(cm) {
+                        setLineNumbers(cm);
+                    })
+                    setLineNumbers(window.codeMirror);
                     console.log("setup");
                 }
                 else {

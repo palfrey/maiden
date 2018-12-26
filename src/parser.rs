@@ -1346,6 +1346,8 @@ pub fn print_program(program: &Program) -> String {
     let mut res = String::new();
     let mut indent = 0;
     let mut last_line = 0;
+    let max_line: f32 = (program.commands.iter().fold(0, |acc, x| acc.max(x.line))) as f32;
+    let max_number_length: usize = (max_line + 1.0).log10().ceil() as usize;
     for command in &program.commands {
         match command.cmd {
             Command::EndFunction | Command::Else { .. } | Command::EndIf | Command::Next { .. } => {
@@ -1355,10 +1357,10 @@ pub fn print_program(program: &Program) -> String {
         }
         while last_line < command.line - 1 {
             last_line += 1;
-            res += &format!("{}:\n", last_line);
+            res += &format!("{:0width$}:\n", last_line, width = max_number_length);
         }
         last_line = command.line;
-        res += &format!("{}: ", command.line);
+        res += &format!("{:0width$}: ", command.line, width = max_number_length);
         for _ in 0..indent {
             res += "  ";
         }
