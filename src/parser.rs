@@ -916,8 +916,50 @@ fn parse_expression_1(
     return Ok((lhs.clone(), index));
 }
 
-fn build_next(commands: &mut Vec<CommandLine>, loop_starts: &mut Vec<usize>) -> Command {
-    let loop_start = loop_starts.pop().expect("loop_starts");
+enum BlockStart {
+    Loop(usize),
+    Func(usize),
+    If(usize),
+}
+
+macro_rules! block_location {
+    ($items:expr, $type:path) => {
+        $items
+            .iter()
+            .rposition(|x| if let $type(_) = x { true } else { false })
+    };
+}
+
+macro_rules! next_block {
+    ($items:expr, $type:path) => {
+        block_location!($items, $type)
+    };
+}
+
+macro_rules! last_block {
+    ($items:expr, $type:path) => {{
+        let location = block_location!($items, $type);
+        if let $type(ref x) = $items.get_mut(location.unwrap()).unwrap() {
+            x
+        } else {
+            panic!("BlockStart without usize");
+        }
+    }};
+}
+
+macro_rules! pop_block {
+    ($items:expr, $type:path) => {{
+        let location = block_location!($items, $type);
+        if let $type(x) = $items.remove(location.unwrap()) {
+            x
+        } else {
+            panic!("BlockStart without usize");
+        }
+    }};
+}
+
+fn build_next(commands: &mut Vec<CommandLine>, block_starts: &mut Vec<BlockStart>) -> Command {
+    let loop_start = pop_block!(block_starts, BlockStart::Loop);
     let loop_len = commands.len();
     match commands.index_mut(loop_start).cmd {
         Command::Until {
@@ -949,9 +991,7 @@ pub fn parse(input: &str) -> Result<Program> {
     debug!("{:?}", raw_lines);
     let mut functions: HashMap<String, Function> = HashMap::new();
     let mut commands: Vec<CommandLine> = Vec::new();
-    let mut loop_starts: Vec<usize> = Vec::new();
-    let mut func_starts: Vec<usize> = Vec::new();
-    let mut if_starts: Vec<usize> = Vec::new();
+    let mut block_starts: Vec<BlockStart> = Vec::new();
     let mut last_line = 0;
     let mut pronoun: Option<String> = None;
     for raw_symbols in raw_lines.1 {
@@ -975,20 +1015,20 @@ pub fn parse(input: &str) -> Result<Program> {
         let symbols: Vec<SymbolType> = symbols.into_iter().map(|t| t.symbol).collect();
         match symbols.as_slice() {
             [SymbolType::Next] => {
-                if loop_starts.is_empty() {
+                if next_block!(block_starts, BlockStart::Loop).is_none() {
                     bail!(ErrorKind::NextOutsideLoop(current_line));
                 }
-                let command = build_next(&mut commands, &mut loop_starts);
+                let command = build_next(&mut commands, &mut block_starts);
                 commands.push(CommandLine {
                     cmd: command,
                     line: current_line,
                 });
             }
             [SymbolType::Continue] => {
-                if loop_starts.is_empty() {
+                if next_block!(block_starts, BlockStart::Loop).is_none() {
                     bail!(ErrorKind::ContinueOutsideLoop(current_line));
                 }
-                let loop_start = loop_starts.last().unwrap();
+                let loop_start = last_block!(block_starts, BlockStart::Loop);
                 commands.push(CommandLine {
                     cmd: Command::Continue {
                         loop_start: *loop_start,
@@ -998,8 +1038,8 @@ pub fn parse(input: &str) -> Result<Program> {
             }
             [SymbolType::Newline] | [] => {
                 // Comment on it's own is newline-equivalent
-                if !if_starts.is_empty() {
-                    let if_start = if_starts.pop().expect("if_starts");
+                if next_block!(block_starts, BlockStart::If).is_some() {
+                    let if_start = pop_block!(block_starts, BlockStart::If);
                     let if_len = commands.len();
                     match commands.index_mut(if_start) {
                         CommandLine {
@@ -1020,8 +1060,8 @@ pub fn parse(input: &str) -> Result<Program> {
                             current_line
                         },
                     });
-                } else if !loop_starts.is_empty() {
-                    let command = build_next(&mut commands, &mut loop_starts);
+                } else if next_block!(block_starts, BlockStart::Loop).is_some() {
+                    let command = build_next(&mut commands, &mut block_starts);
                     commands.push(CommandLine {
                         cmd: command,
                         line: if !symbols.is_empty() && symbols[0] == SymbolType::Newline {
@@ -1030,8 +1070,8 @@ pub fn parse(input: &str) -> Result<Program> {
                             current_line
                         },
                     });
-                } else if !func_starts.is_empty() {
-                    let func_start = func_starts.pop().expect("func_starts");
+                } else if next_block!(block_starts, BlockStart::Func).is_some() {
+                    let func_start = pop_block!(block_starts, BlockStart::Func);
                     let func_len = commands.len();
                     match commands.index_mut(func_start) {
                         CommandLine {
@@ -1074,10 +1114,10 @@ pub fn parse(input: &str) -> Result<Program> {
                 });
             }
             [SymbolType::Else] => {
-                if if_starts.is_empty() {
+                if next_block!(block_starts, BlockStart::If).is_none() {
                     bail!(ErrorKind::ElseWithNoIf(current_line));
                 }
-                let if_start = if_starts.last().expect("if_starts");
+                let if_start = last_block!(block_starts, BlockStart::If);
                 let if_len = commands.len();
                 match commands.index_mut(*if_start) {
                     CommandLine {
@@ -1108,10 +1148,10 @@ pub fn parse(input: &str) -> Result<Program> {
                 });
             }
             [SymbolType::Break] => {
-                if loop_starts.is_empty() {
+                if next_block!(block_starts, BlockStart::Loop).is_none() {
                     bail!(ErrorKind::BreakOutsideLoop(current_line));
                 }
-                let loop_start = loop_starts.last().expect("loop_starts");
+                let loop_start = last_block!(block_starts, BlockStart::Loop);
                 commands.push(CommandLine {
                     cmd: Command::Break {
                         loop_start: *loop_start,
@@ -1135,7 +1175,7 @@ pub fn parse(input: &str) -> Result<Program> {
                 });
             }
             [SymbolType::Takes { ref name, ref args }] => {
-                func_starts.push(commands.len());
+                block_starts.push(BlockStart::Func(commands.len()));
                 functions.insert(
                     name.to_string(),
                     Function {
@@ -1210,7 +1250,7 @@ pub fn parse(input: &str) -> Result<Program> {
                         line: current_line,
                     });
                 } else if symbols[0] == SymbolType::Until && symbols.len() > 1 {
-                    loop_starts.push(commands.len());
+                    block_starts.push(BlockStart::Loop(commands.len()));
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
                     let expression = parse_expression(&expression_seq, current_line)?;
                     commands.push(CommandLine {
@@ -1221,7 +1261,7 @@ pub fn parse(input: &str) -> Result<Program> {
                         line: current_line,
                     });
                 } else if symbols[0] == SymbolType::While && symbols.len() > 1 {
-                    loop_starts.push(commands.len());
+                    block_starts.push(BlockStart::Loop(commands.len()));
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
                     let expression = parse_expression(&expression_seq, current_line)?;
                     commands.push(CommandLine {
@@ -1232,7 +1272,7 @@ pub fn parse(input: &str) -> Result<Program> {
                         line: current_line,
                     });
                 } else if symbols[0] == SymbolType::If && symbols.len() > 1 {
-                    if_starts.push(commands.len());
+                    block_starts.push(BlockStart::If(commands.len()));
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
                     let expression = parse_expression(&expression_seq, current_line)?;
                     commands.push(CommandLine {
@@ -1338,8 +1378,8 @@ pub fn print_program(program: &Program) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_env_logger;
     use pretty_assertions::assert_eq;
+    use pretty_env_logger;
 
     #[test]
     fn multi_word_quote_parse() {
