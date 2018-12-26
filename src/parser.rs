@@ -1339,6 +1339,7 @@ pub fn print_program(program: &Program) -> String {
 mod tests {
     use super::*;
     use pretty_env_logger;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn multi_word_quote_parse() {

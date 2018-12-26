@@ -7,6 +7,7 @@ mod integration {
     use std::fs::File;
     use std::io::{ErrorKind, Read};
     use std::process::Command;
+    use pretty_assertions::assert_eq;
 
     include!(concat!(env!("OUT_DIR"), "/test.rs"));
 
