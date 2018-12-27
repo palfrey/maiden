@@ -506,12 +506,6 @@ named!(word(Span) -> Vec<SymbolType>,
             comp: compare >>
             (pv, comp)
         ) => {|(pv, comp):(String, SymbolType)| vec![SymbolType::Variable(pv), comp]} |
-        do_parse!(
-            tag!("(") >>
-            take_until!(")") >>
-            tag!(")") >>
-            ()
-        ) => {|_| vec![SymbolType::Comment] } |
         boolean_expr => {|e| e}
     )
 );
@@ -681,9 +675,6 @@ fn compact_words(line: Vec<Token>) -> Vec<Token> {
         match word.symbol {
             SymbolType::Words(other) => {
                 words.extend_from_slice(&other);
-            }
-            SymbolType::Comment => {
-                // strip these
             }
             _ => {
                 if !words.is_empty() {
@@ -969,7 +960,17 @@ fn build_next(commands: &mut Vec<CommandLine>, loop_start: usize) -> Command {
 
 #[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
 pub fn parse(input: &str) -> Result<Program> {
-    let raw_lines = lines(&input)?;
+    let mut functions: HashMap<String, Function> = HashMap::new();
+    let mut commands: Vec<CommandLine> = Vec::new();
+    let re = regex::Regex::new(r"(\([^\)]*\))").unwrap();
+    let uncommented = re.replace_all(input, "");
+    if uncommented.is_empty() {
+        return Ok(Program {
+            commands,
+            functions,
+        });
+    }
+    let raw_lines = lines(&uncommented)?;
     if !raw_lines.0.fragment.is_empty() && raw_lines.0.fragment.chars().any(|c| !c.is_whitespace())
     {
         // ignore empty and all-whitespace blocks
@@ -977,8 +978,6 @@ pub fn parse(input: &str) -> Result<Program> {
         bail!(ErrorKind::UnparsedText(pos.fragment.to_string(), pos.line));
     }
     debug!("{:?}", raw_lines);
-    let mut functions: HashMap<String, Function> = HashMap::new();
-    let mut commands: Vec<CommandLine> = Vec::new();
     let mut block_starts: Vec<BlockStart> = Vec::new();
     let mut last_line = 0;
     let mut pronoun: Option<String> = None;
@@ -1504,7 +1503,24 @@ mod tests {
 
     #[test]
     fn comment_parsing() {
-        lines_tokens_check("(foo bar baz)", vec![SymbolType::Comment]);
+        assert_eq!(
+            parse("(foo bar baz)").unwrap(),
+            Program {
+                commands: vec![],
+                functions: HashMap::new()
+            }
+        );
+    }
+
+    #[test]
+    fn empty_program() {
+        assert_eq!(
+            parse("").unwrap(),
+            Program {
+                commands: vec![],
+                functions: HashMap::new()
+            }
+        );
     }
 
     #[test]
@@ -1795,6 +1811,26 @@ mod tests {
         ];
         assert_eq!(
             parse("if false\nsay \"bar\"\nelse\nwhile true\nsay \"foo\"\n\n").unwrap(),
+            Program {
+                commands,
+                functions
+            }
+        );
+    }
+
+    #[test]
+    fn comment_on_same_line() {
+        pretty_env_logger::try_init().unwrap_or(());
+        let functions = HashMap::new();
+        let commands = vec![CommandLine {
+            cmd: Command::Assignment {
+                target: "Cold Steel".to_string(),
+                value: Expression::Floating(1.0),
+            },
+            line: 1,
+        }];
+        assert_eq!(
+            parse("Cold Steel is liquidizing (The ceiling starts spinning)").unwrap(),
             Program {
                 commands,
                 functions
