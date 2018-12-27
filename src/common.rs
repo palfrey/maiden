@@ -83,7 +83,6 @@ pub enum SymbolType {
     Words(Vec<String>),
     Integer(String),
     Floating(String),
-    Comment,
     Listen,
     Divide,
     True,
