@@ -24,12 +24,7 @@ fn nicer_error(err: &common::Error, full_text: &str) -> String {
     } else {
         full_text.split("\n").nth(line - 1).unwrap()
     };
-    format!(
-        "{} at line {}: \"{}\"",
-        err.0,
-        line,
-        line_display
-    )
+    format!("{} at line {}: \"{}\"", err.0, line, line_display)
 }
 
 impl Model {
