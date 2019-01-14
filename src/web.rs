@@ -1,6 +1,6 @@
-use common;
-use parser;
-use runner;
+use crate::common;
+use crate::parser;
+use crate::runner;
 use std;
 use yew::prelude::*;
 

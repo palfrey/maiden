@@ -1,6 +1,6 @@
 #![recursion_limit = "5000"]
 #![deny(warnings)]
-#![cfg_attr(feature = "cargo-clippy", allow(needless_return))]
+#![allow(clippy::needless_return)]
 
 #[macro_use]
 extern crate nom;
@@ -50,7 +50,8 @@ fn main() -> common::Result<()> {
                 .help("Sets the input file to use")
                 .required(true)
                 .index(1),
-        ).get_matches();
+        )
+        .get_matches();
     let mut f = File::open(matches.value_of("INPUT").unwrap())?;
     let mut buffer = String::new();
     f.read_to_string(&mut buffer)?;
@@ -78,7 +79,8 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use common::Expression;
+    use crate::common::Expression;
+    use pretty_assertions::assert_eq;
     use std::collections::HashMap;
     use std::io::Cursor;
 
@@ -120,10 +122,10 @@ mod tests {
         Build Counter up
     End";
         let end_variables = hashmap! {
-            "buzz" => Expression::Integer(5),
-            "limit" => Expression::Integer(100),
-            "counter" => Expression::Integer(100),
-            "fizz" => Expression::Integer(3),
+            "buzz" => Expression::Floating(5f64),
+            "limit" => Expression::Floating(100f64),
+            "counter" => Expression::Floating(100f64),
+            "fizz" => Expression::Floating(3f64),
         };
         test_program(program, end_variables, "");
     }
@@ -136,19 +138,19 @@ mod tests {
     Hate is water
     Until my world is Desire,
     Build my world up
-    And around we go";
+    ";
         let end_variables = hashmap! {
-            "my world" => Expression::Integer(100),
-            "fire" => Expression::Integer(3),
-            "hate" => Expression::Integer(5),
-            "desire" => Expression::Integer(100),
+            "my world" => Expression::Floating(100f64),
+            "fire" => Expression::Floating(3f64),
+            "hate" => Expression::Floating(5f64),
+            "desire" => Expression::Floating(100f64),
         };
         test_program(program, end_variables, "");
     }
 
     #[test]
     fn rocking_fizzbuzz() {
-        let program = "Midnight takes your heart and your soul
+        let program = "Midnight takes your heart & your soul
     While your heart is as high as your soul
     Put your heart without your soul into your heart
 
@@ -173,12 +175,12 @@ mod tests {
     Take it to the top
 
     Whisper my world
-    And around we go";
+    ";
         let end_variables = hashmap! {
-            "my world" => Expression::Integer(100),
-            "fire" => Expression::Integer(3),
-            "hate" => Expression::Integer(5),
-            "desire" => Expression::Integer(100),
+            "my world" => Expression::Floating(100f64),
+            "fire" => Expression::Floating(3f64),
+            "hate" => Expression::Floating(5f64),
+            "desire" => Expression::Floating(100f64),
         };
         test_program(
             program,
@@ -207,15 +209,15 @@ mod tests {
     #[test]
     fn multiple_uppercase_proper_variable() {
         let end_variables = hashmap! {
-            "id" => Expression::Integer(3),
+            "id" => Expression::Floating(3f64),
         };
-        test_program("put foo into ID", end_variables, "");
+        test_program("put 3 into ID", end_variables, "");
     }
 
     #[test]
     fn double_increment() {
-        let end_variables = hashmap!{
-            "my world" => Expression::Integer(2),
+        let end_variables = hashmap! {
+            "my world" => Expression::Floating(2f64),
         };
         test_program(
             "Put 0 into my world\nBuild my world up, up",
@@ -226,8 +228,8 @@ mod tests {
 
     #[test]
     fn double_decrement() {
-        let end_variables = hashmap!{
-            "the walls" => Expression::Integer(-2),
+        let end_variables = hashmap! {
+            "the walls" => Expression::Floating(-2f64),
         };
         test_program(
             "Put 0 into the walls\nKnock the walls down, down",
@@ -237,11 +239,31 @@ mod tests {
     }
 
     #[test]
-    fn expression_comment() {
+    fn skip_else() {
         let end_variables = hashmap! {
-            "baz" => Expression::String("foo".to_string()),
+            "foo" => Expression::String("foo".to_string()),
         };
-        test_program("Baz is \"foo\" (bar)", end_variables, "");
+        test_program(
+            "if nothing is nothing
+        Foo says foo
+        Else
+        Bar says bar
+
+        ",
+            end_variables,
+            "",
+        );
+    }
+
+    #[test]
+    fn numeric_args() {
+        let err = test_error("Multiply taking 3, 5");
+        if let common::ErrorKind::MissingFunction(name, line) = err {
+            assert_eq!(name, "Multiply");
+            assert_eq!(line, 1);
+        } else {
+            assert!(false, err);
+        }
     }
 
     fn test_error(input: &str) -> common::ErrorKind {
@@ -264,42 +286,31 @@ mod tests {
 
     #[test]
     fn end_of_if() {
-        let err = test_error("if this is tests");
+        let err = test_error("if 1 is 2");
         if let common::ErrorKind::NoEndOfIf(line) = err {
             assert_eq!(line, 1);
         } else {
-            assert!(false, err);
-        }
-    }
-
-    #[test]
-    fn bad_boolean() {
-        let err = test_error("if t");
-        if let common::ErrorKind::BadBooleanResolve(name, line) = err {
-            assert_eq!(name, "Integer(1)");
-            assert_eq!(line, 1);
-        } else {
-            assert!(false, err);
+            assert!(false, format!("{:?}", err));
         }
     }
 
     #[test]
     fn no_end_func() {
-        let err = test_error("What Remains takes the fighters and a war");
+        let err = test_error("What Remains takes the fighters, and a war");
         if let common::ErrorKind::NoEndFunction(line) = err {
             assert_eq!(line, 1);
         } else {
-            assert!(false, err);
+            assert!(false, format!("{:?}", err));
         }
     }
 
     #[test]
     fn no_end_loop() {
-        let err = test_error("until this is that");
+        let err = test_error("until 1");
         if let common::ErrorKind::NoEndLoop(line) = err {
             assert_eq!(line, 1);
         } else {
-            assert!(false, err);
+            assert!(false, format!("{:?}", err));
         }
     }
 }

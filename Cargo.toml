@@ -2,6 +2,7 @@
 name = "maiden"
 version = "0.1.0"
 authors = ["Tom Parker <palfrey@tevp.net>"]
+edition = "2018"
 
 [dependencies]
 nom = "4"
@@ -10,10 +11,14 @@ error-chain = "0.12"
 clap = { version = "2", optional = true }
 regex = "1"
 log = "0.4"
-pretty_env_logger = "0.2"
+pretty_env_logger = "0.3"
+
+[build-dependencies]
+walkdir = "2"
 
 [dev-dependencies]
 assert_cmd = "0.6"
+pretty_assertions = "0.5"
 
 [features]
 default = ["cmd"]
@@ -21,7 +26,7 @@ cmd = ["clap"]
 
 [target.wasm32-unknown-unknown.dependencies] # Technically, all "wasm-*", but there's https://github.com/koute/cargo-web/issues/72
 yew = { git = "https://github.com/DenisKolodin/yew", rev="7e921ffae" } # For ComponentLink. Replace with 0.5
-stdweb = "0.4.5"
+stdweb = "0.4.12"
 
 [profile.release]
 lto = true

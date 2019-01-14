@@ -3,6 +3,7 @@ extern crate assert_cmd;
 #[cfg(test)]
 mod integration {
     use assert_cmd::prelude::*;
+    use pretty_assertions::assert_eq;
     use std;
     use std::fs::File;
     use std::io::{ErrorKind, Read};
@@ -10,14 +11,14 @@ mod integration {
 
     include!(concat!(env!("OUT_DIR"), "/test.rs"));
 
-    fn file_test(name: &str) {
-        let mut f = File::open(&format!("./tests/{}.expected", name)).unwrap();
+    fn success_file_test(name: &str) {
+        let mut f = File::open(&format!("./tests/{}.out", name)).unwrap();
         let mut expected = String::new();
         f.read_to_string(&mut expected).unwrap();
 
         let args = [&format!("./tests/{}", name)];
         let mut mb = Command::main_binary().unwrap();
-        let input = File::open(&format!("./tests/{}.input", name));
+        let input = File::open(&format!("./tests/{}.in'", name));
         let input_buffer = match input {
             Ok(mut in_f) => {
                 let mut provided = String::new();
@@ -43,5 +44,18 @@ mod integration {
         assert_eq!(stderr, "");
         let stdout = std::str::from_utf8(&output.stdout).unwrap();
         assert_eq!(stdout, expected);
+    }
+
+    fn parse_fail_file_test(name: &str) {
+        let args = [&format!("./tests/{}", name)];
+        let mut mb = Command::main_binary().unwrap();
+        let output = mb.args(&args).output().unwrap();
+        assert!(!output.status.success());
+
+        let stderr = std::str::from_utf8(&output.stderr).unwrap();
+        assert!(stderr.contains("Error:"), stderr.to_string());
+
+        let stdout = std::str::from_utf8(&output.stdout).unwrap();
+        assert_eq!(stdout, "");
     }
 }

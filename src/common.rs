@@ -6,13 +6,18 @@ pub type Span<'a> = LocatedSpan<CompleteStr<'a>>;
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
 pub enum Expression {
     // Single items
-    Integer(i128),
     String(String),
+    Floating(f64),
     Variable(String),
+    Object(String), // currently just functions
     True,
     False,
     Call(String, Vec<Expression>),
     Nothing,
+    Null,
+    Mysterious,
+    Pronoun,
+    Not(Box<Expression>),
 
     // binary operators
     Is(Box<Expression>, Box<Expression>),
@@ -22,8 +27,11 @@ pub enum Expression {
     Times(Box<Expression>, Box<Expression>),
     Divide(Box<Expression>, Box<Expression>),
     And(Box<Expression>, Box<Expression>),
+    Or(Box<Expression>, Box<Expression>),
+    Nor(Box<Expression>, Box<Expression>),
     GreaterThanOrEqual(Box<Expression>, Box<Expression>),
     GreaterThan(Box<Expression>, Box<Expression>),
+    LessThanOrEqual(Box<Expression>, Box<Expression>),
     LessThan(Box<Expression>, Box<Expression>),
 }
 
@@ -31,11 +39,17 @@ pub enum Expression {
 pub enum SymbolType {
     Dummy,
     And,
+    Or,
+    Nor,
     Is,
-    Build,
-    Up,
-    Knock,
-    Down,
+    Build {
+        target: String,
+        count: usize,
+    },
+    Knock {
+        target: String,
+        count: usize,
+    },
     Until,
     While,
     Next,
@@ -43,12 +57,19 @@ pub enum SymbolType {
     Return,
     Say,
     If,
-    Taking { target: String, args: Vec<String> },
-    Takes,
+    Taking {
+        target: String,
+        args: Vec<SymbolType>,
+    },
+    Takes {
+        name: String,
+        args: Vec<String>,
+    },
     Comma,
     GreaterThanOrEqual,
     GreaterThan,
     LessThan,
+    LessThanOrEqual,
     Add,
     Subtract,
     Times,
@@ -61,9 +82,16 @@ pub enum SymbolType {
     String(String),
     Words(Vec<String>),
     Integer(String),
-    Comment,
+    Floating(String),
     Listen,
     Divide,
+    True,
+    False,
+    Null,
+    Mysterious,
+    Pronoun,
+    Not(Box<SymbolType>),
+    Break,
 }
 
 #[derive(Debug, PartialEq)]
@@ -91,15 +119,16 @@ pub enum Command {
     If {
         expression: Expression,
         if_end: Option<usize>,
+        else_loc: Option<usize>,
     },
     EndIf,
     Increment {
         target: String,
-        count: i128,
+        count: f64,
     },
     Decrement {
         target: String,
-        count: i128,
+        count: f64,
     },
     Next {
         loop_start: usize,
@@ -107,11 +136,14 @@ pub enum Command {
     Continue {
         loop_start: usize,
     },
+    Break {
+        loop_start: usize,
+    },
     Say {
         value: Expression,
     },
     Listen {
-        target: String,
+        target: Option<String>,
     },
     FunctionDeclaration {
         name: String,
@@ -125,6 +157,9 @@ pub enum Command {
     Call {
         name: String,
         args: Vec<Expression>,
+    },
+    Else {
+        if_start: usize,
     },
 }
 
@@ -146,7 +181,7 @@ pub struct Program {
     pub functions: HashMap<String, Function>,
 }
 
-error_chain!{
+error_chain! {
     foreign_links {
         Io(::std::io::Error);
     }
@@ -179,8 +214,8 @@ error_chain!{
         BadCommandSequence(sequence: Vec<SymbolType>, line: u32) {
             display("Don't recognise command sequence {:?}", sequence)
         }
-        ParseIntError(number: String, line: u32) {
-            display("Unparsable integer: '{}'", number)
+        ParseNumberError(number: String, line: u32) {
+            display("Unparsable number: '{}'", number)
         }
         NoSymbols(line: u32) {
             display("No symbols!")
@@ -197,11 +232,26 @@ error_chain!{
         NoEndOfIf(line: u32) {
             display("No end of if statement")
         }
+        ElseWithNoIf(line: u32) {
+            display("Else with no if statement")
+        }
+        MultipleElse(line: u32) {
+            display("More than one else statement")
+        }
         NoEndFunction(line: u32) {
             display("No end of function")
         }
         NoEndLoop(line: u32) {
             display("No end of loop")
+        }
+        ContinueOutsideLoop(line: u32) {
+            display("Continue outside of a loop")
+        }
+        BreakOutsideLoop(line: u32) {
+            display("Break outside of a loop")
+        }
+        NextOutsideLoop(line: u32) {
+            display("Next outside of a loop")
         }
         Unimplemented(description: String, line: u32) {
             display("Unimplemented: {}", description)
@@ -211,6 +261,18 @@ error_chain!{
         }
         BadDecrement(sequence: Vec<SymbolType>, line: u32) {
             display("Bad 'decrement' section: {:?}", sequence)
+        }
+        StackOverflow(depth: u32, line: u32) {
+            display("Exceeded maximum allowed stack depth of {}", depth)
+        }
+        InstructionLimit(line: u32) {
+            display("Hit instruction limit of 10,000,000. Infinite loop?")
+        }
+        UndefinedPronoun(line: u32) {
+            display("Got to a pronoun, but no variable defined")
+        }
+        Infinity(x: String, y: String, line: u32) {
+            display("Got infinity on divide between {} and {}", x, y)
         }
     }
 }
@@ -233,10 +295,12 @@ pub fn get_error_line(e: &Error) -> u32 {
             ErrorKind::UnbalancedExpression(_, line) => line.clone(),
             ErrorKind::NoRunner(_, line) => line.clone(),
             ErrorKind::BadCommandSequence(_, line) => line.clone(),
-            ErrorKind::ParseIntError(_, line) => line.clone(),
+            ErrorKind::ParseNumberError(_, line) => line.clone(),
             ErrorKind::BadIs(_, line) => line.clone(),
             ErrorKind::BadPut(_, line) => line.clone(),
             ErrorKind::NoEndOfIf(line) => line.clone(),
+            ErrorKind::ElseWithNoIf(line) => line.clone(),
+            ErrorKind::MultipleElse(line) => line.clone(),
             ErrorKind::NoEndFunction(line) => line.clone(),
             ErrorKind::NoEndLoop(line) => line.clone(),
             ErrorKind::BadBooleanResolve(_, line) => line.clone(),
@@ -244,6 +308,10 @@ pub fn get_error_line(e: &Error) -> u32 {
             ErrorKind::BadIncrement(_, line) => line.clone(),
             ErrorKind::BadDecrement(_, line) => line.clone(),
             ErrorKind::Unimplemented(_, line) => line.clone(),
+            ErrorKind::StackOverflow(_, line) => line.clone(),
+            ErrorKind::InstructionLimit(line) => line.clone(),
+            ErrorKind::UndefinedPronoun(line) => line.clone(),
+            ErrorKind::Infinity(.., line) => line.clone(),
             _ => 0,
         },
     }

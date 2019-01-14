@@ -10,7 +10,7 @@ Well given that Rockstar is about hard rock from the 1980s, [Iron Maiden](https:
 
 Status
 ------
-Experimental. Rockstar is still very much in active flux, and Maiden doesn't even implement the [entire current spec](https://github.com/dylanbeattie/rockstar) as of writing this, but I'm seeing what I can do.
+Rockstar is still very much in active flux, but we target the [full "correct" test suite](https://github.com/dylanbeattie/rockstar/tree/reference-implementation/tests/correct) from the reference implementation (excepting [some issues](https://github.com/dylanbeattie/rockstar/issues/168) in it)
 
 Usage
 -----
@@ -19,7 +19,6 @@ Usage
 Web version
 -----------
 There's a deployed edition at https://palfrey.github.io/maiden/. To work with it
-1. [Install Rust nightly](https://github.com/rust-lang-nursery/rustup.rs/#working-with-nightly-rust) (to work around stdweb needing procedural macros. See also https://github.com/rust-lang/rust/issues/38356)
-2. [Install cargo web](https://github.com/koute/cargo-web#installation)
-3. Run `cargo +nightly web start --auto-reload`
-4. Goto http://localhost:8000/
+1. [Install cargo web](https://github.com/koute/cargo-web#installation)
+2. Run `cargo web start --auto-reload`
+3. Goto http://localhost:8000/
