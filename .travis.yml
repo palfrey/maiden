@@ -16,6 +16,7 @@ before_cache:
 matrix:
   allow_failures:
   - rust: nightly
+  - rust: beta
 
 stages:
 - test
