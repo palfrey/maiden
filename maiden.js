@@ -16,7 +16,7 @@ if( typeof Rust === "undefined" ) {
     return (function( module_factory ) {
         var instance = module_factory();
 
-        if( typeof window === "undefined" && typeof process === "object" ) {
+        if( typeof process === "object" && typeof process.versions === "object" && typeof process.versions.node === "string" ) {
             var fs = require( "fs" );
             var path = require( "path" );
             var wasm_path = path.join( __dirname, "maiden.wasm" );
@@ -537,6 +537,14 @@ Module.STDWEB_PRIVATE.acquire_tmp = function( dummy ) {
         HEAPU32 = new Uint32Array( buffer );
         HEAPF32 = new Float32Array( buffer );
         HEAPF64 = new Float64Array( buffer );
+        Module.HEAP8 = HEAP8;
+        Module.HEAP16 = HEAP16;
+        Module.HEAP32 = HEAP32;
+        Module.HEAPU8 = HEAPU8;
+        Module.HEAPU16 = HEAPU16;
+        Module.HEAPU32 = HEAPU32;
+        Module.HEAPF32 = HEAPF32;
+        Module.HEAPF64 = HEAPF64;
     }
 
     return {
@@ -554,6 +562,9 @@ Module.STDWEB_PRIVATE.acquire_tmp = function( dummy ) {
             "__cargo_web_snippet_0e54fd9c163fcf648ce0a395fde4500fd167a40b": function($0) {
                 var r = Module.STDWEB_PRIVATE.acquire_js_reference( $0 );return (r instanceof DOMException) && (r.name === "InvalidCharacterError");
             },
+            "__cargo_web_snippet_199d5eb25dfe761687bcd487578eb7e636bd9650": function($0) {
+                $0 = Module.STDWEB_PRIVATE.to_js($0);console.log(($0));
+            },
             "__cargo_web_snippet_351b27505bc97d861c3914c20421b6277babb53b": function($0) {
                 var o = Module.STDWEB_PRIVATE.acquire_js_reference( $0 );return (o instanceof Node) | 0;
             },
@@ -565,6 +576,9 @@ Module.STDWEB_PRIVATE.acquire_tmp = function( dummy ) {
             },
             "__cargo_web_snippet_614a3dd2adb7e9eac4a0ec6e59d37f87e0521c3b": function($0, $1) {
                 $1 = Module.STDWEB_PRIVATE.to_js($1);Module.STDWEB_PRIVATE.from_js($0, (function(){return($1).error;})());
+            },
+            "__cargo_web_snippet_6665474db26841f66f81b24c1a06677b4bdcbd21": function($0, $1) {
+                $0 = Module.STDWEB_PRIVATE.to_js($0);$1 = Module.STDWEB_PRIVATE.to_js($1);function codeMirrorCallback(){if(window.codeMirror){if(! window.codeMirror.configured){window.codeMirror.on("change",function(cm,change){var callback=($0);callback(cm.getValue());});window.codeMirror.setValue(($1));console.log("setup callback");window.codeMirror.configured=true;}}else{window.setTimeout(codeMirrorCallback,500);}}codeMirrorCallback();
             },
             "__cargo_web_snippet_690311d2f9134ac0983620c38a9e6460d4165607": function($0, $1) {
                 $1 = Module.STDWEB_PRIVATE.to_js($1);Module.STDWEB_PRIVATE.from_js($0, (function(){return($1).nextSibling;})());
@@ -628,9 +642,6 @@ Module.STDWEB_PRIVATE.acquire_tmp = function( dummy ) {
             },
             "__cargo_web_snippet_cd41a77d0178ae27c833ef2950e5f1a48a1455c1": function($0, $1, $2) {
                 $1 = Module.STDWEB_PRIVATE.to_js($1);$2 = Module.STDWEB_PRIVATE.to_js($2);Module.STDWEB_PRIVATE.from_js($0, (function(){try{return{value:function(){return($1).removeChild(($2));}(),success:true};}catch(error){return{error:error,success:false};}})());
-            },
-            "__cargo_web_snippet_d0b6b96fd3d75585ea5298c8d1f9a933c19e8478": function($0, $1) {
-                $1 = Module.STDWEB_PRIVATE.to_js($1);Module.STDWEB_PRIVATE.from_js($0, (function(){function codeMirrorCallback(){if(window.codeMirror){if(!window.codeMirror.configured){window.codeMirror.on("change",function(cm,change){var callback=($1);callback(cm.getValue());});console.log("setup callback");window.codeMirror.configured=true;}}else{window.setTimeout(codeMirrorCallback,500);}}codeMirrorCallback();})());
             },
             "__cargo_web_snippet_da2febd72f9938d90bc2bf2905643f595b07abd9": function($0, $1, $2) {
                 $0 = Module.STDWEB_PRIVATE.to_js($0);$1 = Module.STDWEB_PRIVATE.to_js($1);$2 = Module.STDWEB_PRIVATE.to_js($2);($0).setAttribute(($1),($2));
