@@ -19,6 +19,6 @@ Usage
 Web version
 -----------
 There's a deployed edition at https://palfrey.github.io/maiden/. To work with it
-1. [Install cargo web](https://github.com/koute/cargo-web#installation)
+1. [Install cargo web](https://github.com/koute/cargo-web#installation) (0.6.24 or above, because of stdweb)
 2. Run `cargo web start --auto-reload`
 3. Goto http://localhost:8000/

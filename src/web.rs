@@ -3,6 +3,7 @@ use crate::parser;
 use crate::runner;
 use std;
 use yew::prelude::*;
+use yew::services::ConsoleService;
 
 pub struct Model {
     value: String,
@@ -10,7 +11,8 @@ pub struct Model {
     parse_error: bool,
     res: String,
     run_error: bool,
-    link: ComponentLink<Model>,
+    input_callback: Callback<(String)>,
+    console: ConsoleService,
 }
 
 pub enum Msg {
@@ -82,14 +84,15 @@ impl Component for Model {
     type Message = Msg;
     type Properties = ();
 
-    fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
+    fn create(_: Self::Properties, mut link: ComponentLink<Self>) -> Self {
         let mut res = Self {
             value: include_str!("../tests/modulo.rock").into(),
             program: "".into(),
             parse_error: false,
             res: "".into(),
             run_error: false,
-            link: link,
+            input_callback: link.send_back(|data| Msg::GotInput(data)),
+            console: ConsoleService::new(),
         };
         res.run_program();
         res
@@ -98,7 +101,7 @@ impl Component for Model {
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
             Msg::GotInput(input_data) => {
-                println!("Change");
+                self.console.log("Change");
                 self.value = input_data;
                 self.run_program();
                 true
@@ -109,8 +112,8 @@ impl Component for Model {
 
 impl Renderable<Model> for Model {
     fn view(&self) -> Html<Self> {
-        let input_callback = self.link.send_back(Msg::GotInput);
-        let do_input = move |payload: String| input_callback.emit(payload);
+        let callback = self.input_callback.clone();
+        let do_input = move |payload: String| callback.emit(payload);
         js! {
             function codeMirrorCallback() {
                 if (window.codeMirror) {
@@ -119,6 +122,7 @@ impl Renderable<Model> for Model {
                             var callback = @{do_input};
                             callback(cm.getValue());
                         });
+                        window.codeMirror.setValue(@{&self.value});
                         console.log("setup callback");
                         window.codeMirror.configured = true;
                     }
