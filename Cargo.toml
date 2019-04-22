@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 nom = "4"
 nom_locate = "0.3"
-error-chain = "0.12"
+failure = "0.1"
 clap = { version = "2", optional = true }
 regex = "1"
 log = "0.4"

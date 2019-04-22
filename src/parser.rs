@@ -740,10 +740,10 @@ fn evaluate(value: &SymbolType, line: u32) -> Result<Expression> {
             return Ok(Expression::String(phrase.to_string()));
         }
         _ => {
-            bail!(ErrorKind::Unimplemented(
-                format!("Evaluate: '{:?}'", value),
-                line
-            ));
+            return Err(MaidenError::Unimplemented {
+                description: format!("Evaluate: '{:?}'", value),
+                line,
+            });
         }
     }
 }
@@ -794,13 +794,23 @@ fn single_symbol_to_expression(sym: &SymbolType, line: u32) -> Result<Expression
         SymbolType::Integer(ref val) => {
             return match val.parse::<f64>() {
                 Ok(i) => Ok(Expression::Floating(i)),
-                Err(_) => bail!(ErrorKind::ParseNumberError(val.to_string(), line)),
+                Err(_) => {
+                    return Err(MaidenError::ParseNumberError {
+                        number: val.to_string(),
+                        line: line,
+                    })
+                }
             };
         }
         SymbolType::Floating(ref val) => {
             return match val.parse::<f64>() {
                 Ok(i) => Ok(Expression::Floating(i)),
-                Err(_) => bail!(ErrorKind::ParseNumberError(val.to_string(), line)),
+                Err(_) => {
+                    return Err(MaidenError::ParseNumberError {
+                        number: val.to_string(),
+                        line: line,
+                    })
+                }
             };
         }
         SymbolType::True => Ok(Expression::True),
@@ -812,10 +822,10 @@ fn single_symbol_to_expression(sym: &SymbolType, line: u32) -> Result<Expression
             &arg, line,
         )?))),
         _ => {
-            bail!(ErrorKind::Unimplemented(
-                format!("Single symbol to expression: {:?}", sym),
-                line
-            ));
+            return Err(MaidenError::Unimplemented {
+                description: format!("Single symbol to expression: {:?}", sym),
+                line,
+            });
         }
     };
 }
@@ -824,13 +834,19 @@ fn parse_expression(items: &[&SymbolType], line: u32) -> Result<Expression> {
     // based off of https://en.wikipedia.org/wiki/Operator-precedence_parser#Pseudo-code
     let describe = format!("{:?}", items);
     if items.is_empty() {
-        bail!(ErrorKind::UnbalancedExpression(describe, line));
+        return Err(MaidenError::UnbalancedExpression {
+            expression: describe,
+            line: line,
+        });
     }
     debug!("Begin parse: {}", describe);
     let lhs = single_symbol_to_expression(items[0], line)?;
     let res = parse_expression_1(&items, 0, lhs, &LOWEST_PRECDENCE, line)?;
     if res.1 != items.len() - 1 {
-        bail!(ErrorKind::UnbalancedExpression(describe, line));
+        return Err(MaidenError::UnbalancedExpression {
+            expression: describe,
+            line: line,
+        });
     }
     return Ok(res.0);
 }
@@ -856,20 +872,20 @@ fn parse_expression_1(
             index
         };
         if index >= items.len() {
-            bail!(ErrorKind::UnbalancedExpression(
-                format!("{:?}", items),
-                line
-            ));
+            return Err(MaidenError::UnbalancedExpression {
+                expression: format!("{:?}", items),
+                line: line,
+            });
         }
         let mut rhs = single_symbol_to_expression(items[index], line)?;
         lookahead = next_operator(items, index);
         while lookahead.is_some() && lookahead.unwrap().0 > op {
             let l = lookahead.unwrap().1;
             if l >= items.len() {
-                bail!(ErrorKind::UnbalancedExpression(
-                    format!("{:?}", items),
-                    line
-                ));
+                return Err(MaidenError::UnbalancedExpression {
+                    expression: format!("{:?}", items),
+                    line: line,
+                });
             }
             let res = parse_expression_1(items, index, rhs, &items[l], line)?;
             rhs = res.0;
@@ -897,10 +913,10 @@ fn parse_expression_1(
             SymbolType::Or => Expression::Or(Box::new(lhs.clone()), Box::new(rhs)),
             SymbolType::Nor => Expression::Nor(Box::new(lhs.clone()), Box::new(rhs)),
             _ => {
-                bail!(ErrorKind::Unimplemented(
-                    format!("No operation for {:?}", op),
-                    line
-                ));
+                return Err(MaidenError::Unimplemented {
+                    description: format!("No operation for {:?}", op),
+                    line,
+                });
             }
         }
     }
@@ -970,12 +986,17 @@ pub fn parse(input: &str) -> Result<Program> {
             functions,
         });
     }
-    let raw_lines = lines(&uncommented)?;
+    let raw_lines = lines(&uncommented).map_err(|e| MaidenError::Nom {
+        kind: e.into_error_kind(),
+    })?;
     if !raw_lines.0.fragment.is_empty() && raw_lines.0.fragment.chars().any(|c| !c.is_whitespace())
     {
         // ignore empty and all-whitespace blocks
         let pos = raw_lines.0;
-        bail!(ErrorKind::UnparsedText(pos.fragment.to_string(), pos.line));
+        return Err(MaidenError::UnparsedText {
+            text: pos.fragment.to_string(),
+            line: pos.line,
+        });
     }
     debug!("{:?}", raw_lines);
     let mut block_starts: Vec<BlockStart> = Vec::new();
@@ -1003,7 +1024,7 @@ pub fn parse(input: &str) -> Result<Program> {
         match symbols.as_slice() {
             [SymbolType::Next] => {
                 if next_block!(block_starts, BlockStart::Loop).is_none() {
-                    bail!(ErrorKind::NextOutsideLoop(current_line));
+                    return Err(MaidenError::NextOutsideLoop { line: current_line });
                 }
                 let loop_start = last_block!(block_starts, BlockStart::Loop);
                 let command = build_next(&mut commands, *loop_start);
@@ -1014,7 +1035,7 @@ pub fn parse(input: &str) -> Result<Program> {
             }
             [SymbolType::Continue] => {
                 if next_block!(block_starts, BlockStart::Loop).is_none() {
-                    bail!(ErrorKind::ContinueOutsideLoop(current_line));
+                    return Err(MaidenError::ContinueOutsideLoop { line: current_line });
                 }
                 let loop_start = last_block!(block_starts, BlockStart::Loop);
                 commands.push(CommandLine {
@@ -1116,7 +1137,7 @@ pub fn parse(input: &str) -> Result<Program> {
             }
             [SymbolType::Else] => {
                 if next_block!(block_starts, BlockStart::If).is_none() {
-                    bail!(ErrorKind::ElseWithNoIf(current_line));
+                    return Err(MaidenError::ElseWithNoIf { line: current_line });
                 }
                 let if_start = last_block!(block_starts, BlockStart::If);
                 let if_len = commands.len();
@@ -1129,7 +1150,7 @@ pub fn parse(input: &str) -> Result<Program> {
                         ..
                     } => {
                         if else_loc.is_some() {
-                            bail!(ErrorKind::MultipleElse(current_line));
+                            return Err(MaidenError::MultipleElse { line: current_line });
                         }
                         else_loc.get_or_insert(if_len);
                     }
@@ -1150,7 +1171,7 @@ pub fn parse(input: &str) -> Result<Program> {
             }
             [SymbolType::Break] => {
                 if next_block!(block_starts, BlockStart::Loop).is_none() {
-                    bail!(ErrorKind::BreakOutsideLoop(current_line));
+                    return Err(MaidenError::BreakOutsideLoop { line: current_line });
                 }
                 let loop_start = last_block!(block_starts, BlockStart::Loop);
                 commands.push(CommandLine {
@@ -1232,12 +1253,15 @@ pub fn parse(input: &str) -> Result<Program> {
                         SymbolType::Variable(ref target) => target.to_string(),
                         SymbolType::Pronoun => {
                             if pronoun.is_none() {
-                                bail!(ErrorKind::UndefinedPronoun(current_line));
+                                return Err(MaidenError::UndefinedPronoun { line: current_line });
                             }
                             pronoun.clone().unwrap()
                         }
                         _ => {
-                            bail!(ErrorKind::BadIs(symbols.to_vec(), current_line));
+                            return Err(MaidenError::BadIs {
+                                sequence: symbols.to_vec(),
+                                line: current_line,
+                            });
                         }
                     };
                     let expression_seq: Vec<&SymbolType> = symbols.iter().skip(2).collect();
@@ -1292,12 +1316,15 @@ pub fn parse(input: &str) -> Result<Program> {
                         SymbolType::Variable(ref target) => target.to_string(),
                         SymbolType::Pronoun => {
                             if pronoun.is_none() {
-                                bail!(ErrorKind::UndefinedPronoun(current_line));
+                                return Err(MaidenError::UndefinedPronoun { line: current_line });
                             }
                             pronoun.clone().unwrap()
                         }
                         _ => {
-                            bail!(ErrorKind::BadPut(symbols.to_vec(), current_line));
+                            return Err(MaidenError::BadPut {
+                                sequence: symbols.to_vec(),
+                                line: current_line,
+                            });
                         }
                     };
                     let expression_seq: Vec<&SymbolType> =
@@ -1321,10 +1348,10 @@ pub fn parse(input: &str) -> Result<Program> {
                         line: current_line,
                     });
                 } else {
-                    bail!(ErrorKind::BadCommandSequence(
-                        symbols.to_vec(),
-                        current_line
-                    ));
+                    return Err(MaidenError::BadCommandSequence {
+                        sequence: symbols.to_vec(),
+                        line: current_line,
+                    });
                 }
             }
         }
@@ -1715,8 +1742,12 @@ mod tests {
     #[test]
     fn bad_fragment() {
         pretty_env_logger::try_init().unwrap_or(());
-        let err = parse("2 is 1").err().unwrap().0;
-        if let ErrorKind::BadIs(symbols, line) = err {
+        let err = parse("2 is 1").err().unwrap();
+        if let MaidenError::BadIs {
+            sequence: symbols,
+            line,
+        } = err
+        {
             assert_eq!(
                 symbols,
                 vec![
@@ -1734,8 +1765,12 @@ mod tests {
     #[test]
     fn bad_expression() {
         pretty_env_logger::try_init().unwrap_or(());
-        let err = parse("if 1 is").err().unwrap().0;
-        if let ErrorKind::UnparsedText(content, line) = err {
+        let err = parse("if 1 is").err().unwrap();
+        if let MaidenError::UnparsedText {
+            text: content,
+            line,
+        } = err
+        {
             assert_eq!(content, " is");
             assert_eq!(line, 1);
         } else {
@@ -1746,8 +1781,12 @@ mod tests {
     #[test]
     fn bad_put() {
         pretty_env_logger::try_init().unwrap_or(());
-        let err = parse("put 1 into 3").err().unwrap().0;
-        if let ErrorKind::BadPut(expression, line) = err {
+        let err = parse("put 1 into 3").err().unwrap();
+        if let MaidenError::BadPut {
+            sequence: expression,
+            line,
+        } = err
+        {
             assert_eq!(
                 expression,
                 vec![

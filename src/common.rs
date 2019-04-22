@@ -2,6 +2,7 @@ use nom::types::CompleteStr;
 use nom_locate::LocatedSpan;
 use std::collections::HashMap;
 pub type Span<'a> = LocatedSpan<CompleteStr<'a>>;
+use failure::Fail;
 
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
 pub enum Expression {
@@ -181,106 +182,84 @@ pub struct Program {
     pub functions: HashMap<String, Function>,
 }
 
-error_chain! {
-    foreign_links {
-        Io(::std::io::Error);
-    }
-    errors {
-        Nom(kind: ::nom::ErrorKind) {
-            description("parsing error")
-            display("parsing error: {:?}", kind)
-        }
-        UnparsedText(t: String, line: u32) {
-            display("Unparsed text '{}'", t)
-        }
-        MissingVariable(name: String, line: u32) {
-            display("Missing variable '{}'", name)
-        }
-        MissingFunction(name: String, line: u32) {
-            display("Missing function '{}'", name)
-        }
-        WrongArgCount(expected: usize, got: usize, line: u32) {
-            display("Wrong argument count to function (expected {}, got {})", expected, got)
-        }
-        UnbalancedExpression(expression: String, line: u32) {
-            display("Unbalanced expression {}", expression)
-        }
-        BadBooleanResolve(expression: String, line: u32) {
-            display("Bad boolean resolve: {:?}", expression)
-        }
-        NoRunner(expression: String, line: u32) {
-            display("Don't know how to execute the expression '{}'", expression)
-        }
-        BadCommandSequence(sequence: Vec<SymbolType>, line: u32) {
-            display("Don't recognise command sequence {:?}", sequence)
-        }
-        ParseNumberError(number: String, line: u32) {
-            display("Unparsable number: '{}'", number)
-        }
-        NoSymbols(line: u32) {
-            display("No symbols!")
-        }
-        BadIs(sequence: Vec<SymbolType>, line: u32) {
-            display("Bad 'is' section: {:?}", sequence)
-        }
-        BadPut(sequence: Vec<SymbolType>, line: u32) {
-            display("Bad 'put' section: {:?}", sequence)
-        }
-        BadFunctionDeclaration(sequence: Vec<SymbolType>, line: u32) {
-            display("Bad 'function declaration' section: {:?}", sequence)
-        }
-        NoEndOfIf(line: u32) {
-            display("No end of if statement")
-        }
-        ElseWithNoIf(line: u32) {
-            display("Else with no if statement")
-        }
-        MultipleElse(line: u32) {
-            display("More than one else statement")
-        }
-        NoEndFunction(line: u32) {
-            display("No end of function")
-        }
-        NoEndLoop(line: u32) {
-            display("No end of loop")
-        }
-        ContinueOutsideLoop(line: u32) {
-            display("Continue outside of a loop")
-        }
-        BreakOutsideLoop(line: u32) {
-            display("Break outside of a loop")
-        }
-        NextOutsideLoop(line: u32) {
-            display("Next outside of a loop")
-        }
-        Unimplemented(description: String, line: u32) {
-            display("Unimplemented: {}", description)
-        }
-        BadIncrement(sequence: Vec<SymbolType>, line: u32) {
-            display("Bad 'increment' section: {:?}", sequence)
-        }
-        BadDecrement(sequence: Vec<SymbolType>, line: u32) {
-            display("Bad 'decrement' section: {:?}", sequence)
-        }
-        StackOverflow(depth: u32, line: u32) {
-            display("Exceeded maximum allowed stack depth of {}", depth)
-        }
-        InstructionLimit(line: u32) {
-            display("Hit instruction limit of 10,000,000. Infinite loop?")
-        }
-        UndefinedPronoun(line: u32) {
-            display("Got to a pronoun, but no variable defined")
-        }
-        Infinity(x: String, y: String, line: u32) {
-            display("Got infinity on divide between {} and {}", x, y)
-        }
-    }
+#[derive(Debug, Fail)]
+pub enum MaidenError {
+    #[fail(display = "parsing error: {:?}", kind)]
+    Nom { kind: nom::ErrorKind },
+    #[fail(display = "IO Error")]
+    Io {
+        #[fail(cause)]
+        io_error: std::io::Error,
+    },
+    #[fail(display = "Unparsed text '{}'", text)]
+    UnparsedText { text: String, line: u32 },
+    #[fail(display = "Missing variable '{}'", name)]
+    MissingVariable { name: String, line: u32 },
+    #[fail(display = "Missing function '{}'", name)]
+    MissingFunction { name: String, line: u32 },
+    #[fail(
+        display = "Wrong argument count to function (expected {}, got {})",
+        expected, got
+    )]
+    WrongArgCount {
+        expected: usize,
+        got: usize,
+        line: u32,
+    },
+    #[fail(display = "Unbalanced expression {}", expression)]
+    UnbalancedExpression { expression: String, line: u32 },
+    #[fail(display = "Bad boolean resolve: {:?}", expression)]
+    BadBooleanResolve { expression: String, line: u32 },
+    #[fail(display = "Don't recognise command sequence {:?}", sequence)]
+    BadCommandSequence {
+        sequence: Vec<SymbolType>,
+        line: u32,
+    },
+    #[fail(display = "Unparsable number: '{}'", number)]
+    ParseNumberError { number: String, line: u32 },
+    #[fail(display = "Bad 'is' section: {:?}", sequence)]
+    BadIs {
+        sequence: Vec<SymbolType>,
+        line: u32,
+    },
+    #[fail(display = "Bad 'put' section: {:?}", sequence)]
+    BadPut {
+        sequence: Vec<SymbolType>,
+        line: u32,
+    },
+    #[fail(display = "No end of if statement")]
+    NoEndOfIf { line: u32 },
+    #[fail(display = "Else with no if statement")]
+    ElseWithNoIf { line: u32 },
+    #[fail(display = "More than one else statement")]
+    MultipleElse { line: u32 },
+    #[fail(display = "No end of function")]
+    NoEndFunction { line: u32 },
+    #[fail(display = "No end of loop")]
+    NoEndLoop { line: u32 },
+    #[fail(display = "Continue outside of a loop")]
+    ContinueOutsideLoop { line: u32 },
+    #[fail(display = "Break outside of a loop")]
+    BreakOutsideLoop { line: u32 },
+    #[fail(display = "Next outside of a loop")]
+    NextOutsideLoop { line: u32 },
+    #[fail(display = "Unimplemented: {}", description)]
+    Unimplemented { description: String, line: u32 },
+    #[fail(display = "Exceeded maximum allowed stack depth of {}", depth)]
+    StackOverflow { depth: u32, line: u32 },
+    #[fail(display = "Hit instruction limit of 10,000,000. Infinite loop?")]
+    InstructionLimit { line: u32 },
+    #[fail(display = "Got to a pronoun, but no variable defined")]
+    UndefinedPronoun { line: u32 },
+    #[fail(display = "Got infinity on divide between {} and {}", x, y)]
+    Infinity { x: String, y: String, line: u32 },
 }
 
-impl<'a> From<::nom::Err<Span<'a>>> for Error {
-    fn from(err: ::nom::Err<Span<'a>>) -> Error {
-        let kind = err.into_error_kind();
-        Error::from_kind(ErrorKind::Nom(kind))
+pub type Result<T> = ::core::result::Result<T, MaidenError>;
+
+impl From<std::io::Error> for MaidenError {
+    fn from(err: std::io::Error) -> MaidenError {
+        return MaidenError::Io { io_error: err };
     }
 }
 
@@ -293,7 +272,6 @@ pub fn get_error_line(e: &Error) -> u32 {
             ErrorKind::MissingFunction(_, line) => line.clone(),
             ErrorKind::WrongArgCount(_, _, line) => line.clone(),
             ErrorKind::UnbalancedExpression(_, line) => line.clone(),
-            ErrorKind::NoRunner(_, line) => line.clone(),
             ErrorKind::BadCommandSequence(_, line) => line.clone(),
             ErrorKind::ParseNumberError(_, line) => line.clone(),
             ErrorKind::BadIs(_, line) => line.clone(),
@@ -304,9 +282,6 @@ pub fn get_error_line(e: &Error) -> u32 {
             ErrorKind::NoEndFunction(line) => line.clone(),
             ErrorKind::NoEndLoop(line) => line.clone(),
             ErrorKind::BadBooleanResolve(_, line) => line.clone(),
-            ErrorKind::BadFunctionDeclaration(_, line) => line.clone(),
-            ErrorKind::BadIncrement(_, line) => line.clone(),
-            ErrorKind::BadDecrement(_, line) => line.clone(),
             ErrorKind::Unimplemented(_, line) => line.clone(),
             ErrorKind::StackOverflow(_, line) => line.clone(),
             ErrorKind::InstructionLimit(line) => line.clone(),

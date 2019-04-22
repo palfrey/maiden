@@ -7,11 +7,9 @@ extern crate nom;
 #[macro_use]
 extern crate log;
 #[cfg(not(target_arch = "wasm32"))]
-extern crate pretty_env_logger;
-#[macro_use]
-extern crate error_chain;
-#[cfg(not(target_arch = "wasm32"))]
 extern crate clap;
+#[cfg(not(target_arch = "wasm32"))]
+extern crate pretty_env_logger;
 extern crate regex;
 #[macro_use]
 extern crate nom_locate;
@@ -258,7 +256,7 @@ mod tests {
     #[test]
     fn numeric_args() {
         let err = test_error("Multiply taking 3, 5");
-        if let common::ErrorKind::MissingFunction(name, line) = err {
+        if let common::MaidenError::MissingFunction { name, line } = err {
             assert_eq!(name, "Multiply");
             assert_eq!(line, 1);
         } else {
@@ -266,17 +264,17 @@ mod tests {
         }
     }
 
-    fn test_error(input: &str) -> common::ErrorKind {
+    fn test_error(input: &str) -> common::MaidenError {
         pretty_env_logger::try_init().unwrap_or(());
         let program = parser::parse(input).unwrap();
         let mut writer = Cursor::new(Vec::new());
-        runner::run(&program, &mut writer).err().unwrap().0
+        runner::run(&program, &mut writer).err().unwrap()
     }
 
     #[test]
     fn missing_variable() {
         let err = test_error("Put Desire into my world");
-        if let common::ErrorKind::MissingVariable(name, line) = err {
+        if let common::MaidenError::MissingVariable { name, line } = err {
             assert_eq!(name, "Desire");
             assert_eq!(line, 1);
         } else {
@@ -287,7 +285,7 @@ mod tests {
     #[test]
     fn end_of_if() {
         let err = test_error("if 1 is 2");
-        if let common::ErrorKind::NoEndOfIf(line) = err {
+        if let common::MaidenError::NoEndOfIf { line } = err {
             assert_eq!(line, 1);
         } else {
             assert!(false, format!("{:?}", err));
@@ -297,7 +295,7 @@ mod tests {
     #[test]
     fn no_end_func() {
         let err = test_error("What Remains takes the fighters, and a war");
-        if let common::ErrorKind::NoEndFunction(line) = err {
+        if let common::MaidenError::NoEndFunction { line } = err {
             assert_eq!(line, 1);
         } else {
             assert!(false, format!("{:?}", err));
@@ -307,7 +305,7 @@ mod tests {
     #[test]
     fn no_end_loop() {
         let err = test_error("until 1");
-        if let common::ErrorKind::NoEndLoop(line) = err {
+        if let common::MaidenError::NoEndLoop { line } = err {
             assert_eq!(line, 1);
         } else {
             assert!(false, format!("{:?}", err));

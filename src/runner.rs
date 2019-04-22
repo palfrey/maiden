@@ -36,14 +36,17 @@ fn expression_to_number(inp: Expression, line: u32) -> Result<Expression> {
             if let Ok(float) = as_float {
                 return Ok(Expression::Floating(float));
             } else {
-                bail!(ErrorKind::ParseNumberError(s.to_string(), line));
+                return Err(MaidenError::ParseNumberError {
+                    number: s.to_string(),
+                    line: line,
+                });
             }
         }
         _ => {
-            bail!(ErrorKind::Unimplemented(
-                format!("Can't convert {:?} to number", inp),
-                line
-            ));
+            return Err(MaidenError::Unimplemented {
+                description: format!("Can't convert {:?} to number", inp),
+                line: line,
+            });
         }
     };
 }
@@ -206,13 +209,13 @@ fn run_mathbinop(
             }
         }
     };
-    bail!(ErrorKind::Unimplemented(
-        format!(
+    return Err(MaidenError::Unimplemented {
+        description: format!(
             "Math op ({:?}) on values we can't apply: {:?} {:?}",
             op, res_first, res_second
         ),
-        state.current_line
-    ));
+        line: state.current_line,
+    });
 }
 
 fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
@@ -235,7 +238,7 @@ fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
             "wrong" => Ok(false),
             _ => {
                 Ok(true)
-                // bail!(ErrorKind::BadBooleanResolve(
+                // return Err(MaidenError::BadBooleanResolve(
                 //     format!("{:?}", expression),
                 //     state.current_line
                 // ));
@@ -243,10 +246,10 @@ fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
         },
         Expression::Object(_) => Ok(true),
         _ => {
-            bail!(ErrorKind::BadBooleanResolve(
-                format!("{:?}", expression),
-                state.current_line,
-            ));
+            return Err(MaidenError::BadBooleanResolve {
+                expression: format!("{:?}", expression),
+                line: state.current_line,
+            });
         }
     };
 }
@@ -259,23 +262,26 @@ fn call_function(
 ) -> Result<Expression> {
     let func_wrap = program.functions.get(target);
     if func_wrap.is_none() {
-        bail!(ErrorKind::MissingFunction(
-            target.to_string(),
-            state.current_line,
-        ));
+        return Err(MaidenError::MissingFunction {
+            name: target.to_string(),
+            line: state.current_line,
+        });
     }
     let func = func_wrap.unwrap();
     if args.len() != func.args.len() {
-        bail!(ErrorKind::WrongArgCount(
-            func.args.len(),
-            args.len(),
-            state.current_line,
-        ))
+        return Err(MaidenError::WrongArgCount {
+            expected: func.args.len(),
+            got: args.len(),
+            line: state.current_line,
+        });
     }
 
     let mut new_variables = state.variables.clone();
     if state.depth == 100 {
-        bail!(ErrorKind::StackOverflow(state.depth, state.current_line));
+        return Err(MaidenError::StackOverflow {
+            depth: state.depth,
+            line: state.current_line,
+        });
     }
     let mut new_state = State {
         writer: state.writer,
@@ -391,11 +397,11 @@ fn run_expression(
             if let Ok(ok) = res {
                 if let Expression::Floating(val) = ok {
                     if val == std::f64::INFINITY {
-                        bail!(ErrorKind::Infinity(
-                            format!("{:?}", first),
-                            format!("{:?}", second),
-                            state.current_line
-                        ));
+                        return Err(MaidenError::Infinity {
+                            x: format!("{:?}", first),
+                            y: format!("{:?}", second),
+                            line: state.current_line,
+                        });
                     }
                 }
                 Ok(ok)
@@ -412,7 +418,10 @@ fn run_expression(
                 if program.functions.get(name).is_some() {
                     return Ok(Expression::Object(name.clone()));
                 }
-                bail!(ErrorKind::MissingVariable(name.clone(), state.current_line));
+                return Err(MaidenError::MissingVariable {
+                    name: name.clone(),
+                    line: state.current_line,
+                });
             }
         },
         Expression::Call(ref target, ref args) => call_function(state, program, target, args),
@@ -423,14 +432,16 @@ fn run_expression(
                     Ok(exp.clone())
                 }
                 None => {
-                    bail!(ErrorKind::MissingVariable(
-                        pronoun.clone(),
-                        state.current_line
-                    ));
+                    return Err(MaidenError::MissingVariable {
+                        name: pronoun.clone(),
+                        line: state.current_line,
+                    });
                 }
             },
             None => {
-                bail!(ErrorKind::UndefinedPronoun(state.current_line));
+                return Err(MaidenError::UndefinedPronoun {
+                    line: state.current_line,
+                });
             }
         },
         Expression::Not(ref arg) => {
@@ -473,7 +484,10 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
                 let current_line = state.current_line;
                 let v = state.variables.get(&x.to_lowercase());
                 if v.is_none() {
-                    bail!(ErrorKind::MissingVariable(x.to_string(), current_line));
+                    return Err(MaidenError::MissingVariable {
+                        name: x.to_string(),
+                        line: current_line,
+                    });
                 }
                 v.unwrap().clone()
             };
@@ -484,10 +498,10 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
         Expression::Mysterious => Ok("mysterious".to_string()),
         Expression::Null => Ok("null".to_string()),
         _ => {
-            bail!(ErrorKind::Unimplemented(
-                format!("Say '{:?}'", value),
-                state.current_line,
-            ));
+            return Err(MaidenError::Unimplemented {
+                description: format!("Say '{:?}'", value),
+                line: state.current_line,
+            });
         }
     }
 }
@@ -505,10 +519,10 @@ fn flip_boolean(state: &mut State, target: &str, val: &Expression, count: usize)
             .variables
             .insert(target.to_lowercase(), Expression::True),
         _ => {
-            bail!(ErrorKind::Unimplemented(
-                format!("Attempt to flip non-boolean '{}'", target),
-                state.current_line,
-            ));
+            return Err(MaidenError::Unimplemented {
+                description: format!("Attempt to flip non-boolean '{}'", target),
+                line: state.current_line,
+            });
         }
     };
     return Ok(());
@@ -519,7 +533,10 @@ fn alter_variable(state: &mut State, target: &str, f: &Fn(f64) -> f64, count: us
         let current_line = state.current_line;
         let v = state.variables.get(&target.to_lowercase());
         if v.is_none() {
-            bail!(ErrorKind::MissingVariable(target.to_string(), current_line));
+            return Err(MaidenError::MissingVariable {
+                name: target.to_string(),
+                line: current_line,
+            });
         }
         v.unwrap().clone()
     };
@@ -539,10 +556,10 @@ fn alter_variable(state: &mut State, target: &str, f: &Fn(f64) -> f64, count: us
             return flip_boolean(state, target, &val, count);
         }
         _ => {
-            bail!(ErrorKind::Unimplemented(
-                format!("Attempt to alter non-integer '{}'", target),
-                state.current_line,
-            ));
+            return Err(MaidenError::Unimplemented {
+                description: format!("Attempt to alter non-integer '{}'", target),
+                line: state.current_line,
+            });
         }
     };
     return Ok(());
@@ -553,7 +570,9 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
     loop {
         total_instr += 1;
         if total_instr > 1_000_000 {
-            bail!(ErrorKind::InstructionLimit(state.current_line));
+            return Err(MaidenError::InstructionLimit {
+                line: state.current_line,
+            });
         }
         let command_line = match program.commands.get(pc) {
             Some(c) => c,
@@ -592,7 +611,11 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                         Some(val) => {
                             pc = val;
                         }
-                        None => bail!(ErrorKind::NoEndLoop(state.current_line)),
+                        None => {
+                            return Err(MaidenError::NoEndLoop {
+                                line: state.current_line,
+                            })
+                        }
                     }
                 }
             }
@@ -606,7 +629,11 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                         Some(val) => {
                             pc = val;
                         }
-                        None => bail!(ErrorKind::NoEndLoop(state.current_line)),
+                        None => {
+                            return Err(MaidenError::NoEndLoop {
+                                line: state.current_line,
+                            })
+                        }
                     }
                 }
             }
@@ -620,7 +647,11 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                         Some(val) => {
                             pc = val;
                         }
-                        None => bail!(ErrorKind::NoEndLoop(state.current_line)),
+                        None => {
+                            return Err(MaidenError::NoEndLoop {
+                                line: state.current_line,
+                            })
+                        }
                     },
                     _ => {
                         panic!("Matched break with non-while");
@@ -636,7 +667,11 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 Some(val) => {
                     pc = val;
                 }
-                None => bail!(ErrorKind::NoEndFunction(state.current_line)),
+                None => {
+                    return Err(MaidenError::NoEndFunction {
+                        line: state.current_line,
+                    })
+                }
             },
             Command::Return { ref return_value } => {
                 return run_expression(state, program, &return_value);
@@ -660,7 +695,11 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                             Some(val) => {
                                 pc = val;
                             }
-                            None => bail!(ErrorKind::NoEndOfIf(state.current_line)),
+                            None => {
+                                return Err(MaidenError::NoEndOfIf {
+                                    line: state.current_line,
+                                })
+                            }
                         },
                     }
                 }
@@ -672,7 +711,11 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                         Some(val) => {
                             pc = val;
                         }
-                        None => bail!(ErrorKind::NoEndOfIf(state.current_line)),
+                        None => {
+                            return Err(MaidenError::NoEndOfIf {
+                                line: state.current_line,
+                            })
+                        }
                     },
                     _ => {
                         panic!("Matched else with non-if");
@@ -691,7 +734,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expr
                 if let Some(target) = opt_target {
                     state.variables.insert(
                         target.to_lowercase(),
-                        Expression::String(input.trim_right_matches('\n').to_string()),
+                        Expression::String(input.trim_end_matches('\n').to_string()),
                     );
                 }
             }
