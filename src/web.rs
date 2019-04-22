@@ -122,6 +122,7 @@ impl Renderable<Model> for Model {
                             var callback = @{do_input};
                             callback(cm.getValue());
                         });
+                        window.codeMirror.setValue(@{&self.value});
                         console.log("setup callback");
                         window.codeMirror.configured = true;
                     }
