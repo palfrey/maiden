@@ -38,14 +38,14 @@ fn expression_to_number(inp: Expression, line: u32) -> Result<Expression> {
             } else {
                 return Err(MaidenError::ParseNumberError {
                     number: s.to_string(),
-                    line: line,
+                    line,
                 });
             }
         }
         _ => {
             return Err(MaidenError::Unimplemented {
                 description: format!("Can't convert {:?} to number", inp),
-                line: line,
+                line,
             });
         }
     };

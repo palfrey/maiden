@@ -26,11 +26,11 @@ impl Model {
         }
     }
 
-    fn nicer_error(&self, err: &common::Error) -> String {
+    fn nicer_error(&self, err: &common::MaidenError) -> String {
         let line = common::get_error_line(err);
         format!(
             "{} at line {}: \"{}\"",
-            err.0,
+            err,
             line,
             self.get_line(line as usize)
         )

@@ -264,30 +264,28 @@ impl From<std::io::Error> for MaidenError {
 }
 
 #[cfg(target_arch = "wasm32")]
-pub fn get_error_line(e: &Error) -> u32 {
+pub fn get_error_line(e: &MaidenError) -> u32 {
     match e {
-        Error(kind, _) => match kind {
-            ErrorKind::MissingVariable(_, line) => line.clone(),
-            ErrorKind::UnparsedText(_, line) => line.clone(),
-            ErrorKind::MissingFunction(_, line) => line.clone(),
-            ErrorKind::WrongArgCount(_, _, line) => line.clone(),
-            ErrorKind::UnbalancedExpression(_, line) => line.clone(),
-            ErrorKind::BadCommandSequence(_, line) => line.clone(),
-            ErrorKind::ParseNumberError(_, line) => line.clone(),
-            ErrorKind::BadIs(_, line) => line.clone(),
-            ErrorKind::BadPut(_, line) => line.clone(),
-            ErrorKind::NoEndOfIf(line) => line.clone(),
-            ErrorKind::ElseWithNoIf(line) => line.clone(),
-            ErrorKind::MultipleElse(line) => line.clone(),
-            ErrorKind::NoEndFunction(line) => line.clone(),
-            ErrorKind::NoEndLoop(line) => line.clone(),
-            ErrorKind::BadBooleanResolve(_, line) => line.clone(),
-            ErrorKind::Unimplemented(_, line) => line.clone(),
-            ErrorKind::StackOverflow(_, line) => line.clone(),
-            ErrorKind::InstructionLimit(line) => line.clone(),
-            ErrorKind::UndefinedPronoun(line) => line.clone(),
-            ErrorKind::Infinity(.., line) => line.clone(),
-            _ => 0,
-        },
+        MaidenError::MissingVariable { line, .. } => line.clone(),
+        MaidenError::UnparsedText { line, .. } => line.clone(),
+        MaidenError::MissingFunction { line, .. } => line.clone(),
+        MaidenError::WrongArgCount { line, .. } => line.clone(),
+        MaidenError::UnbalancedExpression { line, .. } => line.clone(),
+        MaidenError::BadCommandSequence { line, .. } => line.clone(),
+        MaidenError::ParseNumberError { line, .. } => line.clone(),
+        MaidenError::BadIs { line, .. } => line.clone(),
+        MaidenError::BadPut { line, .. } => line.clone(),
+        MaidenError::NoEndOfIf { line } => line.clone(),
+        MaidenError::ElseWithNoIf { line } => line.clone(),
+        MaidenError::MultipleElse { line } => line.clone(),
+        MaidenError::NoEndFunction { line } => line.clone(),
+        MaidenError::NoEndLoop { line } => line.clone(),
+        MaidenError::BadBooleanResolve { line, .. } => line.clone(),
+        MaidenError::Unimplemented { line, .. } => line.clone(),
+        MaidenError::StackOverflow { line, .. } => line.clone(),
+        MaidenError::InstructionLimit { line } => line.clone(),
+        MaidenError::UndefinedPronoun { line } => line.clone(),
+        MaidenError::Infinity { line, .. } => line.clone(),
+        _ => 0,
     }
 }
