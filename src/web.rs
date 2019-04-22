@@ -12,7 +12,7 @@ pub struct Model {
     res: String,
     run_error: bool,
     input_callback: Callback<(String)>,
-    console: ConsoleService
+    console: ConsoleService,
 }
 
 pub enum Msg {
@@ -92,7 +92,7 @@ impl Component for Model {
             res: "".into(),
             run_error: false,
             input_callback: link.send_back(|data| Msg::GotInput(data)),
-            console: ConsoleService::new()
+            console: ConsoleService::new(),
         };
         res.run_program();
         res
