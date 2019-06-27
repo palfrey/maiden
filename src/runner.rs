@@ -299,7 +299,7 @@ fn call_function(
     return run_core(&mut new_state, program, func.location + 1);
 }
 
-#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
+#[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
 fn run_expression(
     state: &mut State,
     program: &Program,

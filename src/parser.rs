@@ -308,7 +308,7 @@ named!(not_expr(Span) -> SymbolType,
     )
 );
 
-#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
+#[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
 fn multiply_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     let (rest, (mut res, mut times)) = do_parse!(
         input,
@@ -334,7 +334,7 @@ fn multiply_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     return Ok((rest, res));
 }
 
-#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
+#[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
 fn add_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     let (rest, (mut res, mut adds)) = do_parse!(
         input,
@@ -362,7 +362,7 @@ fn add_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     return Ok((rest, res));
 }
 
-#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
+#[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
 fn inequality_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     let (rest, (mut res, mut ineqs)) = do_parse!(
         input,
@@ -386,7 +386,7 @@ fn inequality_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     return Ok((rest, res));
 }
 
-#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
+#[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
 fn equality_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
     let (rest, (mut res, mut eqs)) = do_parse!(
         input,
@@ -974,7 +974,7 @@ fn build_next(commands: &mut Vec<CommandLine>, loop_start: usize) -> Command {
     return Command::Next { loop_start };
 }
 
-#[allow(clippy::cyclomatic_complexity)] // FIXME: break this up a bit
+#[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
 pub fn parse(input: &str) -> Result<Program> {
     let mut functions: HashMap<String, Function> = HashMap::new();
     let mut commands: Vec<CommandLine> = Vec::new();
