@@ -528,7 +528,12 @@ fn flip_boolean(state: &mut State, target: &str, val: &Expression, count: usize)
     return Ok(());
 }
 
-fn alter_variable(state: &mut State, target: &str, f: &dyn Fn(f64) -> f64, count: usize) -> Result<()> {
+fn alter_variable(
+    state: &mut State,
+    target: &str,
+    f: &dyn Fn(f64) -> f64,
+    count: usize,
+) -> Result<()> {
     let val = {
         let current_line = state.current_line;
         let v = state.variables.get(&target.to_lowercase());
