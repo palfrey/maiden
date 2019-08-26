@@ -1,7 +1,4 @@
-use nom::types::CompleteStr;
-use nom_locate::LocatedSpan;
 use std::collections::HashMap;
-pub type Span<'a> = LocatedSpan<CompleteStr<'a>>;
 use failure::Fail;
 
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
@@ -184,8 +181,8 @@ pub struct Program {
 
 #[derive(Debug, Fail)]
 pub enum MaidenError {
-    #[fail(display = "parsing error: {:?}", kind)]
-    Nom { kind: nom::ErrorKind },
+    //#[fail(display = "parsing error: {:?}", kind)]
+    //Nom { kind: nom::ErrorKind },
     #[fail(display = "IO Error")]
     Io {
         #[fail(cause)]

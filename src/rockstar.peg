@@ -1,44 +1,41 @@
 /*
-PEG grammar for Rockstar (https://codewithrockstar.com)
-Created using PEG.js        https://pegjs.org
-After updating, run pegjs -o rockstar-parser.js rockstar.peg
+PEG grammar for Rockstar (https:||codewithrockstar.com)
 */
 
 program     = { line* }
 
-line = { statement* ~ (EOL+ | EOI) }
+line = { (statement ~ (EOL | EOI)) | EOL }
 
-WHITESPACE  =  {" " | "\t" }
-COMMENT     =  {"(" ~ (!")" ~ ANY)* ~ ")"}
+WHITESPACE  =  _{" " | "\t" }
+COMMENT     =  _{"(" ~ (!")" ~ ANY)* ~ ")"}
 
-noise 	= {(";"|","|"?"|"!"|"&"|".")}
-EOL = {noise* ~ NEWLINE}
+noise 	= _{ WHITESPACE|";"|","|"?"|"!"|"&"|"." }
+EOL = _{ noise* ~ NEWLINE }
 
 ignore_rest_of_line = _{(!"\n" ~ ANY)*}
 
-statement   = _{ break | continue | function | function_call
-			| function_return | loop | conditional | operation | expression}
+statement   = { break_kw | continue_kw | function | function_call
+			| function_return | loop_kw | conditional | operation | expression}
 
-break = {^"break" ~ ignore_rest_of_line}
+break_kw = {^"break" ~ ignore_rest_of_line}
 
-continue = {(^"continue" ~ ignore_rest_of_line) | ^"take it to the top"}
+continue_kw = {(^"continue" ~ ignore_rest_of_line) | ^"take it to the top"}
 
 function = { variable ~ ^"takes" ~ variable_list ~ EOL ~ block ~ EOL }
-
 
 expression_list_separator = { ", and" | "'&" | "," | "'n'" }
 
 variable_list_separator   = { expression_list_separator | "and" }
 
-variable_list = { variable ~ variable_list_separator ~ variable_list }
+variable_list = { (variable ~ variable_list_separator ~ variable_list) | variable }
 
 function_call = { variable ~ ^"taking" ~ expression_list }
 
-expression_list = { simple_expression ~ expression_list_separator ~ expression_list }
+expression_list = { (simple_expression ~ expression_list_separator ~ expression_list) | simple_expression }
 
-return = { ^"return" | ^"give back" }
+return_kw = { ^"return" | ^"give back" }
 
-function_return = { return ~ expression }
+function_return = { return_kw ~ expression }
 
 operation = { readline | output | crement | assignment }
 
@@ -52,273 +49,151 @@ consequent 	= { statement | (EOL ~ block) }
 
 alternate 	= { (^"else" ~ statement) | (EOL+ ~ "^else" ~ statement) | (EOL+ ~ ^"else" ~ EOL ~ block) | EOL }
 
-conditional = 'if'i _ e:expression c:consequent? a:alternate?  {
-          return {
-              'conditional': {
-                  'condition' : e,
-                    'consequent' : c,
-                    'alternate' : a
-                }
-            };
-        }
+conditional = {^"if" ~ expression ~ consequent? ~ alternate? }
 
-loopable 	= _ s:statement { return s }
-      		/ EOL s:block EOL { return s }
+loopable 	= { statement | (EOL ~ block ~ EOL) }
 
-loop 	= 'while'i _ e:expression c:loopable
-          { return { 'while_loop': {
-            'condition': e,
-            'consequent': c
-         } }; }
-         /
-         'until'i _ e:expression c:loopable
-          { return { 'until_loop': {
-            'condition': e,
-            'consequent': c
-         } }; }
+loop_kw 	= { (^"while" ~ expression ~ loopable) | (^"until" ~ expression ~ loopable) }
+output  = {(^"say" |^"shout"|^"whisper"|^"scream") ~ expression}
 
-output      = ('say'i/'shout'i/'whisper'i/'scream'i) _ e:expression
-                {return {'output': e}}
+simple_expression = { function_call | constant | lookup | literal | pronoun }
 
-simple_expression  =   function_call / constant / lookup / literal / pronoun
+literal = { constant | number | string}
 
-literal = constant / number / string
+constant = {null | true_kw | false_kw | mysterious}
 
-constant = null / true / false / mysterious
+true_kw 	= {(^"true" | ^"ok" | ^"right" | ^"yes") ~ !letter }
 
-true 	= ('true'i / 'ok'i / 'right'i / 'yes'i) !letter { return { constant: true } }
+false_kw = {(^"false" | ^"lies" | ^"wrong" | ^"no") ~ !letter }
 
-false 	= ('false'i / 'lies'i / 'wrong'i / 'no'i) !letter { return { constant: false } }
+null 	= {^"null" | ^"nothing" | ^"nowhere" | ^"nobody" | ^"empty" | ^"gone" }
 
-null 	= ('null'i / 'nothing'i / 'nowhere'i / 'nobody'i / 'empty'i / 'gone'i) { return { constant: null } }
+mysterious = {"mysterious"}
 
-mysterious = 'mysterious'  { return '__MYSTERIOUS__' }
+number      = {(("-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)?) ~ "."?) | ("." ~ ASCII_DIGIT+) }
 
-number      = n:$('-'?[0-9]+ ('.' [0-9]+)?) '.'?
-                { return {number: parseFloat(n)} }
-      /
-              n:$('.' [0-9]+)
-                { return {number: parseFloat(n) } }
+string      = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 
+expression = { boolean }
 
-string      = '"' s:$[^"]* '"'
-                { return {string: s}}
+boolean = { nor }
 
-expression = boolean
+nor = { (or ~ "nor" ~ nor) | or }
+or = { (and ~ "or" ~ or) | and }
+and = { (equality_check ~ "and" ~ and) | equality_check }
 
-boolean = nor
+ne = {^"aint" | "ain\'t" }
+is_kw = {^"is"}
+eq = { ne | is_kw }
 
-nor = lhs:or _ 'nor' _ rhs:nor {
-	return { 'binary' : { op: 'nor', lhs: lhs, rhs: rhs } } }
-	/ or
+equality_check = { (not ~ eq ~ equality_check) | not }
 
-or = lhs:and _ 'or' _ rhs:or {
-	return { 'binary': {
-        op: 'or',
-        lhs: lhs,
-        rhs: rhs
-    } }
- }
- /and
+not = { ("not" ~ not) | comparison }
 
-and = lhs:equality_check _ 'and' _ rhs:and {
-	return { 'binary': {
-        op: 'and',
-        lhs: lhs,
-        rhs: rhs
-    } }
- }
- /
- equality_check
+comparison = { (arithmetic ~ comparator ~ comparison) | arithmetic }
 
-eq = ('aint'i / 'ain\'t'i) { return 'ne' }
-     / 	'is'i { return 'eq' }
+greater 	= {^"higher" |^"greater" | ^"bigger" | ^"stronger"}
+smaller	 	= {^"lower" |^"less" | ^"smaller" | ^"weaker"}
+great	= {^"high" | ^"great" | ^"big" | ^"strong"}
+small	= {^"low" | ^"small" | ^"weak"}
 
-equality_check = lhs:not _ c:eq _ rhs:equality_check
-	{
-      return {
-          comparison: {
-              comparator: c,
-                lhs: lhs,
-                rhs: rhs
-            }
-        };
-    }
-	/
-    not
-
- not = 'not' _ e:not { return { 'not': { expression: e} } }
- 	/ comparison
-
-comparison = lhs:arithmetic _ c:comparator _ rhs:comparison
-  {
-      return {
-          comparison: {
-              comparator: c,
-                lhs: lhs,
-                rhs: rhs
-            }
-        };
-    }
-    /
-    arithmetic
-
-greater 	= ('higher'i /'greater'i / 'bigger'i / 'stronger'i)
-smaller	 	= ('lower'i /'less'i / 'smaller'i / 'weaker'i)
-great	= ('high'i / 'great'i / 'big'i / 'strong'i)
-small	= ('low'i / 'small'i / 'weak'i)
-
-comparator 	= 	'is'i _ greater _ 'than'i { return 'gt' }
-            / 	'is'i _ smaller _ 'than'i { return 'lt' }
-            /	'is'i _ 'as'i _ great _ 'as'i { return 'ge' }
-            /	'is'i _ 'as'i _ small _ 'as'i { return 'le' }
+comparator 	= { (^"is" ~ greater ~ ^"than")
+            | (^"is" ~ smaller ~ ^"than")
+            |	(^"is" ~ ^"as" ~ great ~ ^"as")
+            |	(^"is" ~ ^"as" ~ small ~ ^"as")}
 
 
-arithmetic         = first:product rest:((add / subtract) product)+
-                { return rest.reduce(function(memo, curr) {
-                      return { binary: { op: curr[0], lhs: memo, rhs: curr[1]} };
-                }, first); }
-            / product
+arithmetic    = { (product ~ ((add | subtract) ~ product)+) | product }
 
-product     = first:simple_expression rest:((multiply / divide) expression_list)+
-                { return rest.reduce(function(memo, curr) {
-                    return { binary: { op: curr[0], lhs: memo, rhs: curr[1]} };
-                }, first); }
-            / expression_list
+product     = { (simple_expression ~ ((multiply | divide) ~ expression_list)+) | expression_list }
 
 // Note that operator aliases explicitly include a trailing space,
-// otherwise 'with' is a prefix code for 'without' and confuses the parser.
-add 		= _* ('+' / 'plus ' / 'with ') _*       { return '+' }
-subtract 	= _* ('-' / 'minus ' / 'without ') _*   { return '-' }
-multiply 	= _* ('*' / 'times ' / 'of ') _*        { return '*' }
-divide 		= _* ('/' / 'over ' / 'between ') _*    { return '/' }
+// otherwise "with" is a prefix code for "without" and confuses the parser.
+add 		= { "+" | "plus " | "with " }
+subtract 	= { "-" | "minus " | "without " }
+multiply 	= { "*" | "times " | "of " }
+divide 		= {"|" | "over " | "between " }
 
-compoundable_operator = add / subtract / multiply / divide
+compoundable_operator = { add | subtract | multiply | divide }
 
-pronoun = pronoun:(
+pronoun = {
     // Longest pronouns first to avoid prefix coding errors.
     // 4-letter pronouns
-    'they'i / 'them'i
+    ^"they" | ^"them"
     // 3-letter pronouns
-    / 'she'i / 'him'i / 'her'i / 'hir'i / 'zie'i / 'zir'i / 'xem'i / 'ver'i
+    | ^"she" | ^"him" | ^"her" | ^"hir" | ^"zie" | ^"zir" | ^"xem" | ^"ver"
     // 2-letter pronouns
-    / 'ze'i / 've'i / 'xe'i / 'it'i / 'he'i
-    )
-    { return { pronoun: pronoun.toLowerCase() } }
+    | ^"ze" | ^"ve" | ^"xe" | ^"it" | ^"he"
+}
 
-lookup 	= v:variable
-  { return { lookup: { variable: v } }; }
+lookup 	=  { variable }
 
-common_prefix = ( 'an'i / 'a'i / 'the'i / 'my'i / 'your'i)
+common_prefix = { ^"an" | ^"a" | ^"the" | ^"my" | ^"your" }
 
-uppercase_letter = [A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞĀĂĄĆĈĊČĎĐĒĔĖĘĚĜĞĠĢĤĦĨĪĬĮİĲĴĶĸĹĻĽĿŁŃŅŇŊŌŎŐŒŔŖŘŚŜŞŠŢŤŦŨŪŬŮŰŲŴŶŸŹŻŽ]
-lowercase_letter = [a-zàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþāăąćĉċčďđēĕėęěĝğġģĥħĩīĭįıĳĵķĸĺļľŀłńņňŋōŏőœŕŗřśŝşšţťŧũūŭůűųŵŷÿźżžŉß]
+uppercase_letter = { ASCII_ALPHA_UPPER |"À" |"Á" |"Â" |"Ã" |"Ä" |"Å" |"Æ" |"Ç" |"È" |"É" |"Ê" |"Ë" |"Ì" |"Í" |"Î" |"Ï" |"Ð" |"Ñ" |"Ò" |"Ó" |"Ô" |"Õ" |"Ö" |"Ø" |"Ù" |"Ú" |"Û" |"Ü" |"Ý" |"Þ" |"Ā" |"Ă" |"Ą" |"Ć" |"Ĉ" |"Ċ" |"Č" |"Ď" |"Đ" |"Ē" |"Ĕ" |"Ė" |"Ę" |"Ě" |"Ĝ" |"Ğ" |"Ġ" |"Ģ" |"Ĥ" |"Ħ" |"Ĩ" |"Ī" |"Ĭ" |"Į" |"İ" |"Ĳ" |"Ĵ" |"Ķ" |"ĸ" |"Ĺ" |"Ļ" |"Ľ" |"Ŀ" |"Ł" |"Ń" |"Ņ" |"Ň" |"Ŋ" |"Ō" |"Ŏ" |"Ő" |"Œ" |"Ŕ" |"Ŗ" |"Ř" |"Ś" |"Ŝ" |"Ş" |"Š" |"Ţ" |"Ť" |"Ŧ" |"Ũ" |"Ū" |"Ŭ" |"Ů" |"Ű" |"Ų" |"Ŵ" |"Ŷ" |"Ÿ" |"Ź" |"Ż" |"Ž" }
+lowercase_letter = { ASCII_ALPHA_LOWER |"à" |"á" |"â" |"ã" |"ä" |"å" |"æ" |"ç" |"è" |"é" |"ê" |"ë" |"ì" |"í" |"î" |"ï" |"ð" |"ñ" |"ò" |"ó" |"ô" |"õ" |"ö" |"ø" |"ù" |"ú" |"û" |"ü" |"ý" |"þ" |"ā" |"ă" |"ą" |"ć" |"ĉ" |"ċ" |"č" |"ď" |"đ" |"ē" |"ĕ" |"ė" |"ę" |"ě" |"ĝ" |"ğ" |"ġ" |"ģ" |"ĥ" |"ħ" |"ĩ" |"ī" |"ĭ" |"į" |"ı" |"ĳ" |"ĵ" |"ķ" |"ĸ" |"ĺ" |"ļ" |"ľ" |"ŀ" |"ł" |"ń" |"ņ" |"ň" |"ŋ" |"ō" |"ŏ" |"ő" |"œ" |"ŕ" |"ŗ" |"ř" |"ś" |"ŝ" |"ş" |"š" |"ţ" |"ť" |"ŧ" |"ũ" |"ū" |"ŭ" |"ů" |"ű" |"ų" |"ŵ" |"ŷ" |"ÿ" |"ź" |"ż" |"ž" |"ŉ" |"ß" }
 
-letter = uppercase_letter / lowercase_letter
+letter = { uppercase_letter | lowercase_letter}
 
-common_variable = prefix:common_prefix _+ name:$(letter+)
-        { return (prefix + '_' + name).toLowerCase() };
+common_variable = @{common_prefix ~ WHITESPACE ~ letter+}
 
-is = ('\'s' / (_* ('=' / 'is 'i / 'was 'i / 'are 'i / 'were 'i)))
-assignment = v:variable is _* e:(literal / poetic_number)
-    { return { assign: { variable: v, expression: e} }; }
+is = {"\'s" | "=''" | ^"'s " | ^"was " | ^"are " | ^"were "}
+assignment = { (variable ~ is ~ (literal | poetic_number))
+  | (variable ~ ^"says " ~ poetic_string)
+  | (^"put" ~ expression ~ ^"into " ~ variable)
+  | (^"let" ~ variable ~ ^"be " ~ compoundable_operator ~ expression)
+  | (^"let" ~ variable ~ ^"be " ~ expression)
+}
 
-  / v:variable _+ 'says 'i e:poetic_string
-    { return { assign: { variable: v, expression: e} }; }
+poetic_string = @{ (!"\n" ~ ANY) }
 
-  / 'put'i _+ e:expression _+ 'into'i _+ v:variable
-    { return { assign: { variable: v, expression: e} }; }
+poetic_number = @{ poetic_digit_separator* ~ poetic_digits ~ poetic_digit_separator* ~ poetic_decimal? ~ poetic_digit_separator* }
 
-  / 'let'i _+ v:variable _+ 'be'i o:compoundable_operator e:expression { 
-      return { assign: { 
-        variable: v, 
-        expression: { 
-          binary: { 
-            op: o, 
-            lhs: { lookup: { variable: v } }, 
-            rhs: e
-          } 
-        } 
-      } }; 
-    }
+poetic_decimal = @{ ("." ~ poetic_decimal_digit_separator* ~ poetic_decimal_digits ~ poetic_decimal_digit_separator*) |
+                ("." ~ poetic_decimal_digit_separator*)}
 
-  / 'let'i _+ v:variable _+ 'be'i _+ e:expression
-    { return { assign: { variable: v, expression: e} }; }
-
-poetic_string = s:$[^\n]*
-  { return { string: s} }
-
-poetic_number = poetic_digit_separator* n:poetic_digits poetic_digit_separator* d:poetic_decimal? poetic_digit_separator*
-
-  { return { number: parseFloat(d?n+'.'+d:n)}}
-
-poetic_decimal = '.' poetic_decimal_digit_separator* d:poetic_decimal_digits poetic_decimal_digit_separator* {return d}
-        /
-                '.' poetic_decimal_digit_separator*
-
-poetic_digit_separator = ( _ / [0-9\',;:?!+_\-/] )
+poetic_digit_separator = { ASCII_DIGIT |"\"" | "'" |"," |";" |":" |"?" |"!" |"+" |"_" |"\\" |"-" |"|" }
 
 poetic_digits =
-  poetic_digit_separator* head:poetic_digit poetic_digit_separator+ tail:poetic_digits
-      { return head + tail }
-  /
-    d: poetic_digit
-      { return d }
+  { (poetic_digit_separator* ~ poetic_digit ~ poetic_digit_separator+ ~ poetic_digits)
+  | poetic_digit}
 
-poetic_decimal_digit_separator = ( _ / poetic_digit_separator / '.')
-poetic_decimal_digits =
-  poetic_decimal_digit_separator* head:poetic_digit poetic_decimal_digit_separator+ tail:poetic_decimal_digits
-      { return head + tail }
-  /
-    d: poetic_digit
-      { return d }
+poetic_decimal_digit_separator = { poetic_digit_separator | "." }
+poetic_decimal_digits = {
+  (poetic_decimal_digit_separator* ~ poetic_digit ~ poetic_decimal_digit_separator+ ~ poetic_decimal_digits)
+  | poetic_digit}
 
-poetic_digit = t:[A-Za-z']+
-  { return (t.filter(c => /[A-Za-z]/.test(c)).length%10).toString()}
+poetic_digit = @{(ASCII_ALPHA | "'")+ }
 
-// To disallow identifiers like 'My back is hurting' (which is illegal because 'back' is a keyword)
+// To disallow identifiers like "My back is hurting" (which is illegal because "back" is a keyword)
 // we need to explicitly define all language keywords, and they MUST be matched in descending order of length
 // because of Complicated Weird Parser Reasons.
-kw10 = 'mysterious'i
-kw8 = ( 'stronger'i / 'continue'i)
-kw7 = ( 'between'i / 'greater'i / 'nothing'i / 'nowhere'i / 'smaller'i / 'whisper'i / 'without'i)
-kw6 = ( 'ain\'t'i / 'bigger'i / 'listen'i / 'nobody'i / 'return'i / 'scream'i / 'taking'i / 'weaker'i / 'higher'i
-    / 'strong'i)
-kw5 = ( 'break'i / 'build'i / 'empty'i / 'false'i / 'great'i / 'knock'i / 'lower'i / 'right'i / 'shout'i / 'small'i
-    / 'take 'i / 'takes'i / 'times'i / 'until'i / 'while'i / 'wrong'i / 'minus'i)
-kw4 = ( 'aint'i / 'back'i / 'down'i / 'else'i / 'give'i / 'gone'i / 'high'i / 'into'i / 'less'i / 'lies'i / 'null'i
-    / 'plus'i / 'says'i / 'than'i / 'them'i / 'they'i / 'true'i / 'weak'i / 'were'i / 'your'i / 'over'i / 'with'i)
-kw3 = ( 'and'i / 'big'i / 'her'i / 'him'i / 'hir'i / 'it 'i / 'low'i / 'nor'i / 'not'i / 'put'i / 'say'i / 'she'i
-    / 'the'i / 'top'i / 'ver'i / 'was'i / 'xem'i / 'yes'i / 'zie'i / 'zir'i)
-kw2 = ( 'an'i / 'as'i / 'he'i / 'if'i / 'is'i / 'it'i / 'my'i / 'no'i / 'of'i / 'ok'i / 'or'i / 'to'i / 'up'i / 've'i
-    / 'xe'i / 'ze'i )
-kw1 = 'a'i
+kw10 = { ^"mysterious" }
+kw8 = { ^"stronger" | ^"continue"}
+kw7 = { ^"between" | ^"greater" | ^"nothing" | ^"nowhere" | ^"smaller" | ^"whisper" | ^"without"}
+kw6 = { ^"ain't" | ^"bigger" | ^"listen" | ^"nobody" | ^"return" | ^"scream" | ^"taking" | ^"weaker" | ^"higher"
+    | ^"strong"}
+kw5 = { ^"break" | ^"build" | ^"empty" | ^"false" | ^"great" | ^"knock" | ^"lower" | ^"right" | ^"shout" | ^"small"
+    | ^"take " | ^"takes" | ^"times" | ^"until" | ^"while" | ^"wrong" | ^"minus"}
+kw4 = { ^"aint" | ^"back" | ^"down" | ^"else" | ^"give" | ^"gone" | ^"high" | ^"into" | ^"less" | ^"lies" | ^"null"
+    | ^"plus" | ^"says" | ^"than" | ^"them" | ^"they" | ^"true" | ^"weak" | ^"were" | ^"your" | ^"over" | ^"with"}
+kw3 = { ^"and" | ^"big" | ^"her" | ^"him" | ^"hir" | ^"it " | ^"low" | ^"nor" | ^"not" | ^"put" | ^"say" | ^"she"
+    | ^"the" | ^"top" | ^"ver" | ^"was" | ^"xem" | ^"yes" | ^"zie" | ^"zir"}
+kw2 = { ^"an" | ^"as" | ^"he" | ^"if" | ^"is" | ^"it" | ^"my" | ^"no" | ^"of" | ^"ok" | ^"or" | ^"to" | ^"up" | ^"ve"
+    | ^"xe" | ^"ze" }
+kw1 = { ^"a" }
 
-keyword = (kw10 / kw8 / kw7 / kw6 / kw5 / kw5 / kw4 / kw3 / kw2 / kw1) !letter
+keyword = @{(kw10 | kw8 | kw7 | kw6 | kw5 | kw5 | kw4 | kw3 | kw2 | kw1) ~ !letter }
 
-variable = common_variable / proper_variable / pronoun / simple_variable
+variable = {common_variable | proper_variable | pronoun | simple_variable }
 
-simple_variable = !keyword name:$(letter letter*) { return name } 
+simple_variable = @{!keyword ~ letter ~ letter* }
 
-proper_noun = !keyword uppercase_letter letter*
-proper_variable = head:$(proper_noun (' ' $proper_noun)*)
-  { return head.replace(/ /g, '_').toLowerCase()  }
+proper_noun = @{!keyword ~ uppercase_letter ~ letter*}
+proper_variable = @{ proper_noun ~ (" " ~ proper_noun)* }
 
-crement = increment / decrement
+crement = { increment | decrement }
 
-increment = 'build'i _ v:variable _ t:('up'i noise*)+
-  { return {
-      increment: {
-          variable: v,
-            multiple: t.length
-        }
-    }; }
+increment = { ^"build" ~ variable ~ (^"up" ~ noise*)+ }
 
-decrement = 'knock'i _ v:variable _ t:('down'i noise*)+
-  { return {
-      decrement: {
-          variable: v,
-            multiple: t.length
-        }
-    }; }
-
+decrement = { ^"knock" ~ variable ~ (^"down" ~ noise*)+ }
