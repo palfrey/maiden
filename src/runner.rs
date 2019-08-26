@@ -5,7 +5,7 @@ use std::io::{self, Write};
 use std::ops::Deref;
 
 struct State<'a> {
-    writer: &'a mut Write,
+    writer: &'a mut dyn Write,
     variables: &'a mut HashMap<String, Expression>,
     current_line: u32,
     depth: u32,
@@ -461,7 +461,7 @@ fn run_expression(
     };
 }
 
-pub fn run(program: &Program, writer: &mut Write) -> Result<HashMap<String, Expression>> {
+pub fn run(program: &Program, writer: &mut dyn Write) -> Result<HashMap<String, Expression>> {
     let pc = 0;
     let mut variables: HashMap<String, Expression> = HashMap::new();
     let mut state = State {
@@ -528,7 +528,7 @@ fn flip_boolean(state: &mut State, target: &str, val: &Expression, count: usize)
     return Ok(());
 }
 
-fn alter_variable(state: &mut State, target: &str, f: &Fn(f64) -> f64, count: usize) -> Result<()> {
+fn alter_variable(state: &mut State, target: &str, f: &dyn Fn(f64) -> f64, count: usize) -> Result<()> {
     let val = {
         let current_line = state.current_line;
         let v = state.variables.get(&target.to_lowercase());
