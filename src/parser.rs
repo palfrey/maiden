@@ -866,8 +866,8 @@ fn parse_expression_1(
     while lookahead.is_some() && lookahead.unwrap().0 >= precedence {
         debug!("lookahead: {:?}", lookahead.unwrap());
         let op = lookahead.unwrap().0;
-        index = if lookahead.is_some() {
-            lookahead.unwrap().1 + 1
+        index = if let Some(lk) = lookahead {
+            lk.1 + 1
         } else {
             index
         };
