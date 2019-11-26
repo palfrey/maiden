@@ -570,7 +570,7 @@ fn alter_variable(
     return Ok(());
 }
 
-fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<(Expression)> {
+fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expression> {
     let mut total_instr = 0;
     loop {
         total_instr += 1;
