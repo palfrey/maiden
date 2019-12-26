@@ -11,7 +11,7 @@ pub struct Model {
     parse_error: bool,
     res: String,
     run_error: bool,
-    input_callback: Callback<(String)>,
+    input_callback: Callback<String>,
     console: ConsoleService,
 }
 

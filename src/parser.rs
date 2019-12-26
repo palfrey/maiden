@@ -920,7 +920,7 @@ fn parse_expression_1(
             }
         }
     }
-    return Ok((lhs.clone(), index));
+    return Ok((lhs, index));
 }
 
 enum BlockStart {
