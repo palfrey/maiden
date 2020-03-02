@@ -1,5 +1,5 @@
 /*
-PEG grammar for Rockstar (https:||codewithrockstar.com)
+PEG grammar for Rockstar (https://codewithrockstar.com)
 */
 
 program     = { line* }

@@ -3,11 +3,12 @@ use std;
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::ops::Deref;
+use log::debug;
 
 struct State<'a> {
     writer: &'a mut dyn Write,
     variables: &'a mut HashMap<String, Expression>,
-    current_line: u32,
+    current_line: usize,
     depth: u32,
     pronoun: Option<String>,
 }
@@ -27,7 +28,7 @@ fn run_binop(
     }
 }
 
-fn expression_to_number(inp: Expression, line: u32) -> Result<Expression> {
+fn expression_to_number(inp: Expression, line: usize) -> Result<Expression> {
     return match inp {
         Expression::Floating(_) => Ok(inp),
         Expression::Null => Ok(Expression::Floating(0.0)),

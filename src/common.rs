@@ -90,17 +90,18 @@ pub enum SymbolType {
     Pronoun,
     Not(Box<SymbolType>),
     Break,
+    Empty,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Token {
-    pub line: u32,
+    pub line: usize,
     pub symbol: SymbolType,
 }
 
 pub static LOWEST_PRECDENCE: SymbolType = SymbolType::Dummy;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Command {
     Assignment {
         target: String,
@@ -170,7 +171,7 @@ pub struct Function {
 #[derive(Debug, PartialEq)]
 pub struct CommandLine {
     pub cmd: Command,
-    pub line: u32,
+    pub line: usize,
 }
 
 #[derive(Debug, PartialEq)]
@@ -189,11 +190,11 @@ pub enum MaidenError {
         io_error: std::io::Error,
     },
     #[fail(display = "Unparsed text '{}'", text)]
-    UnparsedText { text: String, line: u32 },
+    UnparsedText { text: String, line: usize },
     #[fail(display = "Missing variable '{}'", name)]
-    MissingVariable { name: String, line: u32 },
+    MissingVariable { name: String, line: usize },
     #[fail(display = "Missing function '{}'", name)]
-    MissingFunction { name: String, line: u32 },
+    MissingFunction { name: String, line: usize },
     #[fail(
         display = "Wrong argument count to function (expected {}, got {})",
         expected, got
@@ -201,55 +202,55 @@ pub enum MaidenError {
     WrongArgCount {
         expected: usize,
         got: usize,
-        line: u32,
+        line: usize,
     },
     #[fail(display = "Unbalanced expression {}", expression)]
-    UnbalancedExpression { expression: String, line: u32 },
+    UnbalancedExpression { expression: String, line: usize },
     #[fail(display = "Bad boolean resolve: {:?}", expression)]
-    BadBooleanResolve { expression: String, line: u32 },
+    BadBooleanResolve { expression: String, line: usize },
     #[fail(display = "Don't recognise command sequence {:?}", sequence)]
     BadCommandSequence {
         sequence: Vec<SymbolType>,
-        line: u32,
+        line: usize,
     },
     #[fail(display = "Unparsable number: '{}'", number)]
-    ParseNumberError { number: String, line: u32 },
+    ParseNumberError { number: String, line: usize },
     #[fail(display = "Bad 'is' section: {:?}", sequence)]
     BadIs {
         sequence: Vec<SymbolType>,
-        line: u32,
+        line: usize,
     },
     #[fail(display = "Bad 'put' section: {:?}", sequence)]
     BadPut {
         sequence: Vec<SymbolType>,
-        line: u32,
+        line: usize,
     },
     #[fail(display = "No end of if statement")]
-    NoEndOfIf { line: u32 },
+    NoEndOfIf { line: usize },
     #[fail(display = "Else with no if statement")]
-    ElseWithNoIf { line: u32 },
+    ElseWithNoIf { line: usize },
     #[fail(display = "More than one else statement")]
-    MultipleElse { line: u32 },
+    MultipleElse { line: usize },
     #[fail(display = "No end of function")]
-    NoEndFunction { line: u32 },
+    NoEndFunction { line: usize },
     #[fail(display = "No end of loop")]
-    NoEndLoop { line: u32 },
+    NoEndLoop { line: usize },
     #[fail(display = "Continue outside of a loop")]
-    ContinueOutsideLoop { line: u32 },
+    ContinueOutsideLoop { line: usize },
     #[fail(display = "Break outside of a loop")]
-    BreakOutsideLoop { line: u32 },
+    BreakOutsideLoop { line: usize },
     #[fail(display = "Next outside of a loop")]
-    NextOutsideLoop { line: u32 },
+    NextOutsideLoop { line: usize },
     #[fail(display = "Unimplemented: {}", description)]
-    Unimplemented { description: String, line: u32 },
+    Unimplemented { description: String, line: usize },
     #[fail(display = "Exceeded maximum allowed stack depth of {}", depth)]
-    StackOverflow { depth: u32, line: u32 },
+    StackOverflow { depth: u32, line: usize },
     #[fail(display = "Hit instruction limit of 10,000,000. Infinite loop?")]
-    InstructionLimit { line: u32 },
+    InstructionLimit { line: usize },
     #[fail(display = "Got to a pronoun, but no variable defined")]
-    UndefinedPronoun { line: u32 },
+    UndefinedPronoun { line: usize },
     #[fail(display = "Got infinity on divide between {} and {}", x, y)]
-    Infinity { x: String, y: String, line: u32 },
+    Infinity { x: String, y: String, line: usize },
 }
 
 pub type Result<T> = ::core::result::Result<T, MaidenError>;
