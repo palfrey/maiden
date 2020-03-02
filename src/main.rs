@@ -5,6 +5,7 @@ use clap::{App, Arg};
 use std::fs::File;
 use std::io::{self, Read};
 use std::collections::HashMap;
+use pest::iterators::Pair;
 
 mod common;
 mod peg;
@@ -91,6 +92,78 @@ impl From<Command> for Item {
     }
 }
 
+fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
+    let rule = pair.as_rule();
+    match rule {
+        Rule::common_variable => {
+            Expression::Variable(pair.as_span().as_str().to_string()).into()
+        }
+        Rule::true_kw => {
+            Expression::True.into()
+        }
+        Rule::false_kw => {
+            Expression::False.into()
+        }
+        Rule::is_kw => {
+            SymbolType::Is.into()
+        }
+        Rule::output => {
+            let value = depair(&mut pair.into_inner(), level + 1);
+            if let Item::Expression(expr) = value {
+                Command::Say {
+                    value: expr
+                }.into()
+            } else {
+                panic!("Bad say {:?}", value);
+            }
+        }
+        Rule::string => {
+            let mut value = pair.as_str();
+            value = &value[1..value.len()-1];
+            Expression::String(value.to_string()).into()
+        }
+        Rule::conditional => {
+            let mut pairs: Vec<_> = pair.into_inner().collect();
+            let expression = depair_core(pairs.remove(0), level + 1);
+            let first = pairs.remove(0);
+            let consequent;
+            let mut alternate;
+            match first.as_rule() {
+                Rule::consequent => {
+                    consequent = Some(depair_core(first, level + 1));
+                    alternate = if pairs.is_empty() { None } else { Some(depair_core(pairs.remove(0), level + 1)) };
+                }
+                Rule::alternate => {
+                    consequent = None;
+                    alternate = Some(depair_core(first, level + 1));
+                }
+                rule => {
+                    panic!("Bad rule: {:?}", rule);
+                }
+            }
+
+            panic!("exp: {:?}, conseq: {:?}, alt: {:?}", expression, consequent, alternate);
+        }
+        rule => {
+            let original = pair.clone();
+            let inner = pair.into_inner();
+            let count = inner.count();
+            let level_string = format!("({}){}", level, "  ".repeat(level));
+            if count == 0 {
+                panic!("{}Empty pair: {:?}", level_string, original);
+            }
+            else if count == 1 {
+                println!("{}Depairing {:?}", level_string, rule);
+                depair(&mut original.into_inner(), level + 1)
+            } else {
+                println!("{}List rule: {:?}", level_string, rule);
+                depair(&mut original.into_inner(), level + 1)
+            }
+        }
+    }
+}
+
+
 fn depair<'i, I>(pairs: &'i mut I, level: usize) -> Item
 where
     I: Iterator<Item = pest::iterators::Pair<'i, Rule>>
@@ -98,46 +171,7 @@ where
     let mut items = vec![];
     let level_string = format!("({}){}", level, "  ".repeat(level));
     for pair in pairs {
-        let rule = pair.as_rule();
-        match rule {
-            Rule::common_variable => {
-                items.push(Expression::Variable(pair.as_span().as_str().to_string()).into());
-            }
-            Rule::true_kw => {
-                items.push(Expression::True.into());
-            }
-            Rule::false_kw => {
-                items.push(Expression::False.into());
-            }
-            Rule::is_kw => {
-                items.push(SymbolType::Is.into());
-            }
-            Rule::output => {
-                let value = depair(&mut pair.into_inner(), level + 1);
-                if let Item::Expression(expr) = value {
-                    items.push(Command::Say {
-                        value: expr
-                    }.into());
-                } else {
-                    panic!("Bad say {:?}", value);
-                }
-            }
-            rule => {
-                let original = pair.clone();
-                let inner = pair.into_inner();
-                let count = inner.count();
-                if count == 0 {
-                    println!("{}Empty pair: {:?}", level_string, original);
-                }
-                else if count == 1 {
-                    println!("{}Depairing {:?}", level_string, rule);
-                    items.push(depair(&mut original.into_inner(), level + 1));
-                } else {
-                    println!("{}List rule: {:?}", level_string, rule);
-                    items.push(depair(&mut original.into_inner(), level + 1));
-                }
-            }
-        }
+        items.push(depair_core(pair, level));
     }
     match items.as_slice() {
         [Item::Expression(Expression::Variable(target)), Item::Symbol(SymbolType::Is), Item::Expression(value)] => {
@@ -149,10 +183,24 @@ where
         _ => {}
     }
     match items.len() {
-        0 => SymbolType::Empty.into(),
+        0 => {
+            println!("{}Empty", level_string);
+            SymbolType::Empty.into()
+        }
         1 => items.get(0).unwrap().clone(),
         _ => {
             panic!("{}Many! {:?}", level_string, items);
         }
     }
+}
+
+fn depair_seq<'i, I>(pairs: &'i mut I, level: usize) -> Vec<Item>
+where
+    I: Iterator<Item = pest::iterators::Pair<'i, Rule>>
+{
+    let mut items = vec![];
+    for pair in pairs {
+        items.push(depair_core(pair, level));
+    }
+    return items;
 }
