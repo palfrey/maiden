@@ -62,15 +62,15 @@ literal = { constant | number | string}
 
 constant = {null | true_kw | false_kw | mysterious}
 
-true_kw 	= {(^"true" | ^"ok" | ^"right" | ^"yes") ~ !letter }
+true_kw 	= @{(^"true" | ^"ok" | ^"right" | ^"yes") ~ !letter }
 
-false_kw = {(^"false" | ^"lies" | ^"wrong" | ^"no") ~ !letter }
+false_kw = @{(^"false" | ^"lies" | ^"wrong" | ^"no") ~ !letter }
 
 null 	= {^"null" | ^"nothing" | ^"nowhere" | ^"nobody" | ^"empty" | ^"gone" }
 
 mysterious = {"mysterious"}
 
-number      = {(("-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)?) ~ "."?) | ("." ~ ASCII_DIGIT+) }
+number      = @{(("-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)?) ~ "."?) | ("." ~ ASCII_DIGIT+) }
 
 string      = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 
