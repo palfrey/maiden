@@ -102,6 +102,11 @@ pub struct Token {
 pub static LOWEST_PRECDENCE: SymbolType = SymbolType::Dummy;
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct Block {
+    pub commands: Vec<CommandLine>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Command {
     Assignment {
         target: String,
@@ -117,8 +122,8 @@ pub enum Command {
     },
     If {
         expression: Expression,
-        if_end: Option<usize>,
-        else_loc: Option<usize>,
+        then: Option<Block>,
+        otherwise: Option<Block>,
     },
     EndIf,
     Increment {
@@ -168,7 +173,7 @@ pub struct Function {
     pub args: Vec<String>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CommandLine {
     pub cmd: Command,
     pub line: usize,

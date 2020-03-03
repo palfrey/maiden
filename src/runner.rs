@@ -687,42 +687,43 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
             }
             Command::If {
                 ref expression,
-                if_end,
-                else_loc,
+                ref then,
+                ref otherwise,
             } => {
                 let resolve = run_expression(state, program, &expression)?;
                 debug!("if: {:?} {:?}", &resolve, expression);
-                if !to_boolean(state, &resolve)? {
-                    match else_loc {
-                        Some(val) => {
-                            pc = val;
-                        }
-                        None => match if_end {
-                            Some(val) => {
-                                pc = val;
-                            }
-                            None => {
-                                return Err(MaidenError::NoEndOfIf {
-                                    line: state.current_line,
-                                })
-                            }
-                        },
-                    }
-                }
+                unimplemented!("if");
+                // if !to_boolean(state, &resolve)? {
+                //     match else_loc {
+                //         Some(val) => {
+                //             pc = val;
+                //         }
+                //         None => match if_end {
+                //             Some(val) => {
+                //                 pc = val;
+                //             }
+                //             None => {
+                //                 return Err(MaidenError::NoEndOfIf {
+                //                     line: state.current_line,
+                //                 })
+                //             }
+                //         },
+                //     }
+                // }
             }
             Command::Else { if_start } => {
                 let if_cmd = &program.commands[if_start];
                 match if_cmd.cmd {
-                    Command::If { if_end, .. } => match if_end {
-                        Some(val) => {
-                            pc = val;
-                        }
-                        None => {
-                            return Err(MaidenError::NoEndOfIf {
-                                line: state.current_line,
-                            })
-                        }
-                    },
+                    // Command::If { if_end, .. } => match if_end {
+                    //     Some(val) => {
+                    //         pc = val;
+                    //     }
+                    //     None => {
+                    //         return Err(MaidenError::NoEndOfIf {
+                    //             line: state.current_line,
+                    //         })
+                    //     }
+                    // },
                     _ => {
                         panic!("Matched else with non-if");
                     }
