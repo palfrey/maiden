@@ -18,7 +18,7 @@ fn main() -> common::Result<()> {
     pretty_env_logger::try_init().unwrap_or(());
     let matches = App::new("Maiden")
         .version("1.0")
-        .author("Tom Parker <palfrey@tevp.net>")
+        .author("Tom Parker-Shemilt <palfrey@tevp.net>")
         .about("Rockstar interpreter")
         .arg(
             Arg::with_name("INPUT")
@@ -32,12 +32,12 @@ fn main() -> common::Result<()> {
     f.read_to_string(&mut buffer)?;
     let mut parsed = Rockstar::parse(Rule::program, &buffer).unwrap_or_else(|e| panic!("{}", e));
     let program = depair_program(&mut parsed);
-    println!("{:?}", program);
+    println!("{:#?}", program);
     runner::run(&program, &mut io::stdout())?;
     return Ok(());
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum Item {
     Expression(Expression),
     Symbol(SymbolType),
@@ -175,6 +175,19 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
                 commands.push(CommandLine {cmd: item.command(), line: 0});
             }
             Block { commands }.into()
+        }
+        Rule::equality_check => {
+            println!("{}Depairing equality_check", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            if items.len() == 1 {
+                return items.remove(0);
+            }
+            println!("items: {:?}", items);
+            let is = items.remove(1);
+            if is != Item::Symbol(SymbolType::Is) {
+                panic!("Not is: {:?}", is);
+            }
+            Expression::Is(Box::new(items.remove(0).expr()), Box::new(items.remove(0).expr())).into()
         }
         rule => {
             let original = pair.clone();
