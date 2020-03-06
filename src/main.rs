@@ -203,6 +203,19 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             }
             item
         }
+        Rule::assignment => {
+            eprintln!("{}Depairing assignment", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            if items.len() != 2 {
+                panic!("Bad assignment: {:?}", items);
+            }
+            let target = items.remove(0).expr();
+            if let Expression::Variable(name) = target {
+                Command::Assignment{target: name, value: items.remove(0).expr()}.into()
+            } else {
+                panic!("Non-variable in assignment: {:?}", target);
+            }
+        }
         rule => {
             let original = pair.clone();
             let inner = pair.into_inner();
