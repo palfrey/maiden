@@ -32,7 +32,7 @@ fn main() -> common::Result<()> {
     f.read_to_string(&mut buffer)?;
     let mut parsed = Rockstar::parse(Rule::program, &buffer).unwrap_or_else(|e| panic!("{}", e));
     let program = depair_program(&mut parsed);
-    println!("{:#?}", program);
+    eprintln!("{:#?}", program);
     runner::run(&program, &mut io::stdout())?;
     return Ok(());
 }
@@ -168,7 +168,7 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             }.into()
         }
         Rule::block => {
-            println!("{}Depairing Block", level_string);
+            eprintln!("{}Depairing Block", level_string);
             let items = depair_seq(&mut pair.into_inner(), level + 1);
             let mut commands = vec![];
             for item in items {
@@ -177,12 +177,12 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             Block { commands }.into()
         }
         Rule::equality_check => {
-            println!("{}Depairing equality_check", level_string);
+            eprintln!("{}Depairing equality_check", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1);
             if items.len() == 1 {
                 return items.remove(0);
             }
-            println!("items: {:?}", items);
+            eprintln!("items: {:?}", items);
             let is = items.remove(1);
             if is != Item::Symbol(SymbolType::Is) {
                 panic!("Not is: {:?}", is);
@@ -201,10 +201,10 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
                 panic!("{}Empty pair at {}, {}: {:?}", level_string, line_no, col_no, original);
             }
             else if count == 1 {
-                println!("{}Depairing {:?}", level_string, rule);
+                eprintln!("{}Depairing {:?}", level_string, rule);
                 depair(&mut original.into_inner(), level + 1)
             } else {
-                println!("{}List rule: {:?}", level_string, rule);
+                eprintln!("{}List rule: {:?}", level_string, rule);
                 depair(&mut original.into_inner(), level + 1)
             }
         }
@@ -232,7 +232,7 @@ where
     }
     match items.len() {
         0 => {
-            println!("{}Empty", level_string);
+            eprintln!("{}Empty", level_string);
             SymbolType::Empty.into()
         }
         1 => items.get(0).unwrap().clone(),
