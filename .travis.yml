@@ -13,15 +13,13 @@ cache:
 before_cache:
   - rm -rf /home/travis/.cargo/registry
 
-matrix:
-  allow_failures:
-  - rust: nightly
-
 stages:
 - test
 - name: deploy
   if: branch = master
 jobs:
+  allow_failures:
+    - rust: nightly
   include:
   - stage: test
     rust: stable
