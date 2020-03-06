@@ -692,24 +692,13 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
             } => {
                 let resolve = run_expression(state, program, &expression)?;
                 debug!("if: {:?} {:?}", &resolve, expression);
-                unimplemented!("if");
-                // if !to_boolean(state, &resolve)? {
-                //     match else_loc {
-                //         Some(val) => {
-                //             pc = val;
-                //         }
-                //         None => match if_end {
-                //             Some(val) => {
-                //                 pc = val;
-                //             }
-                //             None => {
-                //                 return Err(MaidenError::NoEndOfIf {
-                //                     line: state.current_line,
-                //                 })
-                //             }
-                //         },
-                //     }
-                // }
+                if to_boolean(state, &resolve)? {
+                    if let Some(block) = then {
+                        run_core(state, &Program { commands: block.commands.clone(), functions: program.functions.clone()}, 0);
+                    }
+                } else if let Some(block) = otherwise {
+                    run_core(state, &Program { commands: block.commands.clone(), functions: program.functions.clone()}, 0);
+                }
             }
             Command::Else { if_start } => {
                 let if_cmd = &program.commands[if_start];

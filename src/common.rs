@@ -167,7 +167,7 @@ pub enum Command {
     },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Function {
     pub location: usize,
     pub args: Vec<String>,
