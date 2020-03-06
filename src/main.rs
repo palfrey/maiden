@@ -119,7 +119,7 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
     let rule = pair.as_rule();
     let level_string = format!("({}){}", level, "  ".repeat(level));
     match rule {
-        Rule::common_variable => {
+        Rule::common_variable | Rule::proper_variable => {
             Expression::Variable(pair.as_span().as_str().to_string()).into()
         }
         Rule::true_kw => {
@@ -141,6 +141,10 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             let mut value = pair.as_str();
             value = &value[1..value.len()-1];
             Expression::String(value.to_string()).into()
+        }
+        Rule::number => {
+            let mut value = pair.as_str();
+            Expression::Floating(value.parse::<f64>().unwrap()).into()
         }
         Rule::conditional => {
             let mut pairs: Vec<_> = pair.into_inner().collect();
@@ -188,6 +192,16 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
                 panic!("Not is: {:?}", is);
             }
             Expression::Is(Box::new(items.remove(0).expr()), Box::new(items.remove(0).expr())).into()
+        }
+        Rule::statement => {
+            let item = depair(&mut pair.into_inner(), level + 1);
+            if let Item::Expression(Expression::Is(target, value)) = item {
+                if let Expression::Variable(name) = *target {
+                    return Command::Assignment{target: name, value: *value}.into();
+                }
+                panic!("Non-variable in top-level is: {:?}", target);
+            }
+            item
         }
         rule => {
             let original = pair.clone();
