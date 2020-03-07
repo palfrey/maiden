@@ -186,7 +186,6 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             if items.len() == 1 {
                 return items.remove(0);
             }
-            eprintln!("items: {:?}", items);
             let is = items.remove(1);
             if is != Item::Symbol(SymbolType::Is) {
                 panic!("Not is: {:?}", is);
@@ -196,25 +195,56 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
         Rule::statement => {
             let item = depair(&mut pair.into_inner(), level + 1);
             if let Item::Expression(Expression::Is(target, value)) = item {
-                if let Expression::Variable(name) = *target {
-                    return Command::Assignment{target: name, value: *value}.into();
-                }
-                panic!("Non-variable in top-level is: {:?}", target);
+                return Command::Assignment{target: *target, value: *value}.into();
             }
             item
         }
         Rule::assignment => {
             eprintln!("{}Depairing assignment", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            if items.len() != 2 {
-                panic!("Bad assignment: {:?}", items);
+            if items.len() == 0 {
+                panic!("Empty assignment!");
             }
             let target = items.remove(0).expr();
-            if let Expression::Variable(name) = target {
-                Command::Assignment{target: name, value: items.remove(0).expr()}.into()
-            } else {
-                panic!("Non-variable in assignment: {:?}", target);
+            match items.len() {
+                1 => {
+                    Command::Assignment{target, value: items.remove(0).expr()}.into()
+                }
+                2 => {
+                    let operator = items.remove(0).symbol();
+                    match operator {
+                        SymbolType::Add => {
+                            let expr = Expression::Add(
+                                Box::new(target.clone()),
+                                Box::new(items.remove(0).expr())
+                            );
+                            Command::Assignment{target, value: expr}.into()
+                        }
+                        SymbolType::Subtract => {
+                            let expr = Expression::Subtract(
+                                Box::new(target.clone()),
+                                Box::new(items.remove(0).expr())
+                            );
+                            Command::Assignment{target, value: expr}.into()
+                        }
+                        _ => {
+                            panic!("Bad assignment operator: {:?}", operator);
+                        }
+                    }
+                }
+                _ => {
+                    panic!("Bad assignment: {:?}", items);
+                }
             }
+        }
+        Rule::add => {
+            SymbolType::Add.into()
+        }
+        Rule::subtract => {
+            SymbolType::Subtract.into()
+        }
+        Rule::pronoun => {
+            Expression::Pronoun.into()
         }
         rule => {
             let original = pair.clone();
@@ -247,15 +277,6 @@ where
     let level_string = format!("({}){}", level, "  ".repeat(level));
     for pair in pairs {
         items.push(depair_core(pair, level));
-    }
-    match items.as_slice() {
-        [Item::Expression(Expression::Variable(target)), Item::Symbol(SymbolType::Is), Item::Expression(value)] => {
-            return Command::Assignment {
-                target: target.to_string(),
-                value: value.clone(),
-            }.into();
-        }
-        _ => {}
     }
     match items.len() {
         0 => {

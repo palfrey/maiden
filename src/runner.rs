@@ -592,8 +592,15 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
                 ref value,
             } => {
                 let val = run_expression(state, program, &value)?;
-                state.pronoun = Some(target.clone());
-                state.variables.insert(target.to_lowercase(), val);
+                match target {
+                    Expression::Variable(name) => {
+                        state.pronoun = Some(name.clone());
+                        state.variables.insert(name.to_lowercase(), val);
+                    }
+                    _ => {
+                        panic!("Don't know how to assign to {:?}", target);
+                    }
+                }
             }
             Command::Increment {
                 ref target,

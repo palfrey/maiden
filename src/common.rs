@@ -109,7 +109,7 @@ pub struct Block {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Command {
     Assignment {
-        target: String,
+        target: Expression,
         value: Expression,
     },
     Until {
