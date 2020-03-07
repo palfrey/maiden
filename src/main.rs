@@ -324,11 +324,21 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             eprintln!("number '{}' parsed as {}", value, number);
             Expression::Floating(number as f64).into()
         }
-        Rule::null => {
-            Expression::Null.into()
-        }
-        Rule::mysterious => {
-            Expression::Mysterious.into()
+        Rule::null => Expression::Null.into(),
+        Rule::mysterious => Expression::Mysterious.into(),
+        Rule::readline => {
+            eprintln!("{}Depairing listen", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            if items.is_empty() {
+                return Command::Listen { target: None }.into();
+            }
+            if items.len() != 1 {
+                panic!("listen: {:?}", items);
+            }
+            if let Item::Expression(Expression::Variable(name)) = items.remove(0) {
+                return Command::Listen { target: Some(name) }.into();
+            }
+            panic!("listen: {:?}", items);
         }
         rule => {
             let original = pair.clone();
