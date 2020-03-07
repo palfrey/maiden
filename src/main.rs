@@ -302,6 +302,9 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
         Rule::null => {
             Expression::Null.into()
         }
+        Rule::mysterious => {
+            Expression::Mysterious.into()
+        }
         rule => {
             let original = pair.clone();
             let inner = pair.into_inner();
