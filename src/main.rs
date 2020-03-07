@@ -319,8 +319,9 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
                 if number > 0 {
                     number *= 10;
                 }
-                number += word.len();
+                number += word.len() % 10;
             }
+            eprintln!("number '{}' parsed as {}", value, number);
             Expression::Floating(number as f64).into()
         }
         Rule::null => {
