@@ -207,13 +207,13 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
                 return items.remove(0);
             }
             let is = items.remove(1);
-            if is != Item::Symbol(SymbolType::Is) {
-                panic!("Not is: {:?}", is);
+            let first = Box::new(items.remove(0).expr());
+            let second = Box::new(items.remove(0).expr());
+            match is {
+                Item::Symbol(SymbolType::Is) => Expression::Is(first, second),
+                Item::Symbol(SymbolType::Aint) => Expression::Aint(first, second),
+                _ => panic!("Not is: {:?}", is),
             }
-            Expression::Is(
-                Box::new(items.remove(0).expr()),
-                Box::new(items.remove(0).expr()),
-            )
             .into()
         }
         Rule::statement => {
@@ -226,6 +226,16 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
                 .into();
             }
             item
+        }
+        Rule::not => {
+            let mut pairs = pair.into_inner();
+            let compare = pairs.peek().unwrap().as_rule() == Rule::comparison;
+            let item = depair(&mut pairs, level + 1);
+            if compare {
+                item
+            } else {
+                Expression::Not(Box::new(item.expr())).into()
+            }
         }
         Rule::assignment => {
             eprintln!("{}Depairing assignment", level_string);
@@ -312,6 +322,7 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
         Rule::subtract => SymbolType::Subtract.into(),
         Rule::divide => SymbolType::Divide.into(),
         Rule::pronoun => Expression::Pronoun.into(),
+        Rule::ne => SymbolType::Aint.into(),
         Rule::poetic_digits => {
             let value = pair.as_str();
             let mut number = 0;

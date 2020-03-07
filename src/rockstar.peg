@@ -88,7 +88,7 @@ eq = { ne | is_kw }
 
 equality_check = { (not ~ eq ~ equality_check) | not }
 
-not = { ("not" ~ WHITESPACE ~ not) | comparison }
+not = { (^"not " ~ not) | comparison }
 
 comparison = { (arithmetic ~ comparator ~ comparison) | arithmetic }
 
