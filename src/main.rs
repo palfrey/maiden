@@ -299,6 +299,9 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             }
             Expression::Floating(number as f64).into()
         }
+        Rule::null => {
+            Expression::Null.into()
+        }
         rule => {
             let original = pair.clone();
             let inner = pair.into_inner();
