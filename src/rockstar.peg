@@ -126,7 +126,7 @@ pronoun = {
     | ^"ze" | ^"ve" | ^"xe" | ^"it" | ^"he"
 }
 
-lookup 	=  { variable }
+lookup = { variable }
 
 common_prefix = { ^"an" | ^"a" | ^"the" | ^"my" | ^"your" }
 
@@ -137,7 +137,7 @@ letter = { uppercase_letter | lowercase_letter}
 
 common_variable = @{common_prefix ~ WHITESPACE ~ letter+}
 
-is = {"\'s" | "=''" | ^"'s " | ^"was " | ^"are " | ^"were "}
+is = {"\'s" | "=''" | ^"'s " | ^"is " | ^"was " | ^"are " | ^"were "}
 assignment = { (variable ~ is ~ (literal | poetic_number))
   | (variable ~ ^"says " ~ poetic_string)
   | (^"put" ~ expression ~ ^"into " ~ variable)
@@ -145,17 +145,17 @@ assignment = { (variable ~ is ~ (literal | poetic_number))
   | (^"let" ~ variable ~ ^"be " ~ expression)
 }
 
-poetic_string = @{ (!"\n" ~ ANY) }
+poetic_string = { (!"\n" ~ ANY) }
 
-poetic_number = @{ poetic_digit_separator* ~ poetic_digits ~ poetic_digit_separator* ~ poetic_decimal? ~ poetic_digit_separator* }
+poetic_number = { poetic_digit_separator* ~ poetic_digits ~ poetic_digit_separator* ~ poetic_decimal? ~ poetic_digit_separator* }
 
-poetic_decimal = @{ ("." ~ poetic_decimal_digit_separator* ~ poetic_decimal_digits ~ poetic_decimal_digit_separator*) |
+poetic_decimal = { ("." ~ poetic_decimal_digit_separator* ~ poetic_decimal_digits ~ poetic_decimal_digit_separator*) |
                 ("." ~ poetic_decimal_digit_separator*)}
 
-poetic_digit_separator = { ASCII_DIGIT |"\"" | "'" |"," |";" |":" |"?" |"!" |"+" |"_" |"\\" |"-" |"|" }
+poetic_digit_separator = { ASCII_DIGIT |"\"" | "'" |"," |";" |":" |"?" |"!" |"+" |"_" |"\\" |"-" |"|"| WHITESPACE }
 
 poetic_digits =
-  { (poetic_digit_separator* ~ poetic_digit ~ poetic_digit_separator+ ~ poetic_digits)
+  @{ (poetic_digit_separator* ~ poetic_digit ~ poetic_digit_separator+ ~ poetic_digits)
   | poetic_digit}
 
 poetic_decimal_digit_separator = { poetic_digit_separator | "." }

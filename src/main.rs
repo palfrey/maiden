@@ -119,6 +119,9 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
     let rule = pair.as_rule();
     let level_string = format!("({}){}", level, "  ".repeat(level));
     match rule {
+        Rule::EOI => {
+            SymbolType::Empty.into()
+        }
         Rule::common_variable | Rule::proper_variable => {
             Expression::Variable(pair.as_span().as_str().to_string()).into()
         }
@@ -128,7 +131,7 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
         Rule::false_kw => {
             Expression::False.into()
         }
-        Rule::is_kw => {
+        Rule::is_kw | Rule::is => {
             SymbolType::Is.into()
         }
         Rule::output => {
@@ -212,20 +215,32 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
                 }
                 2 => {
                     let operator = items.remove(0).symbol();
+                    let first = Box::new(target.clone());
+                    let second = items.remove(0).expr();
                     match operator {
                         SymbolType::Add => {
                             let expr = Expression::Add(
-                                Box::new(target.clone()),
-                                Box::new(items.remove(0).expr())
+                                first,
+                                Box::new(second)
                             );
                             Command::Assignment{target, value: expr}.into()
                         }
                         SymbolType::Subtract => {
                             let expr = Expression::Subtract(
-                                Box::new(target.clone()),
-                                Box::new(items.remove(0).expr())
+                                first,
+                                Box::new(second)
                             );
                             Command::Assignment{target, value: expr}.into()
+                        }
+                        SymbolType::Divide => {
+                            let expr = Expression::Divide(
+                                first,
+                                Box::new(second)
+                            );
+                            Command::Assignment{target, value: expr}.into()
+                        }
+                        SymbolType::Is => {
+                            Command::Assignment{target, value: second}.into()
                         }
                         _ => {
                             panic!("Bad assignment operator: {:?}", operator);
@@ -243,8 +258,22 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
         Rule::subtract => {
             SymbolType::Subtract.into()
         }
+        Rule::divide => {
+            SymbolType::Divide.into()
+        }
         Rule::pronoun => {
             Expression::Pronoun.into()
+        }
+        Rule::poetic_digits => {
+            let value = pair.as_str();
+            let mut number = 0;
+            for word in value.split_whitespace() {
+                if number > 0 {
+                    number *= 10;
+                }
+                number += word.len();
+            }
+            Expression::Floating(number as f64).into()
         }
         rule => {
             let original = pair.clone();
@@ -276,7 +305,11 @@ where
     let mut items = vec![];
     let level_string = format!("({}){}", level, "  ".repeat(level));
     for pair in pairs {
-        items.push(depair_core(pair, level));
+        let item = depair_core(pair, level);
+        if item == SymbolType::Empty.into() {
+            continue;
+        }
+        items.push(item);
     }
     match items.len() {
         0 => {
