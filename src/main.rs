@@ -1,17 +1,17 @@
 #![allow(warnings)]
 
-use pest::Parser;
 use clap::{App, Arg};
+use pest::iterators::Pair;
+use pest::Parser;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Read};
-use std::collections::HashMap;
-use pest::iterators::Pair;
 
 mod common;
 mod peg;
 mod runner;
 
-use crate::common::{Block, Expression, SymbolType, Command, Program, CommandLine};
+use crate::common::{Block, Command, CommandLine, Expression, Program, SymbolType};
 use crate::peg::{Rockstar, Rule};
 
 fn main() -> common::Result<()> {
@@ -42,27 +42,43 @@ enum Item {
     Expression(Expression),
     Symbol(SymbolType),
     Command(Command),
-    Block(Block)
+    Block(Block),
 }
 
 impl Item {
     fn expr(self) -> Expression {
-        if let Item::Expression(e) = self { e } else { panic!("Not an expression: {:?}", self)}
+        if let Item::Expression(e) = self {
+            e
+        } else {
+            panic!("Not an expression: {:?}", self)
+        }
     }
     fn symbol(self) -> SymbolType {
-        if let Item::Symbol(e) = self { e } else { panic!("Not a symboltype: {:?}", self)}
+        if let Item::Symbol(e) = self {
+            e
+        } else {
+            panic!("Not a symboltype: {:?}", self)
+        }
     }
     fn command(self) -> Command {
-        if let Item::Command(e) = self { e } else { panic!("Not a command: {:?}", self)}
+        if let Item::Command(e) = self {
+            e
+        } else {
+            panic!("Not a command: {:?}", self)
+        }
     }
     fn block(self) -> Block {
-        if let Item::Block(e) = self { e } else { panic!("Not a block: {:?}", self)}
+        if let Item::Block(e) = self {
+            e
+        } else {
+            panic!("Not a block: {:?}", self)
+        }
     }
 }
 
 fn depair_program<'i, I>(pairs: &'i mut I) -> Program
 where
-    I: Iterator<Item = pest::iterators::Pair<'i, Rule>>
+    I: Iterator<Item = pest::iterators::Pair<'i, Rule>>,
 {
     let pair = pairs.next().expect("one pair");
     if pair.as_rule() != Rule::program {
@@ -77,9 +93,12 @@ where
         let depaired = depair(&mut line.into_inner(), 0);
         match depaired {
             Item::Command(command) => {
-                commands.push(CommandLine{cmd: command, line: line_no});
+                commands.push(CommandLine {
+                    cmd: command,
+                    line: line_no,
+                });
             }
-            Item::Symbol(SymbolType::Empty) => {},
+            Item::Symbol(SymbolType::Empty) => {}
             item => {
                 println!("Something else {:?}", item);
             }
@@ -87,7 +106,7 @@ where
     }
     common::Program {
         commands,
-        functions: HashMap::new()
+        functions: HashMap::new(),
     }
 }
 
@@ -119,30 +138,20 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
     let rule = pair.as_rule();
     let level_string = format!("({}){}", level, "  ".repeat(level));
     match rule {
-        Rule::EOI => {
-            SymbolType::Empty.into()
-        }
+        Rule::EOI => SymbolType::Empty.into(),
         Rule::common_variable | Rule::proper_variable => {
             Expression::Variable(pair.as_span().as_str().to_string()).into()
         }
-        Rule::true_kw => {
-            Expression::True.into()
-        }
-        Rule::false_kw => {
-            Expression::False.into()
-        }
-        Rule::is_kw | Rule::is => {
-            SymbolType::Is.into()
-        }
+        Rule::true_kw => Expression::True.into(),
+        Rule::false_kw => Expression::False.into(),
+        Rule::is_kw | Rule::is => SymbolType::Is.into(),
         Rule::output => {
             let value = depair(&mut pair.into_inner(), level + 1).expr();
-            Command::Say {
-                value
-            }.into()
+            Command::Say { value }.into()
         }
         Rule::string => {
             let mut value = pair.as_str();
-            value = &value[1..value.len()-1];
+            value = &value[1..value.len() - 1];
             Expression::String(value.to_string()).into()
         }
         Rule::number => {
@@ -158,7 +167,11 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             match first.as_rule() {
                 Rule::consequent => {
                     consequent = Some(depair_core(first, level + 1).block());
-                    alternate = if pairs.is_empty() { None } else { Some(depair_core(pairs.remove(0), level + 1).block()) };
+                    alternate = if pairs.is_empty() {
+                        None
+                    } else {
+                        Some(depair_core(pairs.remove(0), level + 1).block())
+                    };
                 }
                 Rule::alternate => {
                     consequent = None;
@@ -171,15 +184,19 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             Command::If {
                 expression,
                 then: consequent,
-                otherwise: alternate
-            }.into()
+                otherwise: alternate,
+            }
+            .into()
         }
         Rule::block => {
             eprintln!("{}Depairing Block", level_string);
             let items = depair_seq(&mut pair.into_inner(), level + 1);
             let mut commands = vec![];
             for item in items {
-                commands.push(CommandLine {cmd: item.command(), line: 0});
+                commands.push(CommandLine {
+                    cmd: item.command(),
+                    line: 0,
+                });
             }
             Block { commands }.into()
         }
@@ -193,12 +210,20 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             if is != Item::Symbol(SymbolType::Is) {
                 panic!("Not is: {:?}", is);
             }
-            Expression::Is(Box::new(items.remove(0).expr()), Box::new(items.remove(0).expr())).into()
+            Expression::Is(
+                Box::new(items.remove(0).expr()),
+                Box::new(items.remove(0).expr()),
+            )
+            .into()
         }
         Rule::statement => {
             let item = depair(&mut pair.into_inner(), level + 1);
             if let Item::Expression(Expression::Is(target, value)) = item {
-                return Command::Assignment{target: *target, value: *value}.into();
+                return Command::Assignment {
+                    target: *target,
+                    value: *value,
+                }
+                .into();
             }
             item
         }
@@ -210,38 +235,45 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             }
             let target = items.remove(0).expr();
             match items.len() {
-                1 => {
-                    Command::Assignment{target, value: items.remove(0).expr()}.into()
+                1 => Command::Assignment {
+                    target,
+                    value: items.remove(0).expr(),
                 }
+                .into(),
                 2 => {
                     let operator = items.remove(0).symbol();
                     let first = Box::new(target.clone());
                     let second = items.remove(0).expr();
                     match operator {
                         SymbolType::Add => {
-                            let expr = Expression::Add(
-                                first,
-                                Box::new(second)
-                            );
-                            Command::Assignment{target, value: expr}.into()
+                            let expr = Expression::Add(first, Box::new(second));
+                            Command::Assignment {
+                                target,
+                                value: expr,
+                            }
+                            .into()
                         }
                         SymbolType::Subtract => {
-                            let expr = Expression::Subtract(
-                                first,
-                                Box::new(second)
-                            );
-                            Command::Assignment{target, value: expr}.into()
+                            let expr = Expression::Subtract(first, Box::new(second));
+                            Command::Assignment {
+                                target,
+                                value: expr,
+                            }
+                            .into()
                         }
                         SymbolType::Divide => {
-                            let expr = Expression::Divide(
-                                first,
-                                Box::new(second)
-                            );
-                            Command::Assignment{target, value: expr}.into()
+                            let expr = Expression::Divide(first, Box::new(second));
+                            Command::Assignment {
+                                target,
+                                value: expr,
+                            }
+                            .into()
                         }
-                        SymbolType::Is => {
-                            Command::Assignment{target, value: second}.into()
+                        SymbolType::Is => Command::Assignment {
+                            target,
+                            value: second,
                         }
+                        .into(),
                         _ => {
                             panic!("Bad assignment operator: {:?}", operator);
                         }
@@ -252,18 +284,10 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
                 }
             }
         }
-        Rule::add => {
-            SymbolType::Add.into()
-        }
-        Rule::subtract => {
-            SymbolType::Subtract.into()
-        }
-        Rule::divide => {
-            SymbolType::Divide.into()
-        }
-        Rule::pronoun => {
-            Expression::Pronoun.into()
-        }
+        Rule::add => SymbolType::Add.into(),
+        Rule::subtract => SymbolType::Subtract.into(),
+        Rule::divide => SymbolType::Divide.into(),
+        Rule::pronoun => Expression::Pronoun.into(),
         Rule::poetic_digits => {
             let value = pair.as_str();
             let mut number = 0;
@@ -281,12 +305,14 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             let count = inner.count();
             if count == 0 {
                 if rule == Rule::alternate {
-                    return Block { commands: vec![] }.into()
+                    return Block { commands: vec![] }.into();
                 }
                 let (line_no, col_no) = original.as_span().start_pos().line_col();
-                panic!("{}Empty pair at {}, {}: {:?}", level_string, line_no, col_no, original);
-            }
-            else if count == 1 {
+                panic!(
+                    "{}Empty pair at {}, {}: {:?}",
+                    level_string, line_no, col_no, original
+                );
+            } else if count == 1 {
                 eprintln!("{}Depairing {:?}", level_string, rule);
                 depair(&mut original.into_inner(), level + 1)
             } else {
@@ -297,10 +323,9 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
     }
 }
 
-
 fn depair<'i, I>(pairs: &'i mut I, level: usize) -> Item
 where
-    I: Iterator<Item = pest::iterators::Pair<'i, Rule>>
+    I: Iterator<Item = pest::iterators::Pair<'i, Rule>>,
 {
     let mut items = vec![];
     let level_string = format!("({}){}", level, "  ".repeat(level));
@@ -325,7 +350,7 @@ where
 
 fn depair_seq<'i, I>(pairs: &'i mut I, level: usize) -> Vec<Item>
 where
-    I: Iterator<Item = pest::iterators::Pair<'i, Rule>>
+    I: Iterator<Item = pest::iterators::Pair<'i, Rule>>,
 {
     let mut items = vec![];
     for pair in pairs {

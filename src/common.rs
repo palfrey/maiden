@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use failure::Fail;
+use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
 pub enum Expression {

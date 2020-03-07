@@ -1,9 +1,9 @@
 use crate::common::*;
+use log::debug;
 use std;
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::ops::Deref;
-use log::debug;
 
 struct State<'a> {
     writer: &'a mut dyn Write,
@@ -701,10 +701,24 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
                 debug!("if: {:?} {:?}", &resolve, expression);
                 if to_boolean(state, &resolve)? {
                     if let Some(block) = then {
-                        run_core(state, &Program { commands: block.commands.clone(), functions: program.functions.clone()}, 0);
+                        run_core(
+                            state,
+                            &Program {
+                                commands: block.commands.clone(),
+                                functions: program.functions.clone(),
+                            },
+                            0,
+                        );
                     }
                 } else if let Some(block) = otherwise {
-                    run_core(state, &Program { commands: block.commands.clone(), functions: program.functions.clone()}, 0);
+                    run_core(
+                        state,
+                        &Program {
+                            commands: block.commands.clone(),
+                            functions: program.functions.clone(),
+                        },
+                        0,
+                    );
                 }
             }
             Command::Else { if_start } => {
