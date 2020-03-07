@@ -147,15 +147,15 @@ assignment = { (variable ~ is ~ (literal | poetic_number))
 
 poetic_string = { (!"\n" ~ ANY) }
 
-poetic_number = { poetic_digit_separator* ~ poetic_digits ~ poetic_digit_separator* ~ poetic_decimal? ~ poetic_digit_separator* }
+poetic_number = @{ poetic_digit_separator* ~ poetic_digits ~ poetic_digit_separator* ~ poetic_decimal? ~ poetic_digit_separator* }
 
 poetic_decimal = { ("." ~ poetic_decimal_digit_separator* ~ poetic_decimal_digits ~ poetic_decimal_digit_separator*) |
                 ("." ~ poetic_decimal_digit_separator*)}
 
-poetic_digit_separator = { ASCII_DIGIT |"\"" | "'" |"," |";" |":" |"?" |"!" |"+" |"_" |"\\" |"-" |"|"| WHITESPACE }
+poetic_digit_separator = { ASCII_DIGIT |"\"" | "'" |"," |";" |":" |"?" |"!" |"+" |"_" |"\\" |"-" |"|" | WHITESPACE }
 
 poetic_digits =
-  @{ (poetic_digit_separator* ~ poetic_digit ~ poetic_digit_separator+ ~ poetic_digits)
+  { (poetic_digit ~ poetic_digit_separator+ ~ poetic_digits)
   | poetic_digit}
 
 poetic_decimal_digit_separator = { poetic_digit_separator | "." }
@@ -163,7 +163,7 @@ poetic_decimal_digits = {
   (poetic_decimal_digit_separator* ~ poetic_digit ~ poetic_decimal_digit_separator+ ~ poetic_decimal_digits)
   | poetic_digit}
 
-poetic_digit = @{(ASCII_ALPHA | "'")+ }
+poetic_digit = @{(ASCII_ALPHA | "'" | "-")+ }
 
 // To disallow identifiers like "My back is hurting" (which is illegal because "back" is a keyword)
 // we need to explicitly define all language keywords, and they MUST be matched in descending order of length

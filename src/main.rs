@@ -323,17 +323,33 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
         Rule::divide => SymbolType::Divide.into(),
         Rule::pronoun => Expression::Pronoun.into(),
         Rule::ne => SymbolType::Aint.into(),
-        Rule::poetic_digits => {
+        Rule::poetic_number => {
             let value = pair.as_str();
-            let mut number = 0;
-            for word in value.split_whitespace() {
-                if number > 0 {
-                    number *= 10;
+            let mut number: f64 = 0.0;
+            let mut decimal = false;
+            let mut decimal_places = 0;
+            for raw_word in value.split_whitespace() {
+                let mut word = raw_word.to_string();
+                word.retain(|c| c.is_alphabetic());
+                if word.len() == 0 {
+                    continue;
                 }
-                number += word.len() % 10;
+                if number > 0.0 {
+                    number *= 10.0;
+                }
+                number += (word.len() % 10) as f64;
+                if decimal {
+                    decimal_places += 1;
+                }
+                if raw_word.ends_with(".") {
+                    decimal = true;
+                }
+            }
+            if decimal_places > 0 {
+                number /= 10.0_f64.powf(decimal_places as f64);
             }
             eprintln!("number '{}' parsed as {}", value, number);
-            Expression::Floating(number as f64).into()
+            Expression::Floating(number).into()
         }
         Rule::null => Expression::Null.into(),
         Rule::mysterious => Expression::Mysterious.into(),
