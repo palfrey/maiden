@@ -88,7 +88,7 @@ eq = { ne | is_kw }
 
 equality_check = { (not ~ eq ~ equality_check) | not }
 
-not = { ("not" ~ not) | comparison }
+not = { ("not" ~ WHITESPACE ~ not) | comparison }
 
 comparison = { (arithmetic ~ comparator ~ comparison) | arithmetic }
 
@@ -187,7 +187,7 @@ keyword = @{(kw10 | kw8 | kw7 | kw6 | kw5 | kw5 | kw4 | kw3 | kw2 | kw1) ~ !lett
 
 variable = {common_variable | proper_variable | pronoun | simple_variable }
 
-simple_variable = @{!keyword ~ letter ~ letter* }
+simple_variable = @{!keyword ~ letter+ }
 
 proper_noun = @{!keyword ~ uppercase_letter ~ letter*}
 proper_variable = @{ proper_noun ~ (" " ~ proper_noun)* }
