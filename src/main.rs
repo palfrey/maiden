@@ -351,6 +351,7 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             eprintln!("number '{}' parsed as {}", value, number);
             Expression::Floating(number).into()
         }
+        Rule::poetic_string => Expression::String(pair.as_str().to_string()).into(),
         Rule::null => Expression::Null.into(),
         Rule::mysterious => Expression::Mysterious.into(),
         Rule::readline => {
