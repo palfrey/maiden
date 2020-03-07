@@ -233,21 +233,10 @@ fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
                 Ok(true)
             }
         }
-        Expression::String(ref val) => match val.to_lowercase().as_str() {
-            "" => Ok(true),
-            "lies" => Ok(false),
-            "true" => Ok(true),
-            "right" => Ok(true),
-            "false" => Ok(false),
-            "wrong" => Ok(false),
-            _ => {
-                Ok(true)
-                // return Err(MaidenError::BadBooleanResolve(
-                //     format!("{:?}", expression),
-                //     state.current_line
-                // ));
-            }
-        },
+        Expression::String(ref val) => Ok(match val.to_lowercase().as_str() {
+            "" => false,
+            _ => true,
+        }),
         Expression::Object(_) => Ok(true),
         _ => {
             return Err(MaidenError::BadBooleanResolve {
