@@ -89,6 +89,9 @@ fn run_binop_shortcut(
             if let Expression::String(_) = res_second {
                 return Ok(f(state, &res_first, &res_second)?);
             }
+            if Expression::Null == res_second {
+                return Ok(false);
+            }
         }
         Expression::Mysterious => {
             if let Expression::Mysterious = res_second {
