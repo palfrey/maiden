@@ -597,6 +597,10 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
                         state.pronoun = Some(name.clone());
                         state.variables.insert(name.to_lowercase(), val);
                     }
+                    Expression::Pronoun => {
+                        let pronoun = state.pronoun.as_ref().unwrap();
+                        state.variables.insert(pronoun.to_lowercase(), val);
+                    }
                     _ => {
                         panic!("Don't know how to assign to {:?}", target);
                     }
