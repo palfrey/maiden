@@ -139,7 +139,7 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
     let level_string = format!("({}){}", level, "  ".repeat(level));
     match rule {
         Rule::EOI => SymbolType::Empty.into(),
-        Rule::common_variable | Rule::proper_variable => {
+        Rule::common_variable | Rule::proper_variable | Rule::simple_variable => {
             Expression::Variable(pair.as_span().as_str().to_string()).into()
         }
         Rule::true_kw => Expression::True.into(),
@@ -283,6 +283,30 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
                     panic!("Bad assignment: {:?}", items);
                 }
             }
+        }
+        Rule::arithmetic => {
+            eprintln!("{}Depairing arithmetic", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            if items.len() % 2 != 1 {
+                panic!("Weird arithmetic: {:?}", items);
+            };
+            let mut first = items.remove(0).expr();
+            while !items.is_empty() {
+                let operator = items.remove(0).symbol();
+                let second = Box::new(items.remove(0).expr());
+                match operator {
+                    SymbolType::Add => {
+                        first = Expression::Add(Box::new(first), second);
+                    }
+                    SymbolType::Subtract => {
+                        first = Expression::Subtract(Box::new(first), second);
+                    }
+                    _ => {
+                        panic!("Unknown operator: {:?}", operator);
+                    }
+                }
+            }
+            first.into()
         }
         Rule::add => SymbolType::Add.into(),
         Rule::subtract => SymbolType::Subtract.into(),
