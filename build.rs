@@ -17,12 +17,18 @@ fn main() {
             .replace("tests/", "");
         if name.ends_with(".rock") {
             let test_name = name.replace(".", "_").replace("-", "_").replace("/", "_");
-            if test_name == "upstream_correct_operators_equalityComparison_rock"
-                || test_name == "upstream_correct_truthinessTest_rock"
+            if test_name == "upstream_fixtures_equality_mysterious_rock"
+                || test_name == "upstream_fixtures_equality_equalityComparison_rock"
+                || test_name == "upstream_fixtures_equality_nothing_rock"
             {
-                continue; // FIXME: Blocked by https://github.com/dylanbeattie/rockstar/issues/168
+                continue; // FIXME: Blocked by https://github.com/RockstarLang/rockstar/pull/238
             }
-            let function = if name.contains("parse-errors") || name.contains("runtime-errors") {
+
+            if test_name.contains("_arrays_") {
+                continue; // we don't implement arrays yet
+            }
+
+            let function = if name.contains("failures") {
                 "parse_fail_file_test"
             } else {
                 "success_file_test"
