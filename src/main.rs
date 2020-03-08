@@ -11,7 +11,7 @@ mod common;
 mod peg;
 mod runner;
 
-use crate::common::{Block, Command, CommandLine, Expression, Program, SymbolType};
+use crate::common::{Block, Command, CommandLine, Expression, Function, Program, SymbolType};
 use crate::peg::{Rockstar, Rule};
 
 fn main() -> common::Result<()> {
@@ -85,6 +85,7 @@ where
         panic!("Bad rule: {:?}", pair.as_rule());
     }
     let mut commands = vec![];
+    let mut functions = HashMap::new();
     for line in pair.into_inner() {
         if line.as_rule() != Rule::line {
             panic!("Bad rule: {:?}", line.as_rule());
@@ -92,6 +93,9 @@ where
         let (line_no, _) = line.as_span().start_pos().line_col();
         let depaired = depair(&mut line.into_inner(), 0);
         match depaired {
+            Item::Command(Command::FunctionDeclaration { name, args, block }) => {
+                functions.insert(name, Function { args, block });
+            }
             Item::Command(command) => {
                 commands.push(CommandLine {
                     cmd: command,
@@ -106,7 +110,7 @@ where
     }
     common::Program {
         commands,
-        functions: HashMap::new(),
+        functions,
     }
 }
 
@@ -329,6 +333,14 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
         Rule::divide => SymbolType::Divide.into(),
         Rule::pronoun => Expression::Pronoun.into(),
         Rule::ne => SymbolType::Aint.into(),
+        Rule::return_kw => SymbolType::Return.into(),
+        Rule::function_return => {
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            Command::Return {
+                return_value: items.remove(1).expr(),
+            }
+            .into()
+        }
         Rule::poetic_number => {
             let value = pair.as_str();
             let mut number: f64 = 0.0;
@@ -373,6 +385,55 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
                 return Command::Listen { target: Some(name) }.into();
             }
             panic!("listen: {:?}", items);
+        }
+        Rule::variable_list => {
+            eprintln!("{}Depairing variable_list", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            let variables = items
+                .drain(0..)
+                .map(|i| i.expr())
+                .map(|e| {
+                    if let Expression::Variable(name) = e {
+                        name
+                    } else {
+                        panic!("Non-variable in variable list: {:?}", e);
+                    }
+                })
+                .collect::<Vec<String>>();
+            SymbolType::VariableList(variables).into()
+        }
+        Rule::function => {
+            eprintln!("{}Depairing function", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            let name = if let Expression::Variable(n) = items.remove(0).expr() {
+                n
+            } else {
+                panic!("Non-variable name for function");
+            };
+            let args = if let SymbolType::VariableList(variables) = items.remove(0).symbol() {
+                variables
+            } else {
+                panic!("Non-variable list for function");
+            };
+            let block = items.remove(0).block();
+            Command::FunctionDeclaration { name, args, block }.into()
+        }
+        Rule::function_call => {
+            eprintln!("{}Depairing function_call", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            let name = if let Expression::Variable(n) = items.remove(0).expr() {
+                n
+            } else {
+                panic!("Non-variable name for function_call");
+            };
+            Expression::Call(
+                name,
+                items
+                    .drain(0..)
+                    .map(|i| i.expr())
+                    .collect::<Vec<Expression>>(),
+            )
+            .into()
         }
         rule => {
             let original = pair.clone();

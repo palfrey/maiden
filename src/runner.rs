@@ -289,7 +289,15 @@ fn call_function(
             .variables
             .insert(func.args[i].to_lowercase(), value);
     }
-    return run_core(&mut new_state, program, func.location + 1);
+
+    return run_core(
+        &mut new_state,
+        &Program {
+            commands: func.block.commands.clone(),
+            functions: program.functions.clone(),
+        },
+        0,
+    );
 }
 
 #[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
@@ -672,16 +680,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
                 let x = get_printable(&resolve, state)?;
                 writeln!(state.writer, "{}", x)?;
             }
-            Command::FunctionDeclaration { func_end, .. } => match func_end {
-                Some(val) => {
-                    pc = val;
-                }
-                None => {
-                    return Err(MaidenError::NoEndFunction {
-                        line: state.current_line,
-                    })
-                }
-            },
+            Command::FunctionDeclaration { .. } => {}
             Command::Return { ref return_value } => {
                 return run_expression(state, program, &return_value);
             }

@@ -91,6 +91,7 @@ pub enum SymbolType {
     Not(Box<SymbolType>),
     Break,
     Empty,
+    VariableList(Vec<String>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -152,7 +153,7 @@ pub enum Command {
     FunctionDeclaration {
         name: String,
         args: Vec<String>,
-        func_end: Option<usize>,
+        block: Block,
     },
     Return {
         return_value: Expression,
@@ -169,8 +170,8 @@ pub enum Command {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Function {
-    pub location: usize,
     pub args: Vec<String>,
+    pub block: Block,
 }
 
 #[derive(Debug, Clone, PartialEq)]
