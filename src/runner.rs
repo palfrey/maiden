@@ -620,60 +620,42 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
             }
             Command::Until {
                 ref expression,
-                loop_end,
+                ref block,
             } => {
                 let resolve = run_expression(state, program, &expression)?;
                 if to_boolean(state, &resolve)? {
-                    match loop_end {
-                        Some(val) => {
-                            pc = val;
-                        }
-                        None => {
-                            return Err(MaidenError::NoEndLoop {
-                                line: state.current_line,
-                            })
-                        }
-                    }
+                    unimplemented!("until");
                 }
             }
             Command::While {
                 ref expression,
-                loop_end,
+                ref block,
             } => {
                 let resolve = run_expression(state, program, &expression)?;
                 if !to_boolean(state, &resolve)? {
-                    match loop_end {
-                        Some(val) => {
-                            pc = val;
-                        }
-                        None => {
-                            return Err(MaidenError::NoEndLoop {
-                                line: state.current_line,
-                            })
-                        }
-                    }
+                    unimplemented!("while");
                 }
             }
             Command::Next { loop_start } | Command::Continue { loop_start } => {
                 pc = loop_start - 1;
             }
             Command::Break { loop_start } => {
-                let loop_cmd = &program.commands[loop_start];
-                match loop_cmd.cmd {
-                    Command::While { loop_end, .. } => match loop_end {
-                        Some(val) => {
-                            pc = val;
-                        }
-                        None => {
-                            return Err(MaidenError::NoEndLoop {
-                                line: state.current_line,
-                            })
-                        }
-                    },
-                    _ => {
-                        panic!("Matched break with non-while");
-                    }
-                }
+                // let loop_cmd = &program.commands[loop_start];
+                // match loop_cmd.cmd {
+                //     Command::While { loop_end, .. } => match loop_end {
+                //         Some(val) => {
+                //             pc = val;
+                //         }
+                //         None => {
+                //             return Err(MaidenError::NoEndLoop {
+                //                 line: state.current_line,
+                //             })
+                //         }
+                //     },
+                //     _ => {
+                //         panic!("Matched break with non-while");
+                //     }
+                // }
             }
             Command::Say { ref value } => {
                 let resolve = run_expression(state, program, &value)?;

@@ -117,11 +117,11 @@ pub enum Command {
     },
     Until {
         expression: Expression,
-        loop_end: Option<usize>,
+        block: Block,
     },
     While {
         expression: Expression,
-        loop_end: Option<usize>,
+        block: Block,
     },
     If {
         expression: Expression,

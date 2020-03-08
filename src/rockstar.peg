@@ -53,7 +53,9 @@ conditional = {^"if" ~ expression ~ consequent? ~ alternate? }
 
 loopable 	= { statement | (EOL ~ block ~ EOL) }
 
-loop_kw 	= { (^"while" ~ expression ~ loopable) | (^"until" ~ expression ~ loopable) }
+while_kw = {^"while"}
+until_kw = {^"until"}
+loop_kw 	= { (while_kw ~ expression ~ loopable) | (until_kw ~ expression ~ loopable) }
 output  = {(^"say" |^"shout"|^"whisper"|^"scream") ~ expression}
 
 simple_expression = { function_call | constant | lookup | literal | pronoun }

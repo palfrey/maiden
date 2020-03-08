@@ -352,6 +352,23 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             )
             .into()
         }
+        Rule::comparison => {
+            eprintln!("{}Depairing comparison", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            if items.len() == 1 {
+                return items.remove(0);
+            }
+            let first = Box::new(items.remove(0).expr());
+            let operator = items.remove(0).symbol();
+            let second = Box::new(items.remove(0).expr());
+            match operator {
+                SymbolType::GreaterThanOrEqual => Expression::GreaterThanOrEqual(first, second),
+                _ => {
+                    panic!("Unknown operator: {:?}", operator);
+                }
+            }
+            .into()
+        }
         Rule::add => SymbolType::Add.into(),
         Rule::subtract => SymbolType::Subtract.into(),
         Rule::divide => SymbolType::Divide.into(),
@@ -413,17 +430,21 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
         Rule::variable_list => {
             eprintln!("{}Depairing variable_list", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            let variables = items
-                .drain(0..)
-                .map(|i| i.expr())
-                .map(|e| {
-                    if let Expression::Variable(name) = e {
-                        name
-                    } else {
-                        panic!("Non-variable in variable list: {:?}", e);
+            let mut variables = vec![];
+            for item in items.drain(0..) {
+                match item {
+                    Item::Symbol(SymbolType::Empty) => {}
+                    Item::Expression(Expression::Variable(name)) => {
+                        variables.push(name);
                     }
-                })
-                .collect::<Vec<String>>();
+                    Item::Symbol(SymbolType::VariableList(vars)) => {
+                        variables.extend(vars);
+                    }
+                    _ => {
+                        panic!("Non-variable in variable list: {:?}", item);
+                    }
+                }
+            }
             SymbolType::VariableList(variables).into()
         }
         Rule::function => {
@@ -486,6 +507,31 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             Command::Decrement {
                 target: name,
                 count: items.len() as f64,
+            }
+            .into()
+        }
+        Rule::variable_list_separator => SymbolType::Empty.into(),
+        Rule::great => SymbolType::GreaterThanOrEqual.into(),
+        Rule::while_kw => SymbolType::While.into(),
+        Rule::until_kw => SymbolType::Until.into(),
+        Rule::loop_kw => {
+            eprintln!("{}Depairing loop", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            let kind = items.remove(0).symbol();
+            let condition = items.remove(0).expr();
+            let block = items.remove(0).block();
+            match kind {
+                SymbolType::While => Command::While {
+                    expression: condition,
+                    block,
+                },
+                SymbolType::Until => Command::Until {
+                    expression: condition,
+                    block,
+                },
+                _ => {
+                    panic!("Unrecognised block type: {:?}", kind);
+                }
             }
             .into()
         }
