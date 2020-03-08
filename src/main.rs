@@ -328,6 +328,30 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             }
             first.into()
         }
+        Rule::and => {
+            eprintln!("{}Depairing and", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            if items.len() == 1 {
+                return items.remove(0);
+            }
+            Expression::And(
+                Box::new(items.remove(0).expr()),
+                Box::new(items.remove(0).expr()),
+            )
+            .into()
+        }
+        Rule::or => {
+            eprintln!("{}Depairing or", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            if items.len() == 1 {
+                return items.remove(0);
+            }
+            Expression::Or(
+                Box::new(items.remove(0).expr()),
+                Box::new(items.remove(0).expr()),
+            )
+            .into()
+        }
         Rule::add => SymbolType::Add.into(),
         Rule::subtract => SymbolType::Subtract.into(),
         Rule::divide => SymbolType::Divide.into(),
