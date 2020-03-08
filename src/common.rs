@@ -40,6 +40,8 @@ pub enum SymbolType {
     Or,
     Nor,
     Is,
+    Up,
+    Down,
     Build {
         target: String,
         count: usize,

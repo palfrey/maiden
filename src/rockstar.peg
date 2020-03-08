@@ -194,6 +194,8 @@ proper_variable = @{ proper_noun ~ (" " ~ proper_noun)* }
 
 crement = { increment | decrement }
 
-increment = { ^"build" ~ variable ~ (^"up" ~ noise*)+ }
+up_kw = {^"up"}
+increment = { ^"build" ~ variable ~ (up_kw ~ noise*)+ }
 
-decrement = { ^"knock" ~ variable ~ (^"down" ~ noise*)+ }
+down_kw = {^"down"}
+decrement = { ^"knock" ~ variable ~ (down_kw ~ noise*)+ }

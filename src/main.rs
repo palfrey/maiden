@@ -459,6 +459,36 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             )
             .into()
         }
+        Rule::up_kw => SymbolType::Up.into(),
+        Rule::down_kw => SymbolType::Down.into(),
+        Rule::increment => {
+            eprintln!("{}Depairing increment", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            let name = if let Expression::Variable(n) = items.remove(0).expr() {
+                n
+            } else {
+                panic!("Non-variable name for increment");
+            };
+            Command::Increment {
+                target: name,
+                count: items.len() as f64,
+            }
+            .into()
+        }
+        Rule::decrement => {
+            eprintln!("{}Depairing decrement", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            let name = if let Expression::Variable(n) = items.remove(0).expr() {
+                n
+            } else {
+                panic!("Non-variable name for decrement");
+            };
+            Command::Decrement {
+                target: name,
+                count: items.len() as f64,
+            }
+            .into()
+        }
         rule => {
             let original = pair.clone();
             let inner = pair.into_inner();
