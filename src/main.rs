@@ -237,6 +237,12 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
                 Expression::Not(Box::new(item.expr())).into()
             }
         }
+        Rule::put_assignment => {
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            let value = items.remove(0).expr();
+            let target = items.remove(0).expr();
+            Command::Assignment { target, value }.into()
+        }
         Rule::assignment => {
             eprintln!("{}Depairing assignment", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1);

@@ -37,7 +37,7 @@ return_kw = { ^"return" | ^"give back" }
 
 function_return = { return_kw ~ expression }
 
-operation = { readline | output | crement | assignment }
+operation = { readline | output | crement | assignment | put_assignment }
 
 readline = { (^"listen to" ~ variable) | ^"listen" }
 
@@ -138,9 +138,9 @@ letter = { uppercase_letter | lowercase_letter}
 common_variable = @{common_prefix ~ WHITESPACE ~ letter+}
 
 is = {"\'s" | "=''" | ^"'s " | ^"is " | ^"was " | ^"are " | ^"were "}
+put_assignment = { ^"put" ~ expression ~ ^"into " ~ variable }
 assignment = { (variable ~ is ~ (literal | poetic_number))
   | (variable ~ ^"says " ~ poetic_string)
-  | (^"put" ~ expression ~ ^"into " ~ variable)
   | (^"let" ~ variable ~ ^"be " ~ compoundable_operator ~ expression)
   | (^"let" ~ variable ~ ^"be " ~ expression)
 }
