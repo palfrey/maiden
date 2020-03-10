@@ -17,6 +17,10 @@ pub enum Expression {
     Pronoun,
     Not(Box<Expression>),
 
+    // needed by loops
+    Break,
+    Continue,
+
     // binary operators
     Is(Box<Expression>, Box<Expression>),
     Aint(Box<Expression>, Box<Expression>),
@@ -138,15 +142,9 @@ pub enum Command {
         target: String,
         count: f64,
     },
-    Next {
-        loop_start: usize,
-    },
-    Continue {
-        loop_start: usize,
-    },
-    Break {
-        loop_start: usize,
-    },
+    Next,
+    Continue,
+    Break,
     Say {
         value: Expression,
     },

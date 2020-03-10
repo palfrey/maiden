@@ -33,7 +33,7 @@ fn main() -> common::Result<()> {
     let mut parsed = Rockstar::parse(Rule::program, &buffer).unwrap_or_else(|e| panic!("{}", e));
     let program = depair_program(&mut parsed);
     eprintln!("{:#?}", program);
-    runner::run(&program, &mut io::stdout())?;
+    eprintln!("{:#?}", runner::run(&program, &mut io::stdout())?);
     return Ok(());
 }
 
@@ -535,6 +535,7 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
         Rule::great => SymbolType::GreaterThanOrEqual.into(),
         Rule::while_kw => SymbolType::While.into(),
         Rule::until_kw => SymbolType::Until.into(),
+        Rule::continue_kw => Command::Continue.into(),
         Rule::loop_kw => {
             eprintln!("{}Depairing loop", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1);

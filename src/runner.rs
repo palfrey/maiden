@@ -29,6 +29,7 @@ fn run_binop(
 }
 
 fn expression_to_number(inp: Expression, line: usize) -> Result<Expression> {
+    debug!("x to number: {:?}", inp);
     return match inp {
         Expression::Floating(_) => Ok(inp),
         Expression::Null => Ok(Expression::Floating(0.0)),
@@ -621,25 +622,47 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
             Command::Until {
                 ref expression,
                 ref block,
-            } => {
+            } => loop {
                 let resolve = run_expression(state, program, &expression)?;
                 if to_boolean(state, &resolve)? {
-                    unimplemented!("until");
+                    break;
                 }
-            }
+                run_core(
+                    state,
+                    &Program {
+                        commands: block.commands.clone(),
+                        functions: program.functions.clone(),
+                    },
+                    0,
+                )
+                .unwrap();
+            },
             Command::While {
                 ref expression,
                 ref block,
-            } => {
+            } => loop {
                 let resolve = run_expression(state, program, &expression)?;
                 if !to_boolean(state, &resolve)? {
-                    unimplemented!("while");
+                    break;
                 }
+                let res = run_core(
+                    state,
+                    &Program {
+                        commands: block.commands.clone(),
+                        functions: program.functions.clone(),
+                    },
+                    0,
+                )
+                .unwrap();
+                if res == Expression::Break {
+                    break;
+                }
+            },
+            Command::Next | Command::Continue => {
+                return Ok(Expression::Continue);
             }
-            Command::Next { loop_start } | Command::Continue { loop_start } => {
-                pc = loop_start - 1;
-            }
-            Command::Break { loop_start } => {
+            Command::Break => {
+                return Ok(Expression::Break);
                 // let loop_cmd = &program.commands[loop_start];
                 // match loop_cmd.cmd {
                 //     Command::While { loop_end, .. } => match loop_end {
@@ -678,24 +701,32 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
                 debug!("if: {:?} {:?}", &resolve, expression);
                 if to_boolean(state, &resolve)? {
                     if let Some(block) = then {
-                        run_core(
+                        let res = run_core(
                             state,
                             &Program {
                                 commands: block.commands.clone(),
                                 functions: program.functions.clone(),
                             },
                             0,
-                        );
+                        )
+                        .unwrap();
+                        if res != Expression::Nothing {
+                            return Ok(res);
+                        }
                     }
                 } else if let Some(block) = otherwise {
-                    run_core(
+                    let res = run_core(
                         state,
                         &Program {
                             commands: block.commands.clone(),
                             functions: program.functions.clone(),
                         },
                         0,
-                    );
+                    )
+                    .unwrap();
+                    if res != Expression::Nothing {
+                        return Ok(res);
+                    }
                 }
             }
             Command::Else { if_start } => {
