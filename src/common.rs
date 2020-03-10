@@ -33,7 +33,7 @@ pub enum Expression {
     LessThan(Box<Expression>, Box<Expression>),
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum SymbolType {
     Dummy,
     And,
@@ -94,6 +94,7 @@ pub enum SymbolType {
     Break,
     Empty,
     VariableList(Vec<String>),
+    ExpressionList(Vec<Expression>),
 }
 
 #[derive(Debug, PartialEq)]

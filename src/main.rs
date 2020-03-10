@@ -447,6 +447,29 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             }
             SymbolType::VariableList(variables).into()
         }
+        Rule::expression_list => {
+            eprintln!("{}Depairing expression_list", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            let mut expressions = vec![];
+            if items.len() == 1 {
+                return items.remove(0);
+            }
+            for item in items.drain(0..) {
+                match item {
+                    Item::Symbol(SymbolType::Empty) => {}
+                    Item::Expression(expr) => {
+                        expressions.push(expr);
+                    }
+                    Item::Symbol(SymbolType::ExpressionList(exprs)) => {
+                        expressions.extend(exprs);
+                    }
+                    _ => {
+                        panic!("Non-expression in expr list: {:?}", item);
+                    }
+                }
+            }
+            SymbolType::ExpressionList(expressions).into()
+        }
         Rule::function => {
             eprintln!("{}Depairing function", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1);
@@ -471,14 +494,12 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             } else {
                 panic!("Non-variable name for function_call");
             };
-            Expression::Call(
-                name,
-                items
-                    .drain(0..)
-                    .map(|i| i.expr())
-                    .collect::<Vec<Expression>>(),
-            )
-            .into()
+            let expression_list = items.remove(0).symbol();
+            if let SymbolType::ExpressionList(variables) = expression_list {
+                Expression::Call(name, variables).into()
+            } else {
+                panic!("Non-expression list: {:?}", expression_list);
+            }
         }
         Rule::up_kw => SymbolType::Up.into(),
         Rule::down_kw => SymbolType::Down.into(),
@@ -510,7 +531,7 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             }
             .into()
         }
-        Rule::variable_list_separator => SymbolType::Empty.into(),
+        Rule::variable_list_separator | Rule::expression_list_separator => SymbolType::Empty.into(),
         Rule::great => SymbolType::GreaterThanOrEqual.into(),
         Rule::while_kw => SymbolType::While.into(),
         Rule::until_kw => SymbolType::Until.into(),
