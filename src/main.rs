@@ -373,23 +373,6 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             )
             .into()
         }
-        Rule::comparison => {
-            eprintln!("{}Depairing comparison", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            if items.len() == 1 {
-                return items.remove(0);
-            }
-            let first = Box::new(items.remove(0).expr());
-            let operator = items.remove(0).symbol();
-            let second = Box::new(items.remove(0).expr());
-            match operator {
-                SymbolType::GreaterThanOrEqual => Expression::GreaterThanOrEqual(first, second),
-                _ => {
-                    panic!("Unknown operator: {:?}", operator);
-                }
-            }
-            .into()
-        }
         Rule::add => SymbolType::Add.into(),
         Rule::subtract => SymbolType::Subtract.into(),
         Rule::divide => SymbolType::Divide.into(),
@@ -573,7 +556,30 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             .into()
         }
         Rule::variable_list_separator | Rule::expression_list_separator => SymbolType::Empty.into(),
+        Rule::greater => SymbolType::GreaterThan.into(),
         Rule::great => SymbolType::GreaterThanOrEqual.into(),
+        Rule::smaller => SymbolType::LessThan.into(),
+        Rule::small => SymbolType::LessThanOrEqual.into(),
+        Rule::comparison => {
+            eprintln!("{}Depairing comparison", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            if items.len() == 1 {
+                return items.remove(0);
+            }
+            let first = Box::new(items.remove(0).expr());
+            let operator = items.remove(0).symbol();
+            let second = Box::new(items.remove(0).expr());
+            match operator {
+                SymbolType::GreaterThan => Expression::GreaterThan(first, second),
+                SymbolType::GreaterThanOrEqual => Expression::GreaterThanOrEqual(first, second),
+                SymbolType::LessThan => Expression::LessThan(first, second),
+                SymbolType::LessThanOrEqual => Expression::LessThanOrEqual(first, second),
+                _ => {
+                    panic!("Unknown operator: {:?}", operator);
+                }
+            }
+            .into()
+        }
         Rule::while_kw => SymbolType::While.into(),
         Rule::until_kw => SymbolType::Until.into(),
         Rule::continue_kw => Command::Continue.into(),
