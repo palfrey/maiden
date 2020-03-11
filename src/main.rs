@@ -313,18 +313,26 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             let mut first = items.remove(0).expr();
             while !items.is_empty() {
                 let operator = items.remove(0).symbol();
-                let second = Box::new(items.remove(0).expr());
-                match operator {
-                    SymbolType::Add => {
-                        first = Expression::Add(Box::new(first), second);
-                    }
-                    SymbolType::Subtract => {
-                        first = Expression::Subtract(Box::new(first), second);
-                    }
+                let apply_operator = move |first, other| match operator {
+                    SymbolType::Add => Expression::Add(Box::new(first), Box::new(other)),
+                    SymbolType::Subtract => Expression::Subtract(Box::new(first), Box::new(other)),
                     _ => {
                         panic!("Unknown operator: {:?}", operator);
                     }
-                }
+                };
+                match items.remove(0) {
+                    Item::Expression(second) => {
+                        first = apply_operator(first, second);
+                    }
+                    Item::Symbol(SymbolType::ExpressionList(mut multiple)) => {
+                        for second in multiple.drain(0..) {
+                            first = apply_operator(first, second);
+                        }
+                    }
+                    item => {
+                        panic!("Other item for arithmetic: {:?}", item);
+                    }
+                };
             }
             first.into()
         }
