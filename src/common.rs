@@ -98,6 +98,7 @@ pub enum SymbolType {
     Break,
     Empty,
     VariableList(Vec<String>),
+    ArgsList(Vec<Expression>),
     ExpressionList(Vec<Expression>),
 }
 

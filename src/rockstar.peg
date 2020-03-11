@@ -29,7 +29,8 @@ variable_list_separator   = { expression_list_separator | "and" }
 
 variable_list = { (variable ~ variable_list_separator ~ variable_list) | variable }
 
-function_call = { variable ~ ^"taking" ~ expression_list }
+args_list = { expression_list }
+function_call = { variable ~ ^"taking" ~ args_list }
 
 expression_list = { (simple_expression ~ expression_list_separator ~ expression_list) | simple_expression }
 

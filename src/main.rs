@@ -447,6 +447,26 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             }
             SymbolType::VariableList(variables).into()
         }
+        Rule::args_list => {
+            eprintln!("{}Depairing args_list", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            let mut expressions = vec![];
+            for item in items.drain(0..) {
+                match item {
+                    Item::Symbol(SymbolType::Empty) => {}
+                    Item::Expression(expr) => {
+                        expressions.push(expr);
+                    }
+                    Item::Symbol(SymbolType::ArgsList(exprs)) => {
+                        expressions.extend(exprs);
+                    }
+                    _ => {
+                        panic!("Non-expression in expr list: {:?}", item);
+                    }
+                }
+            }
+            SymbolType::ArgsList(expressions).into()
+        }
         Rule::expression_list => {
             eprintln!("{}Depairing expression_list", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1);
@@ -494,11 +514,11 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             } else {
                 panic!("Non-variable name for function_call");
             };
-            let expression_list = items.remove(0).symbol();
-            if let SymbolType::ExpressionList(variables) = expression_list {
+            let args_list = items.remove(0).symbol();
+            if let SymbolType::ArgsList(variables) = args_list {
                 Expression::Call(name, variables).into()
             } else {
-                panic!("Non-expression list: {:?}", expression_list);
+                panic!("Non-args list: {:?}", args_list);
             }
         }
         Rule::up_kw => SymbolType::Up.into(),
