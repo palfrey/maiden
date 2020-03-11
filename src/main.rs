@@ -361,6 +361,18 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
             )
             .into()
         }
+        Rule::nor => {
+            eprintln!("{}Depairing nor", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
+            if items.len() == 1 {
+                return items.remove(0);
+            }
+            Expression::Nor(
+                Box::new(items.remove(0).expr()),
+                Box::new(items.remove(0).expr()),
+            )
+            .into()
+        }
         Rule::comparison => {
             eprintln!("{}Depairing comparison", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1);
