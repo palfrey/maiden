@@ -316,6 +316,7 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
                 let apply_operator = move |first, other| match operator {
                     SymbolType::Add => Expression::Add(Box::new(first), Box::new(other)),
                     SymbolType::Subtract => Expression::Subtract(Box::new(first), Box::new(other)),
+                    SymbolType::Times => Expression::Times(Box::new(first), Box::new(other)),
                     SymbolType::Divide => Expression::Divide(Box::new(first), Box::new(other)),
                     _ => {
                         panic!("Unknown operator: {:?}", operator);
@@ -375,6 +376,7 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
         }
         Rule::add => SymbolType::Add.into(),
         Rule::subtract => SymbolType::Subtract.into(),
+        Rule::multiply => SymbolType::Times.into(),
         Rule::divide => SymbolType::Divide.into(),
         Rule::pronoun => Expression::Pronoun.into(),
         Rule::ne => SymbolType::Aint.into(),

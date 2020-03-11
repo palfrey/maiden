@@ -23,6 +23,9 @@ fn main() {
             {
                 continue; // FIXME: Blocked by https://github.com/RockstarLang/rockstar/pull/238
             }
+            if test_name == "upstream_fixtures_operators_multiplicationOperator_rock" {
+                continue; // FIXME: Blocked by https://github.com/RockstarLang/rockstar/issues/162
+            }
 
             if test_name.contains("_arrays_") {
                 continue; // we don't implement arrays yet
