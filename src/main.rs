@@ -304,7 +304,7 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
                 }
             }
         }
-        Rule::arithmetic => {
+        Rule::arithmetic | Rule::product => {
             eprintln!("{}Depairing arithmetic", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1);
             if items.len() % 2 != 1 {
@@ -316,6 +316,7 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
                 let apply_operator = move |first, other| match operator {
                     SymbolType::Add => Expression::Add(Box::new(first), Box::new(other)),
                     SymbolType::Subtract => Expression::Subtract(Box::new(first), Box::new(other)),
+                    SymbolType::Divide => Expression::Divide(Box::new(first), Box::new(other)),
                     _ => {
                         panic!("Unknown operator: {:?}", operator);
                     }
