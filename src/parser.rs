@@ -57,7 +57,7 @@ where
     }
     if span.end() != content.len() {
         let text = content[span.end()..].trim();
-        if text.len() > 0 {
+        if !text.is_empty() {
             return Err(MaidenError::UnparsedText {
                 text: text.to_string(),
                 line: span.end_pos().line_col().0,
@@ -120,7 +120,9 @@ impl From<Block> for Item {
     }
 }
 
-fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Result<Item, MaidenError> {
+// FIXME: Split this up
+#[allow(clippy::cognitive_complexity)]
+fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> {
     let line = pair.as_span().start_pos().line_col().0;
     let rule = pair.as_rule();
     let level_string = format!("({}){}", level, "  ".repeat(level));
@@ -236,7 +238,7 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Result<Item, MaidenErr
         Rule::assignment => {
             eprintln!("{}Depairing assignment", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
-            if items.len() == 0 {
+            if items.is_empty() {
                 panic!("Empty assignment!");
             }
             let target = items.remove(0).expr();
@@ -382,7 +384,7 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Result<Item, MaidenErr
             for raw_word in value.split_whitespace() {
                 let mut word = raw_word.to_string();
                 word.retain(|c| c.is_alphabetic());
-                if word.len() == 0 {
+                if word.is_empty() {
                     continue;
                 }
                 if number > 0.0 {
@@ -392,7 +394,7 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Result<Item, MaidenErr
                 if decimal {
                     decimal_places += 1;
                 }
-                if raw_word.ends_with(".") {
+                if raw_word.ends_with('.') {
                     decimal = true;
                 }
             }
