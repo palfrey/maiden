@@ -1,1879 +1,681 @@
-// because nom macros
-#![allow(clippy::double_parens)]
-#![allow(clippy::double_comparisons)]
-
-use crate::common::*;
-use nom;
-use nom::types::CompleteStr;
+use crate::common::{Block, Command, CommandLine, Expression, MaidenError, Program, SymbolType};
+use crate::peg::{Rockstar, Rule};
+use pest::iterators::Pair;
+use pest::Parser;
 use std::collections::HashMap;
-use std::ops::IndexMut;
 
-fn is_space(chr: char) -> bool {
-    chr == ' ' || chr == '\t'
+#[derive(Debug, Clone, PartialEq)]
+enum Item {
+    Expression(Expression),
+    Symbol(SymbolType),
+    Command(Command),
+    Block(Block),
 }
 
-fn is_literal_spacing_character(chr: char) -> bool {
-    !is_newline(chr) && !word_character(chr)
-}
-
-fn is_newline(chr: char) -> bool {
-    chr == '\r' || chr == '\n'
-}
-
-fn is_not_newline(chr: char) -> bool {
-    !is_newline(chr)
-}
-
-fn string_character(chr: char) -> bool {
-    !is_newline(chr) && chr != '\"'
-}
-
-fn variable_character(chr: char) -> bool {
-    chr.is_alphabetic()
-}
-
-fn word_character(chr: char) -> bool {
-    variable_character(chr) || char::is_numeric(chr) || chr == '\'' || chr == '.'
-}
-
-fn is_digit(chr: char) -> bool {
-    chr.is_digit(10)
-}
-
-named!(title_case<Span, String>,
-    do_parse!(
-        not!(keyword) >> // to shortcut the "Until Counter" case
-        first: verify!(take!(1), |val: Span| val.fragment.chars().all(char::is_uppercase)) >>
-        rest: take_while!(variable_character) >>
-        (format!("{}{}", first.fragment, rest.fragment))
-    ));
-
-named!(proper_variable<Span, String>,
-    do_parse!(
-        first: title_case >>
-        rest: many0!(do_parse!(
-            take_while1!(is_space) >>
-            word: title_case >>
-            (word)
-        )) >>
-        (format!("{}{}{}", first, if rest.is_empty() {""} else {" "}, rest.join(" ")))
-    ));
-
-named!(variable<Span, String>, alt_complete!(
-    do_parse!(
-        keyword: alt_complete!(
-            tag_no_case!("a") |
-            tag_no_case!("an") |
-            tag_no_case!("the") |
-            tag_no_case!("my") |
-            tag_no_case!("your")
-        ) >>
-        take_while1!(is_space) >>
-        word: take_while1!(char::is_lowercase) >>
-        (format!("{} {}", keyword.fragment, word.fragment))
-    ) => {|s| s } |
-    proper_variable => {|s| s }
-));
-
-named!(keyword<Span, Span>, // single-words only
-    alt_complete!(
-        tag_no_case!("and") |
-        tag_no_case!("build") |
-        tag_no_case!("end") |
-        tag_no_case!("else") |
-        tag_no_case!("if") |
-        tag_no_case!("into") |
-        tag_no_case!("is") |
-        tag_no_case!("minus") |
-        tag_no_case!("put") |
-        tag_no_case!("scream") |
-        tag_no_case!("shout") |
-        tag_no_case!("takes") |
-        tag_no_case!("until") |
-        tag_no_case!("up") |
-        tag_no_case!("was") |
-        tag_no_case!("while") |
-        tag_no_case!("whisper") |
-        tag_no_case!("with") |
-        tag_no_case!("without")
-    )
-);
-
-named!(null<Span, Span>,
-    alt_complete!(
-        tag_no_case!("nothing") |
-        tag_no_case!("null") |
-        tag_no_case!("gone") |
-        tag_no_case!("nobody") |
-        tag_no_case!("nowhere") |
-        tag_no_case!("empty")
-    )
-);
-
-named!(literal_word<Span, Span>,
-    alt_complete!(
-        null
-    )
-);
-
-named!(compare(Span) -> SymbolType,
-    alt_complete!(
-        do_parse!(
-            tag_no_case!("as") >>
-            take_while1!(is_space) >>
-            alt_complete!(
-                tag_no_case!("high") | tag_no_case!("strong") | tag_no_case!("big")
-            ) >>
-            take_while1!(is_space) >>
-            tag_no_case!("as") >>
-            (())
-        ) => {|_| SymbolType::GreaterThanOrEqual} |
-        do_parse!(
-            alt_complete!(
-                tag_no_case!("less") | tag_no_case!("weaker") | tag_no_case!("lower") | tag_no_case!("smaller")
-            ) >>
-            take_while1!(is_space) >>
-            tag_no_case!("than") >>
-            (())
-        ) => {|_| SymbolType::LessThan} |
-        do_parse!(
-            tag_no_case!("as") >>
-            take_while1!(is_space) >>
-            alt_complete!(
-                tag_no_case!("low") | tag_no_case!("little") | tag_no_case!("small") | tag_no_case!("weak")
-            ) >>
-            take_while1!(is_space) >>
-            tag_no_case!("as") >>
-            (())
-        ) => {|_| SymbolType::LessThanOrEqual} |
-        do_parse!(
-            alt_complete!(
-                tag_no_case!("higher") | tag_no_case!("stronger") | tag_no_case!("bigger") | tag_no_case!("greater")
-            ) >>
-            take_while1!(is_space) >>
-            tag_no_case!("than") >>
-            (())
-        ) => {|_| SymbolType::GreaterThan}
-    )
-);
-
-named!(pronoun(Span) -> SymbolType,
-    value!(SymbolType::Pronoun,
-        alt_complete!(
-            tag_no_case!("it") |
-            tag_no_case!("he") | tag_no_case!("she") | tag_no_case!("him") | tag_no_case!("her") | tag_no_case!("they") | tag_no_case!("them") | 
-            tag_no_case!("ze") | tag_no_case!("hir") | tag_no_case!("zie") | tag_no_case!("zir") | tag_no_case!("xe") | tag_no_case!("xem") | 
-            tag_no_case!("ve") | tag_no_case!("ver")
-        )
-    )
-);
-
-named!(literal(Span) -> SymbolType,
-    alt_complete!(
-        tag_no_case!("mysterious") => {|_| SymbolType::Mysterious} |
-        null => {|_| SymbolType::Null} |
-        alt_complete!(
-            tag_no_case!("true") |
-            tag_no_case!("right") |
-            tag_no_case!("yes") |
-            tag_no_case!("ok")
-        ) => {|_| SymbolType::True} |
-        alt_complete!(
-            tag_no_case!("false") |
-            tag_no_case!("lies") |
-            tag_no_case!("wrong") |
-            tag_no_case!("no")
-        ) => {|_| SymbolType::False} |
-        do_parse!(
-            minus: opt!(tag!("-")) >>
-            before: take_while!(is_digit) >>
-            tag!(".") >>
-            after: take_while1!(is_digit) >>
-            (minus, before, after)
-        ) => {|(minus, before, after):(Option<Span>, Span, Span)|
-            if minus.is_some() {
-                SymbolType::Floating(format!("-{}.{}", before.fragment, after.fragment))
-            } else {
-                SymbolType::Floating(format!("{}.{}", before.fragment, after.fragment))
-            }}|
-        do_parse!(
-            minus: opt!(tag!("-")) >>
-            val: take_while1!(is_digit) >>
-            (minus, val)
-        ) => {|(minus, val):(Option<Span>, Span)|
-            if minus.is_some() {
-                SymbolType::Integer(format!("-{}", val.fragment))
-            } else {
-                SymbolType::Integer(val.fragment.to_string())
-            }}|
-        do_parse!(
-            tag!("\"") >>
-            phrase: take_while!(string_character) >>
-            tag!("\"") >>
-            (phrase)
-        ) => {|p: Span| SymbolType::String(p.to_string())}
-    )
-);
-
-named!(value_provider(Span) -> SymbolType,
-    alt!(
-        do_parse!(
-            l: literal >>
-            peek!(alt!(tag!("'n'") | tag!(",") | take_while1!(is_space) | take_while1!(is_newline) | eof!())) >>
-            (l)
-        ) => {|s| s} |
-        pronoun => {|s| s} |
-        variable => {|s| SymbolType::Variable(s)}
-    )
-);
-
-named!(function_call_expr(Span) -> SymbolType,
-    alt_complete!(
-        do_parse!(
-            target: variable >>
-            take_while1!(is_space) >>
-            tag_no_case!("taking") >>
-            take_while1!(is_space) >>
-            first: value_provider >>
-            rest: many0!(do_parse!(
-                alt!(
-                    tag!("'n'") => {|_|()} |
-                    tuple!(
-                        alt!(
-                            tuple!(
-                                tag!(","),
-                                opt!(tuple!(take_while1!(is_space), tag!("and")))
-                            ) => {|_|()} |
-                            tuple!(take_while1!(is_space), tag!("&")) => {|_|()}
-                        ),
-                        take_while1!(is_space)
-                    ) => {|_|()}
-                ) >>
-                value: value_provider >>
-                (value)
-            )) >>
-            (target, first, rest)
-        ) => {|(name, first, mut rest): (String, SymbolType, Vec<SymbolType>)| {
-            rest.insert(0, first);
-            SymbolType::Taking{target: name, args: rest}
-        }} |
-        value_provider => {|s| s}
-    )
-);
-
-named!(function_signature(Span) -> SymbolType,
-    alt_complete!(
-        do_parse!(
-            target: variable >>
-            take_while1!(is_space) >>
-            tag_no_case!("takes") >>
-            take_while1!(is_space) >>
-            first: variable >>
-            rest: many0!(do_parse!(
-                alt!(
-                    tag!("'n'") => {|_|()} |
-                    tuple!(
-                        alt!(
-                            tuple!(
-                                tag!(","),
-                                opt!(tuple!(take_while1!(is_space), tag!("and")))
-                            ) => {|_|()} |
-                            tuple!(take_while1!(is_space), tag!("and")) => {|_|()} |
-                            tuple!(take_while1!(is_space), tag!("&")) => {|_|()}
-                        ),
-                        take_while1!(is_space)
-                    ) => {|_|()}
-                ) >>
-                value: variable >>
-                (value)
-            )) >>
-            (target, first, rest)
-        ) => {|(name, first, mut rest): (String, String, Vec<String>)| {
-            rest.insert(0, first);
-            SymbolType::Takes{name, args: rest}
-        }}
-    )
-);
-
-named!(not_expr(Span) -> SymbolType,
-    alt_complete!(
-        do_parse!(
-            tag_no_case!("not") >>
-            take_while1!(is_space) >>
-            func: not_expr >>
-            (func)
-        ) => {|f| SymbolType::Not(Box::new(f))} |
-        function_call_expr => {|s| s} |
-        value_provider => {|s| s}
-    )
-);
-
-#[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
-fn multiply_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
-    let (rest, (mut res, mut times)) = do_parse!(
-        input,
-        ne: not_expr
-            >> times:
-                many0!(do_parse!(
-                    take_while1!(is_space)
-                        >> op: alt_complete!(
-                            alt_complete!(
-                                tag_no_case!("times") | tag_no_case!("of")
-                            ) => {|_| SymbolType::Times} |
-                            tag_no_case!("over") => {|_| SymbolType::Divide}
-                        )
-                        >> take_while1!(is_space)
-                        >> other_ne: not_expr
-                        >> (vec![op, other_ne])
-                ))
-            >> (vec![ne], times)
-    )?;
-    for item in &mut times {
-        res.append(item);
-    }
-    return Ok((rest, res));
-}
-
-#[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
-fn add_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
-    let (rest, (mut res, mut adds)) = do_parse!(
-        input,
-        me: multiply_expr
-            >> adds: many0!(do_parse!(
-                take_while1!(is_space)
-                    >> op: alt_complete!(
-                        alt_complete!(
-                            tag_no_case!("without") | tag_no_case!("minus")
-                        ) => {|_| SymbolType::Subtract} |
-                        alt_complete!(
-                            tag_no_case!("with") | tag_no_case!("plus")
-                        ) => {|_| SymbolType::Add}
-                    )
-                    >> take_while1!(is_space)
-                    >> other_me: multiply_expr
-                    >> (op, other_me)
-            ))
-            >> (me, adds)
-    )?;
-    for (op, item) in &mut adds {
-        res.push(op.clone());
-        res.append(item);
-    }
-    return Ok((rest, res));
-}
-
-#[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
-fn inequality_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
-    let (rest, (mut res, mut ineqs)) = do_parse!(
-        input,
-        ae: add_expr
-            >> ineqs:
-                many0!(do_parse!(
-                    take_while1!(is_space)
-                        >> tag!("is")
-                        >> take_while1!(is_space)
-                        >> comp: compare
-                        >> take_while1!(is_space)
-                        >> other_add: add_expr
-                        >> (comp, other_add)
-                ))
-            >> (ae, ineqs)
-    )?;
-    for (comp, item) in &mut ineqs {
-        res.push(comp.clone());
-        res.append(item);
-    }
-    return Ok((rest, res));
-}
-
-#[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
-fn equality_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
-    let (rest, (mut res, mut eqs)) = do_parse!(
-        input,
-        ie: inequality_expr
-            >> eqs: many0!(do_parse!(
-                take_while1!(is_space)
-                    >> kind: alt_complete!(
-                        alt_complete!(
-                            tag!("is") | tag!("was") | tag!("are") | tag!("were")
-                        ) => {|_| SymbolType::Is} |
-                        alt_complete!(
-                            tag_no_case!("ain't") | tag_no_case!("aint")
-                        ) => {|_| SymbolType::Aint}
-                    )
-                    >> take_while1!(is_space)
-                    >> other_ie: inequality_expr
-                    >> (kind, other_ie)
-            ))
-            >> (ie, eqs)
-    )?;
-    for (kind, item) in &mut eqs {
-        res.push(kind.clone());
-        res.append(item);
-    }
-    return Ok((rest, res));
-}
-
-fn boolean_expr(input: Span) -> nom::IResult<Span, Vec<SymbolType>> {
-    let (rest, (mut res, mut bqs)) = do_parse!(
-        input,
-        ee: equality_expr
-            >> bqs: many0!(do_parse!(
-                take_while1!(is_space)
-                    >> kind: alt_complete!(
-                        tag_no_case!("and") => {|_| SymbolType::And} |
-                        tag_no_case!("or") => {|_| SymbolType::Or} |
-                        tag_no_case!("nor") => {|_| SymbolType::Nor}
-                    )
-                    >> take_while1!(is_space)
-                    >> other_ee: equality_expr
-                    >> (kind, other_ee)
-            ))
-            >> (ee, bqs)
-    )?;
-    for (kind, item) in &mut bqs {
-        res.push(kind.clone());
-        res.append(item);
-    }
-    return Ok((rest, res));
-}
-
-named!(statement(Span) -> SymbolType,
-    do_parse!(
-        val: alt_complete!(
-            function_signature => {|s| s} |
-            tag_no_case!("if") => {|_| SymbolType::If} |
-            do_parse!(
-                tag_no_case!("build") >>
-                take_while1!(is_space) >>
-                target: variable >>
-                take_while1!(is_space) >>
-                tag_no_case!("up") >>
-                rest: many0!(do_parse!(
-                    opt!(tag!(",")) >>
-                    take_while1!(is_space) >>
-                    tag_no_case!("up") >>
-                    (())
-                )) >>
-                (target, rest.len())
-            ) => {|(target, rest)| SymbolType::Build { target, count: rest + 1}} |
-            do_parse!(
-                tag_no_case!("knock") >>
-                take_while1!(is_space) >>
-                target: variable >>
-                take_while1!(is_space) >>
-                tag_no_case!("down") >>
-                rest: many0!(do_parse!(
-                    opt!(tag!(",")) >>
-                    take_while1!(is_space) >>
-                    tag_no_case!("down") >>
-                    (())
-                )) >>
-                (target, rest.len())
-            ) => {|(target, rest)| SymbolType::Knock { target, count: rest + 1}} |
-            alt_complete!(
-                tag_no_case!("say") | tag_no_case!("shout") | tag_no_case!("whisper") | tag_no_case!("scream")
-            ) => {|_| SymbolType::Say} |
-            tag_no_case!("while") => {|_| SymbolType::While} |
-            tag_no_case!("until") => {|_| SymbolType::Until} |
-            alt_complete!(
-                tag_no_case!("end") | tag_no_case!("around we go")
-            ) => {|_| SymbolType::Next} |
-            alt_complete!(
-                tag_no_case!("take it to the top") | tag_no_case!("continue")
-            ) => {|_| SymbolType::Continue} |
-            tag_no_case!("give back") => {|_| SymbolType::Return} |
-            tag_no_case!("into") => {|_| SymbolType::Where} |
-            tag_no_case!("put") => {|_| SymbolType::Put} |
-            tag_no_case!("else") => {|_| SymbolType::Else} |
-            tag_no_case!("listen to") => {|_| SymbolType::Listen} |
-            tag_no_case!("listen") => {|_| SymbolType::Listen} |
-            tag_no_case!("break it down") => {|_| SymbolType::Break} |
-            tag_no_case!("break") => {|_| SymbolType::Break}
-        ) >>
-        peek!(alt!(take_while1!(is_space) | take_while1!(is_newline) | eof!())) >>
-        (val)
-    )
-);
-
-named!(word(Span) -> Vec<SymbolType>,
-    alt_complete!(
-        statement => {|s: SymbolType| vec![s]} |
-        do_parse!(
-            pv: variable >>
-            tag!("'s") >>
-            take_while1!(is_space) >>
-            comp: compare >>
-            (pv, comp)
-        ) => {|(pv, comp):(String, SymbolType)| vec![SymbolType::Variable(pv), comp]} |
-        boolean_expr => {|e| e}
-    )
-);
-
-named!(poetic_number_literal_core<Span, (u32, String, Vec<Span>)>,
-    do_parse!(
-        pv: variable >>
-        alt!(
-            tag!("'s") => {|_| (())} |
-            do_parse!(
-                take_while1!(is_space) >>
-                alt!(tag!("is") | tag!("are") | tag!("was") | tag!("were")) >>
-                (())
-            )
-        ) >>
-        position: position!() >>
-        peek!(not!(tuple!(
-            take_while1!(is_space),
-            literal_word,
-            alt!(take_while1!(is_space) | take_while1!(is_newline) | eof!()))
-        )) >> // number literals cannot start with a literal word
-        peek!(tuple!(take_while1!(is_space), take_while1!(word_character))) >> // make sure it starts with a word character
-        words: many1!(
-            do_parse!(
-                take_while1!(is_literal_spacing_character) >>
-                word: take_while1!(word_character) >>
-                (word)
-            )
-        ) >>
-        (position.line, pv, words)
-    )
-);
-
-fn poetic_number_literal(input: Span) -> nom::IResult<Span, (u32, Vec<SymbolType>)> {
-    let (rest, (line, target, words)) = poetic_number_literal_core(input)?;
-    let literal = SymbolType::Words(words.iter().map(std::string::ToString::to_string).collect());
-    return Ok((
-        rest,
-        (
-            line,
-            vec![SymbolType::Variable(target), SymbolType::Is, literal],
-        ),
-    ));
-}
-
-named!(poetic_string_literal_core<Span, (u32, String, Span)>,
-    do_parse!(
-        pv: variable >>
-        take_while1!(is_space) >>
-        tag!("says") >>
-        take_while1!(is_space) >>
-        position: position!() >>
-        words: take_while1!(is_not_newline) >>
-        (position.line, pv, words)
-    )
-);
-
-fn poetic_string_literal(input: Span) -> nom::IResult<Span, (u32, Vec<SymbolType>)> {
-    let (rest, (line, target, words)) = poetic_string_literal_core(input)?;
-    let literal = SymbolType::String(words.to_string());
-    return Ok((
-        rest,
-        (
-            line,
-            vec![SymbolType::Variable(target), SymbolType::Is, literal],
-        ),
-    ));
-}
-
-named!(pub line_core<Span, (u32, Vec<Vec<SymbolType>>)>, alt_complete!(
-    do_parse!(
-        position: position!() >>
-        variable: variable >>
-        take_while1!(is_space) >>
-        tag!("is") >>
-        take_while1!(is_space) >>
-        kind: alt!(
-            alt!(tag_no_case!("true") | tag_no_case!("yes")) => {|_| SymbolType::True } |
-            alt!(tag_no_case!("false") | tag_no_case!("lies")) => {|_| SymbolType::False } |
-            tag_no_case!("mysterious") => {|_| SymbolType::Mysterious }
-        ) >>
-        (position, variable, kind)
-    ) => {|(p,v,k): (Span, String, SymbolType)|
-        (p.line, vec![vec![
-            SymbolType::Variable(v),
-            SymbolType::Is,
-            k]])} |
-    poetic_number_literal => {|(line, s)| (line, vec![s]) } |
-    poetic_string_literal => {|(line, s)| (line, vec![s]) } |
-    do_parse!(
-        position: position!() >>
-        first_words: word >>
-        other_words: many0!(
-            alt_complete!(
-                tag!(",") => {|_| vec![SymbolType::Comma]}|
-                do_parse!(
-                    take_while1!(is_space) >>
-                    words: word >>
-                    (words)
-                ) => {|t| t}
-        )) >>
-        (position, first_words, other_words)
-    ) => {|(pos, first, mut other):(Span, Vec<SymbolType>, Vec<Vec<SymbolType>>)| {
-        other.insert(0, first);
-        (pos.line, other)
-         }}
-));
-
-fn line(input: Span) -> nom::IResult<Span, Vec<Token>> {
-    let (rest, (line, words)) = line_core(input)?;
-    let mut res = vec![];
-    for wordset in words {
-        for word in wordset {
-            res.push(Token { line, symbol: word });
+impl Item {
+    fn expr(self) -> Expression {
+        if let Item::Expression(e) = self {
+            e
+        } else {
+            panic!("Not an expression: {:?}", self)
         }
     }
-    return Ok((rest, res));
-}
-
-named!(blank_line<Span, Vec<Token>>,
-    do_parse!(
-        pos: position!() >>
-        take_while!(is_space) >>
-        alt!(tag!("\n") | tag!("\r")) >>
-        take_while!(is_space) >>
-        (vec![Token{line: pos.line, symbol: SymbolType::Newline}])
-    )
-);
-
-named!(lines_core<Span, (Vec<Token>, Vec<Vec<Token>>)>,
-    do_parse!(
-        many0!(blank_line) >>
-        first_line: line >>
-        other_lines: many0!(
-            alt_complete!(
-                do_parse!(
-                    take_while!(is_space) >>
-                    alt!(tag!("\n") | tag!("\r")) >>
-                    take_while!(is_space) >>
-                    a_line: line >>
-                    (a_line)
-                ) => {|l| l } |
-                blank_line => {|b| b }
-            )
-        ) >>
-        (first_line, other_lines)
-    )
-);
-
-fn lines(input: &str) -> nom::IResult<Span, Vec<Vec<Token>>> {
-    let cs = CompleteStr(&input);
-    let complete: Span = Span::new(cs);
-    return match lines_core(complete) {
-        Ok((rest, (first, mut others))) => {
-            others.insert(0, first);
-            Ok((rest, others))
-        }
-        Err(err) => Err(err),
-    };
-}
-
-fn compact_words(line: Vec<Token>) -> Vec<Token> {
-    let mut symbols: Vec<Token> = Vec::new();
-    let mut words = Vec::new();
-    let pos = line[0].line;
-    for word in line {
-        match word.symbol {
-            SymbolType::Words(other) => {
-                words.extend_from_slice(&other);
-            }
-            _ => {
-                if !words.is_empty() {
-                    symbols.push(Token {
-                        line: word.line,
-                        symbol: SymbolType::Words(words),
-                    });
-                    words = Vec::new();
-                }
-                symbols.push(word);
-            }
+    fn symbol(self) -> SymbolType {
+        if let Item::Symbol(e) = self {
+            e
+        } else {
+            panic!("Not a symboltype: {:?}", self)
         }
     }
-    if !words.is_empty() {
-        symbols.push(Token {
-            line: pos,
-            symbol: SymbolType::Words(words),
-        });
-    }
-    return symbols;
-}
-
-fn parse_words(words: &[String]) -> usize {
-    let mut number = 0;
-    for word in words {
-        let len = word.chars().filter(|c| char::is_alphabetic(*c)).count();
-        if len > 0 {
-            number *= 10;
-            number += len % 10;
+    fn command(self) -> Command {
+        if let Item::Command(e) = self {
+            e
+        } else {
+            panic!("Not a command: {:?}", self)
         }
     }
-    return number;
+    fn block(self) -> Block {
+        if let Item::Block(e) = self {
+            e
+        } else {
+            panic!("Not a block: {:?}", self)
+        }
+    }
 }
 
-fn evaluate(value: &SymbolType, line: u32) -> Result<Expression> {
-    match value {
-        SymbolType::Words(words) => {
-            if words.len() == 1 {
-                let as_float = words[0].parse::<f64>();
-                if let Ok(float) = as_float {
-                    return Ok(Expression::Floating(float));
-                }
-            }
-            let fullstop = words.iter().position(|s| s.contains('.'));
-            let number = if let Some(fullstop_pos) = fullstop {
-                let mut editable_words = words.clone();
-                let after = editable_words.split_off(fullstop_pos + 1);
-                let first = parse_words(&editable_words) as f64;
-                let second = parse_words(&after) as f64;
-                let divisor = 10f64.powf(second.log10().ceil());
-                debug!("first: {}, second: {}, divisor: {}", first, second, divisor);
-                if second == 0.0 && divisor == 0.0 {
-                    first
-                } else {
-                    first + (second / divisor)
-                }
-            } else {
-                parse_words(&words) as f64
-            };
-            return Ok(Expression::Floating(number));
-        }
-        SymbolType::String(phrase) => {
-            return Ok(Expression::String(phrase.to_string()));
-        }
-        _ => {
-            return Err(MaidenError::Unimplemented {
-                description: format!("Evaluate: '{:?}'", value),
-                line,
+fn depair_program<'i, I>(pairs: &'i mut I, content: &'i str) -> Result<Program, MaidenError>
+where
+    I: Iterator<Item = pest::iterators::Pair<'i, Rule>>,
+{
+    let pair = pairs.next().expect("one pair");
+    if pair.as_rule() != Rule::program {
+        panic!("Bad rule: {:?}", pair.as_rule());
+    }
+    let span = pair.as_span();
+    if span.start() != 0 {
+        panic!("Non-zero start");
+    }
+    if span.end() != content.len() {
+        let text = content[span.end()..].trim();
+        if text.len() > 0 {
+            return Err(MaidenError::UnparsedText {
+                text: text.to_string(),
+                line: span.end_pos().line_col().0,
             });
         }
     }
-}
-
-fn next_operator<'a>(
-    items: &[&'a SymbolType],
-    mut index: usize,
-) -> Option<(&'a SymbolType, usize)> {
-    loop {
-        let item_poss = items.get(index);
-        let item = item_poss?;
-        match *item {
-            SymbolType::Is
-            | SymbolType::Aint
-            | SymbolType::GreaterThanOrEqual
-            | SymbolType::GreaterThan
-            | SymbolType::LessThan
-            | SymbolType::LessThanOrEqual
-            | SymbolType::Add
-            | SymbolType::Subtract
-            | SymbolType::Times
-            | SymbolType::Divide
-            | SymbolType::Or
-            | SymbolType::Nor
-            | SymbolType::And => {
-                return Some((item, index));
-            }
-            _ => {}
+    let mut commands = vec![];
+    for line in pair.into_inner() {
+        if line.as_rule() != Rule::line {
+            panic!("Bad rule: {:?}", line.as_rule());
         }
-        index += 1;
-    }
-}
-
-fn single_symbol_to_expression(sym: &SymbolType, line: u32) -> Result<Expression> {
-    return match *sym {
-        SymbolType::Taking {
-            ref target,
-            ref args,
-        } => Ok(Expression::Call(
-            target.clone(),
-            args.iter()
-                .map(|arg| single_symbol_to_expression(arg, line).unwrap())
-                .collect::<Vec<Expression>>(),
-        )),
-        SymbolType::Words(_) => evaluate(sym, line),
-        SymbolType::Variable(ref name) => Ok(Expression::Variable(name.clone())),
-        SymbolType::String(ref phrase) => Ok(Expression::String(phrase.clone())),
-        SymbolType::Integer(ref val) => {
-            return match val.parse::<f64>() {
-                Ok(i) => Ok(Expression::Floating(i)),
-                Err(_) => {
-                    return Err(MaidenError::ParseNumberError {
-                        number: val.to_string(),
-                        line,
-                    })
-                }
-            };
-        }
-        SymbolType::Floating(ref val) => {
-            return match val.parse::<f64>() {
-                Ok(i) => Ok(Expression::Floating(i)),
-                Err(_) => {
-                    return Err(MaidenError::ParseNumberError {
-                        number: val.to_string(),
-                        line,
-                    })
-                }
-            };
-        }
-        SymbolType::True => Ok(Expression::True),
-        SymbolType::False => Ok(Expression::False),
-        SymbolType::Null => Ok(Expression::Null),
-        SymbolType::Mysterious => Ok(Expression::Mysterious),
-        SymbolType::Pronoun => Ok(Expression::Pronoun),
-        SymbolType::Not(ref arg) => Ok(Expression::Not(Box::new(single_symbol_to_expression(
-            &arg, line,
-        )?))),
-        _ => {
-            return Err(MaidenError::Unimplemented {
-                description: format!("Single symbol to expression: {:?}", sym),
-                line,
-            });
-        }
-    };
-}
-
-fn parse_expression(items: &[&SymbolType], line: u32) -> Result<Expression> {
-    // based off of https://en.wikipedia.org/wiki/Operator-precedence_parser#Pseudo-code
-    let describe = format!("{:?}", items);
-    if items.is_empty() {
-        return Err(MaidenError::UnbalancedExpression {
-            expression: describe,
-            line,
-        });
-    }
-    debug!("Begin parse: {}", describe);
-    let lhs = single_symbol_to_expression(items[0], line)?;
-    let res = parse_expression_1(&items, 0, lhs, &LOWEST_PRECDENCE, line)?;
-    if res.1 != items.len() - 1 {
-        return Err(MaidenError::UnbalancedExpression {
-            expression: describe,
-            line,
-        });
-    }
-    return Ok(res.0);
-}
-
-fn parse_expression_1(
-    items: &[&SymbolType],
-    mut index: usize,
-    mut lhs: Expression,
-    precedence: &SymbolType,
-    line: u32,
-) -> Result<(Expression, usize)> {
-    debug!(
-        "index: {}, lhs: {:?} precedence: {:?}",
-        index, lhs, precedence
-    );
-    let mut lookahead = next_operator(items, index);
-    while lookahead.is_some() && lookahead.unwrap().0 >= precedence {
-        debug!("lookahead: {:?}", lookahead.unwrap());
-        let op = lookahead.unwrap().0;
-        index = if let Some(lk) = lookahead {
-            lk.1 + 1
-        } else {
-            index
-        };
-        if index >= items.len() {
-            return Err(MaidenError::UnbalancedExpression {
-                expression: format!("{:?}", items),
-                line,
-            });
-        }
-        let mut rhs = single_symbol_to_expression(items[index], line)?;
-        lookahead = next_operator(items, index);
-        while lookahead.is_some() && lookahead.unwrap().0 > op {
-            let l = lookahead.unwrap().1;
-            if l >= items.len() {
-                return Err(MaidenError::UnbalancedExpression {
-                    expression: format!("{:?}", items),
-                    line,
-                });
-            }
-            let res = parse_expression_1(items, index, rhs, &items[l], line)?;
-            rhs = res.0;
-            index = res.1;
-            lookahead = next_operator(items, index);
-        }
-        lhs = match *op {
-            SymbolType::Is => Expression::Is(Box::new(lhs.clone()), Box::new(rhs)),
-            SymbolType::Aint => Expression::Aint(Box::new(lhs.clone()), Box::new(rhs)),
-            SymbolType::GreaterThanOrEqual => {
-                Expression::GreaterThanOrEqual(Box::new(lhs.clone()), Box::new(rhs))
-            }
-            SymbolType::GreaterThan => {
-                Expression::GreaterThan(Box::new(lhs.clone()), Box::new(rhs))
-            }
-            SymbolType::LessThan => Expression::LessThan(Box::new(lhs.clone()), Box::new(rhs)),
-            SymbolType::LessThanOrEqual => {
-                Expression::LessThanOrEqual(Box::new(lhs.clone()), Box::new(rhs))
-            }
-            SymbolType::Add => Expression::Add(Box::new(lhs.clone()), Box::new(rhs)),
-            SymbolType::Subtract => Expression::Subtract(Box::new(lhs.clone()), Box::new(rhs)),
-            SymbolType::Times => Expression::Times(Box::new(lhs.clone()), Box::new(rhs)),
-            SymbolType::Divide => Expression::Divide(Box::new(lhs.clone()), Box::new(rhs)),
-            SymbolType::And => Expression::And(Box::new(lhs.clone()), Box::new(rhs)),
-            SymbolType::Or => Expression::Or(Box::new(lhs.clone()), Box::new(rhs)),
-            SymbolType::Nor => Expression::Nor(Box::new(lhs.clone()), Box::new(rhs)),
-            _ => {
-                return Err(MaidenError::Unimplemented {
-                    description: format!("No operation for {:?}", op),
-                    line,
-                });
-            }
-        }
-    }
-    return Ok((lhs, index));
-}
-
-enum BlockStart {
-    Loop(usize),
-    Func(usize),
-    If(usize),
-}
-
-macro_rules! block_location {
-    ($items:expr, $type:path) => {
-        $items
-            .iter()
-            .rposition(|x| if let $type(_) = x { true } else { false })
-    };
-}
-
-macro_rules! next_block {
-    ($items:expr, $type:path) => {
-        block_location!($items, $type)
-    };
-}
-
-macro_rules! last_block {
-    ($items:expr, $type:path) => {{
-        let location = block_location!($items, $type);
-        if let $type(ref x) = $items.get_mut(location.unwrap()).unwrap() {
-            x
-        } else {
-            panic!("BlockStart without usize");
-        }
-    }};
-}
-
-fn build_next(commands: &mut Vec<CommandLine>, loop_start: usize) -> Command {
-    let loop_len = commands.len();
-    match commands.index_mut(loop_start).cmd {
-        Command::Until {
-            ref mut loop_end, ..
-        } => {
-            loop_end.get_or_insert(loop_len);
-        }
-        Command::While {
-            ref mut loop_end, ..
-        } => {
-            loop_end.get_or_insert(loop_len);
-        }
-        _ => {
-            panic!("loop to non-loop command");
-        }
-    }
-    return Command::Next { loop_start };
-}
-
-#[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
-pub fn parse(input: &str) -> Result<Program> {
-    let mut functions: HashMap<String, Function> = HashMap::new();
-    let mut commands: Vec<CommandLine> = Vec::new();
-    let re = regex::Regex::new(r"(\([^\)]*\))").unwrap();
-    let uncommented = re.replace_all(input, "");
-    if uncommented.is_empty() {
-        return Ok(Program {
-            commands,
-            functions,
-        });
-    }
-    let raw_lines = lines(&uncommented).map_err(|e| MaidenError::Nom {
-        kind: e.into_error_kind(),
-    })?;
-    if !raw_lines.0.fragment.is_empty() && raw_lines.0.fragment.chars().any(|c| !c.is_whitespace())
-    {
-        // ignore empty and all-whitespace blocks
-        let pos = raw_lines.0;
-        return Err(MaidenError::UnparsedText {
-            text: pos.fragment.to_string(),
-            line: pos.line,
-        });
-    }
-    debug!("{:?}", raw_lines);
-    let mut block_starts: Vec<BlockStart> = Vec::new();
-    let mut last_line = 0;
-    let mut pronoun: Option<String> = None;
-    for raw_symbols in raw_lines.1 {
-        debug!("raw_symbols: {:?}", raw_symbols);
-        let mut symbols = compact_words(raw_symbols);
-        if !symbols.is_empty() {
-            if symbols[0].symbol == SymbolType::And {
-                symbols.remove(0);
-            }
-            if symbols[symbols.len() - 1].symbol == SymbolType::Comma {
-                symbols.pop();
-            }
-        }
-        debug!("symbols: {:?}", symbols);
-        let current_line = if symbols.is_empty() {
-            last_line
-        } else {
-            symbols.first().unwrap().line
-        };
-        last_line = current_line;
-        let symbols: Vec<SymbolType> = symbols.into_iter().map(|t| t.symbol).collect();
-        match symbols.as_slice() {
-            [SymbolType::Next] => {
-                if next_block!(block_starts, BlockStart::Loop).is_none() {
-                    return Err(MaidenError::NextOutsideLoop { line: current_line });
-                }
-                let loop_start = last_block!(block_starts, BlockStart::Loop);
-                let command = build_next(&mut commands, *loop_start);
+        let (line_no, _) = line.as_span().start_pos().line_col();
+        let depaired = depair(&mut line.into_inner(), 0)?;
+        match depaired {
+            Item::Command(command) => {
                 commands.push(CommandLine {
                     cmd: command,
-                    line: current_line,
+                    line: line_no,
                 });
             }
-            [SymbolType::Continue] => {
-                if next_block!(block_starts, BlockStart::Loop).is_none() {
-                    return Err(MaidenError::ContinueOutsideLoop { line: current_line });
-                }
-                let loop_start = last_block!(block_starts, BlockStart::Loop);
+            Item::Symbol(SymbolType::Empty) => {}
+            Item::Expression(Expression::Call(name, args)) => {
                 commands.push(CommandLine {
-                    cmd: Command::Continue {
-                        loop_start: *loop_start,
-                    },
-                    line: current_line,
+                    cmd: Command::Call { name, args },
+                    line: line_no,
                 });
             }
-            [SymbolType::Newline] | [] => {
-                // Comment on it's own is newline-equivalent
-                match block_starts.pop() {
-                    None => {
-                        debug!("Double newline that doesn't end anything");
-                    }
-                    Some(start) => {
-                        match start {
-                            BlockStart::If(if_start) => {
-                                let if_len = commands.len();
-                                match commands.index_mut(if_start) {
-                                    CommandLine {
-                                        cmd: Command::If { ref mut if_end, .. },
-                                        ..
-                                    } => {
-                                        if_end.get_or_insert(if_len);
-                                    }
-                                    _ => {
-                                        panic!("return to non-if command");
-                                    }
-                                }
-                                commands.push(CommandLine {
-                                    cmd: Command::EndIf,
-                                    line: if !symbols.is_empty()
-                                        && symbols[0] == SymbolType::Newline
-                                    {
-                                        current_line + 1 // Newline line is the one before this
-                                    } else {
-                                        current_line
-                                    },
-                                });
+            item => {
+                println!("Something else {:?}", item);
+            }
+        }
+    }
+    Ok(Program {
+        commands,
+        functions: HashMap::new(),
+    })
+}
+
+impl From<Expression> for Item {
+    fn from(exp: Expression) -> Item {
+        Item::Expression(exp)
+    }
+}
+
+impl From<SymbolType> for Item {
+    fn from(sym: SymbolType) -> Item {
+        Item::Symbol(sym)
+    }
+}
+
+impl From<Command> for Item {
+    fn from(command: Command) -> Item {
+        Item::Command(command)
+    }
+}
+
+impl From<Block> for Item {
+    fn from(block: Block) -> Item {
+        Item::Block(block)
+    }
+}
+
+fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Result<Item, MaidenError> {
+    let line = pair.as_span().start_pos().line_col().0;
+    let rule = pair.as_rule();
+    let level_string = format!("({}){}", level, "  ".repeat(level));
+    let res = match rule {
+        Rule::EOI => SymbolType::Empty.into(),
+        Rule::common_variable | Rule::proper_variable | Rule::simple_variable => {
+            Expression::Variable(pair.as_span().as_str().to_string()).into()
+        }
+        Rule::true_kw => Expression::True.into(),
+        Rule::false_kw => Expression::False.into(),
+        Rule::is_kw | Rule::is => SymbolType::Is.into(),
+        Rule::output => {
+            let value = depair(&mut pair.into_inner(), level + 1)?.expr();
+            Command::Say { value }.into()
+        }
+        Rule::string => {
+            let mut value = pair.as_str();
+            value = &value[1..value.len() - 1];
+            Expression::String(value.to_string()).into()
+        }
+        Rule::number => {
+            let value = pair.as_str();
+            Expression::Floating(value.parse::<f64>().unwrap()).into()
+        }
+        Rule::conditional => {
+            let mut pairs: Vec<_> = pair.into_inner().collect();
+            let expression = depair_core(pairs.remove(0), level + 1)?.expr();
+            if pairs.is_empty() {
+                return Err(MaidenError::NoEndOfIf { line });
+            }
+            let first = pairs.remove(0);
+            let consequent;
+            let alternate;
+            match first.as_rule() {
+                Rule::consequent => {
+                    consequent = Some(depair_core(first, level + 1)?.block());
+                    alternate = if pairs.is_empty() {
+                        None
+                    } else {
+                        Some(depair_core(pairs.remove(0), level + 1)?.block())
+                    };
+                }
+                Rule::alternate => {
+                    consequent = None;
+                    alternate = Some(depair_core(first, level + 1)?.block());
+                }
+                rule => {
+                    panic!("Bad rule: {:?}", rule);
+                }
+            }
+            Command::If {
+                expression,
+                then: consequent,
+                otherwise: alternate,
+            }
+            .into()
+        }
+        Rule::block => {
+            eprintln!("{}Depairing Block", level_string);
+            let items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            let mut commands = vec![];
+            for item in items {
+                commands.push(CommandLine {
+                    cmd: item.command(),
+                    line: 0,
+                });
+            }
+            Block { commands }.into()
+        }
+        Rule::equality_check => {
+            eprintln!("{}Depairing equality_check", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            if items.len() == 1 {
+                return Ok(items.remove(0));
+            }
+            let is = items.remove(1);
+            let first = Box::new(items.remove(0).expr());
+            let second = Box::new(items.remove(0).expr());
+            match is {
+                Item::Symbol(SymbolType::Is) => Expression::Is(first, second),
+                Item::Symbol(SymbolType::Aint) => Expression::Aint(first, second),
+                _ => panic!("Not is: {:?}", is),
+            }
+            .into()
+        }
+        Rule::statement => {
+            let item = depair(&mut pair.into_inner(), level + 1)?;
+            if let Item::Expression(Expression::Is(target, value)) = item {
+                return Ok(Command::Assignment {
+                    target: *target,
+                    value: *value,
+                }
+                .into());
+            }
+            item
+        }
+        Rule::not => {
+            let mut pairs = pair.into_inner();
+            let compare = pairs.peek().unwrap().as_rule() == Rule::comparison;
+            let item = depair(&mut pairs, level + 1)?;
+            if compare {
+                item
+            } else {
+                Expression::Not(Box::new(item.expr())).into()
+            }
+        }
+        Rule::put_assignment => {
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            let value = items.remove(0).expr();
+            let target = items.remove(0).expr();
+            Command::Assignment { target, value }.into()
+        }
+        Rule::assignment => {
+            eprintln!("{}Depairing assignment", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            if items.len() == 0 {
+                panic!("Empty assignment!");
+            }
+            let target = items.remove(0).expr();
+            match items.len() {
+                1 => Command::Assignment {
+                    target,
+                    value: items.remove(0).expr(),
+                }
+                .into(),
+                2 => {
+                    let operator = items.remove(0).symbol();
+                    let first = Box::new(target.clone());
+                    let second = items.remove(0).expr();
+                    match operator {
+                        SymbolType::Add => {
+                            let expr = Expression::Add(first, Box::new(second));
+                            Command::Assignment {
+                                target,
+                                value: expr,
                             }
-                            BlockStart::Loop(loop_start) => {
-                                let command = build_next(&mut commands, loop_start);
-                                commands.push(CommandLine {
-                                    cmd: command,
-                                    line: if !symbols.is_empty()
-                                        && symbols[0] == SymbolType::Newline
-                                    {
-                                        current_line + 1 // Newline line is the one before this
-                                    } else {
-                                        current_line
-                                    },
-                                });
+                            .into()
+                        }
+                        SymbolType::Subtract => {
+                            let expr = Expression::Subtract(first, Box::new(second));
+                            Command::Assignment {
+                                target,
+                                value: expr,
                             }
-                            BlockStart::Func(func_start) => {
-                                let func_len = commands.len();
-                                match commands.index_mut(func_start) {
-                                    CommandLine {
-                                        cmd:
-                                            Command::FunctionDeclaration {
-                                                ref mut func_end, ..
-                                            },
-                                        ..
-                                    } => {
-                                        func_end.get_or_insert(func_len);
-                                    }
-                                    _ => {
-                                        panic!("return to non-func command");
-                                    }
-                                }
-                                commands.push(CommandLine {
-                                    cmd: Command::EndFunction,
-                                    line: if !symbols.is_empty()
-                                        && symbols[0] == SymbolType::Newline
-                                    {
-                                        current_line + 1 // Newline line is the one before this
-                                    } else {
-                                        current_line
-                                    },
-                                });
+                            .into()
+                        }
+                        SymbolType::Divide => {
+                            let expr = Expression::Divide(first, Box::new(second));
+                            Command::Assignment {
+                                target,
+                                value: expr,
                             }
+                            .into()
+                        }
+                        SymbolType::Is => Command::Assignment {
+                            target,
+                            value: second,
+                        }
+                        .into(),
+                        _ => {
+                            panic!("Bad assignment operator: {:?}", operator);
                         }
                     }
                 }
-            }
-            [SymbolType::Listen] => {
-                commands.push(CommandLine {
-                    cmd: Command::Listen { target: None },
-                    line: current_line,
-                });
-            }
-            [SymbolType::Listen, SymbolType::Variable(target)] => {
-                commands.push(CommandLine {
-                    cmd: Command::Listen {
-                        target: Some(target.to_string()),
-                    },
-                    line: current_line,
-                });
-            }
-            [SymbolType::Else] => {
-                if next_block!(block_starts, BlockStart::If).is_none() {
-                    return Err(MaidenError::ElseWithNoIf { line: current_line });
+                _ => {
+                    panic!("Bad assignment: {:?}", items);
                 }
-                let if_start = last_block!(block_starts, BlockStart::If);
-                let if_len = commands.len();
-                match commands.index_mut(*if_start) {
-                    CommandLine {
-                        cmd:
-                            Command::If {
-                                ref mut else_loc, ..
-                            },
-                        ..
-                    } => {
-                        if else_loc.is_some() {
-                            return Err(MaidenError::MultipleElse { line: current_line });
+            }
+        }
+        Rule::arithmetic | Rule::product => {
+            eprintln!("{}Depairing arithmetic", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            if items.len() % 2 != 1 {
+                panic!("Weird arithmetic: {:?}", items);
+            };
+            let mut first = items.remove(0).expr();
+            while !items.is_empty() {
+                let operator = items.remove(0).symbol();
+                let apply_operator = move |first, other| match operator {
+                    SymbolType::Add => Expression::Add(Box::new(first), Box::new(other)),
+                    SymbolType::Subtract => Expression::Subtract(Box::new(first), Box::new(other)),
+                    SymbolType::Times => Expression::Times(Box::new(first), Box::new(other)),
+                    SymbolType::Divide => Expression::Divide(Box::new(first), Box::new(other)),
+                    _ => {
+                        panic!("Unknown operator: {:?}", operator);
+                    }
+                };
+                match items.remove(0) {
+                    Item::Expression(second) => {
+                        first = apply_operator(first, second);
+                    }
+                    Item::Symbol(SymbolType::ExpressionList(mut multiple)) => {
+                        for second in multiple.drain(0..) {
+                            first = apply_operator(first, second);
                         }
-                        else_loc.get_or_insert(if_len);
+                    }
+                    item => {
+                        panic!("Other item for arithmetic: {:?}", item);
+                    }
+                };
+            }
+            first.into()
+        }
+        Rule::and => {
+            eprintln!("{}Depairing and", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            if items.len() == 1 {
+                return Ok(items.remove(0));
+            }
+            Expression::And(
+                Box::new(items.remove(0).expr()),
+                Box::new(items.remove(0).expr()),
+            )
+            .into()
+        }
+        Rule::or => {
+            eprintln!("{}Depairing or", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            if items.len() == 1 {
+                return Ok(items.remove(0));
+            }
+            Expression::Or(
+                Box::new(items.remove(0).expr()),
+                Box::new(items.remove(0).expr()),
+            )
+            .into()
+        }
+        Rule::nor => {
+            eprintln!("{}Depairing nor", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            if items.len() == 1 {
+                return Ok(items.remove(0));
+            }
+            Expression::Nor(
+                Box::new(items.remove(0).expr()),
+                Box::new(items.remove(0).expr()),
+            )
+            .into()
+        }
+        Rule::add => SymbolType::Add.into(),
+        Rule::subtract => SymbolType::Subtract.into(),
+        Rule::multiply => SymbolType::Times.into(),
+        Rule::divide => SymbolType::Divide.into(),
+        Rule::pronoun => Expression::Pronoun.into(),
+        Rule::ne => SymbolType::Aint.into(),
+        Rule::return_kw => SymbolType::Return.into(),
+        Rule::function_return => {
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            Command::Return {
+                return_value: items.remove(1).expr(),
+            }
+            .into()
+        }
+        Rule::poetic_number => {
+            let value = pair.as_str();
+            let mut number: f64 = 0.0;
+            let mut decimal = false;
+            let mut decimal_places = 0;
+            for raw_word in value.split_whitespace() {
+                let mut word = raw_word.to_string();
+                word.retain(|c| c.is_alphabetic());
+                if word.len() == 0 {
+                    continue;
+                }
+                if number > 0.0 {
+                    number *= 10.0;
+                }
+                number += (word.len() % 10) as f64;
+                if decimal {
+                    decimal_places += 1;
+                }
+                if raw_word.ends_with(".") {
+                    decimal = true;
+                }
+            }
+            if decimal_places > 0 {
+                number /= 10.0_f64.powf(decimal_places as f64);
+            }
+            eprintln!("number '{}' parsed as {}", value, number);
+            Expression::Floating(number).into()
+        }
+        Rule::poetic_string => Expression::String(pair.as_str().to_string()).into(),
+        Rule::null => Expression::Null.into(),
+        Rule::mysterious => Expression::Mysterious.into(),
+        Rule::readline => {
+            eprintln!("{}Depairing listen", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            if items.is_empty() {
+                return Ok(Command::Listen { target: None }.into());
+            }
+            if items.len() != 1 {
+                panic!("listen: {:?}", items);
+            }
+            if let Item::Expression(Expression::Variable(name)) = items.remove(0) {
+                Command::Listen { target: Some(name) }.into()
+            } else {
+                panic!("listen: {:?}", items);
+            }
+        }
+        Rule::variable_list => {
+            eprintln!("{}Depairing variable_list", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            let mut variables = vec![];
+            for item in items.drain(0..) {
+                match item {
+                    Item::Symbol(SymbolType::Empty) => {}
+                    Item::Expression(Expression::Variable(name)) => {
+                        variables.push(name);
+                    }
+                    Item::Symbol(SymbolType::VariableList(vars)) => {
+                        variables.extend(vars);
                     }
                     _ => {
-                        panic!("return to non-if command");
+                        panic!("Non-variable in variable list: {:?}", item);
                     }
                 }
-                commands.push(CommandLine {
-                    cmd: Command::Else {
-                        if_start: *if_start,
-                    },
-                    line: if !symbols.is_empty() && symbols[0] == SymbolType::Newline {
-                        current_line + 1 // Newline line is the one before this
-                    } else {
-                        current_line
-                    },
-                });
             }
-            [SymbolType::Break] => {
-                if next_block!(block_starts, BlockStart::Loop).is_none() {
-                    return Err(MaidenError::BreakOutsideLoop { line: current_line });
+            SymbolType::VariableList(variables).into()
+        }
+        Rule::args_list => {
+            eprintln!("{}Depairing args_list", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            let mut expressions = vec![];
+            for item in items.drain(0..) {
+                match item {
+                    Item::Symbol(SymbolType::Empty) => {}
+                    Item::Expression(expr) => {
+                        expressions.push(expr);
+                    }
+                    Item::Symbol(SymbolType::ArgsList(exprs))
+                    | Item::Symbol(SymbolType::ExpressionList(exprs)) => {
+                        expressions.extend(exprs);
+                    }
+                    _ => {
+                        panic!("Non-expression in expr list: {:?}", item);
+                    }
                 }
-                let loop_start = last_block!(block_starts, BlockStart::Loop);
-                commands.push(CommandLine {
-                    cmd: Command::Break {
-                        loop_start: *loop_start,
-                    },
-                    line: current_line,
-                });
             }
-            [SymbolType::Taking {
-                ref target,
-                ref args,
-            }] => {
-                commands.push(CommandLine {
-                    cmd: Command::Call {
-                        name: target.to_string(),
-                        args: args
-                            .iter()
-                            .map(|arg| single_symbol_to_expression(&arg, current_line).unwrap())
-                            .collect::<Vec<Expression>>(),
-                    },
-                    line: current_line,
-                });
+            SymbolType::ArgsList(expressions).into()
+        }
+        Rule::expression_list => {
+            eprintln!("{}Depairing expression_list", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            let mut expressions = vec![];
+            if items.len() == 1 {
+                return Ok(items.remove(0));
             }
-            [SymbolType::Takes { ref name, ref args }] => {
-                block_starts.push(BlockStart::Func(commands.len()));
-                functions.insert(
-                    name.to_string(),
-                    Function {
-                        location: commands.len(),
-                        args: args.clone(),
-                    },
+            for item in items.drain(0..) {
+                match item {
+                    Item::Symbol(SymbolType::Empty) => {}
+                    Item::Expression(expr) => {
+                        expressions.push(expr);
+                    }
+                    Item::Symbol(SymbolType::ExpressionList(exprs)) => {
+                        expressions.extend(exprs);
+                    }
+                    _ => {
+                        panic!("Non-expression in expr list: {:?}", item);
+                    }
+                }
+            }
+            SymbolType::ExpressionList(expressions).into()
+        }
+        Rule::function => {
+            eprintln!("{}Depairing function", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            let name = if let Expression::Variable(n) = items.remove(0).expr() {
+                n
+            } else {
+                panic!("Non-variable name for function");
+            };
+            let args = if let SymbolType::VariableList(variables) = items.remove(0).symbol() {
+                variables
+            } else {
+                panic!("Non-variable list for function");
+            };
+            let block = items.remove(0).block();
+            Command::FunctionDeclaration { name, args, block }.into()
+        }
+        Rule::function_call => {
+            eprintln!("{}Depairing function_call", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            let name = if let Expression::Variable(n) = items.remove(0).expr() {
+                n
+            } else {
+                panic!("Non-variable name for function_call");
+            };
+            let args_list = items.remove(0).symbol();
+            if let SymbolType::ArgsList(variables) = args_list {
+                Expression::Call(name, variables).into()
+            } else {
+                panic!("Non-args list: {:?}", args_list);
+            }
+        }
+        Rule::up_kw => SymbolType::Up.into(),
+        Rule::down_kw => SymbolType::Down.into(),
+        Rule::increment => {
+            eprintln!("{}Depairing increment", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            let name = if let Expression::Variable(n) = items.remove(0).expr() {
+                n
+            } else {
+                panic!("Non-variable name for increment");
+            };
+            Command::Increment {
+                target: name,
+                count: items.len() as f64,
+            }
+            .into()
+        }
+        Rule::decrement => {
+            eprintln!("{}Depairing decrement", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            let name = if let Expression::Variable(n) = items.remove(0).expr() {
+                n
+            } else {
+                panic!("Non-variable name for decrement");
+            };
+            Command::Decrement {
+                target: name,
+                count: items.len() as f64,
+            }
+            .into()
+        }
+        Rule::variable_list_separator | Rule::expression_list_separator => SymbolType::Empty.into(),
+        Rule::greater => SymbolType::GreaterThan.into(),
+        Rule::great => SymbolType::GreaterThanOrEqual.into(),
+        Rule::smaller => SymbolType::LessThan.into(),
+        Rule::small => SymbolType::LessThanOrEqual.into(),
+        Rule::comparison => {
+            eprintln!("{}Depairing comparison", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            if items.len() == 1 {
+                return Ok(items.remove(0));
+            }
+            if items.len() != 3 {
+                panic!("Bad comparison: {:?}", items);
+            }
+            let first = Box::new(items.remove(0).expr());
+            let operator = items.remove(0).symbol();
+            let second = Box::new(items.remove(0).expr());
+            match operator {
+                SymbolType::GreaterThan => Expression::GreaterThan(first, second),
+                SymbolType::GreaterThanOrEqual => Expression::GreaterThanOrEqual(first, second),
+                SymbolType::LessThan => Expression::LessThan(first, second),
+                SymbolType::LessThanOrEqual => Expression::LessThanOrEqual(first, second),
+                _ => {
+                    panic!("Unknown operator: {:?}", operator);
+                }
+            }
+            .into()
+        }
+        Rule::while_kw => SymbolType::While.into(),
+        Rule::until_kw => SymbolType::Until.into(),
+        Rule::continue_kw => Command::Continue.into(),
+        Rule::break_kw => Command::Break.into(),
+        Rule::loop_kw => {
+            eprintln!("{}Depairing loop", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            let kind = items.remove(0).symbol();
+            let condition = items.remove(0).expr();
+            let block = items.remove(0).block();
+            match kind {
+                SymbolType::While => Command::While {
+                    expression: condition,
+                    block,
+                },
+                SymbolType::Until => Command::Until {
+                    expression: condition,
+                    block,
+                },
+                _ => {
+                    panic!("Unrecognised block type: {:?}", kind);
+                }
+            }
+            .into()
+        }
+        rule => {
+            let original = pair.clone();
+            let inner = pair.into_inner();
+            let count = inner.count();
+            if count == 0 {
+                if rule == Rule::alternate {
+                    return Ok(Block { commands: vec![] }.into());
+                }
+                let (line_no, col_no) = original.as_span().start_pos().line_col();
+                panic!(
+                    "{}Empty pair at {}, {}: {:?}",
+                    level_string, line_no, col_no, original
                 );
-                commands.push(CommandLine {
-                    cmd: Command::FunctionDeclaration {
-                        name: name.to_string(),
-                        args: args.clone(),
-                        func_end: None,
-                    },
-                    line: current_line,
-                });
-            }
-            [SymbolType::Build {
-                ref target,
-                ref count,
-            }] => {
-                commands.push(CommandLine {
-                    cmd: Command::Increment {
-                        target: target.to_string(),
-                        count: *count as f64,
-                    },
-                    line: current_line,
-                });
-            }
-            [SymbolType::Knock {
-                ref target,
-                ref count,
-            }] => {
-                commands.push(CommandLine {
-                    cmd: Command::Decrement {
-                        target: target.to_string(),
-                        count: *count as f64,
-                    },
-                    line: current_line,
-                });
-            }
-            _ => {
-                // Better done with slice patterns once they stabilise
-                // (see https://github.com/rust-lang/rust/issues/23121)
-                if symbols[0] == SymbolType::Say && symbols.len() > 1 {
-                    let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
-                    let expression = parse_expression(&expression_seq, current_line)?;
-                    commands.push(CommandLine {
-                        cmd: Command::Say { value: expression },
-                        line: current_line,
-                    });
-                } else if symbols.len() > 1 && symbols[1] == SymbolType::Is {
-                    let target = match symbols[0] {
-                        SymbolType::Variable(ref target) => target.to_string(),
-                        SymbolType::Pronoun => {
-                            if pronoun.is_none() {
-                                return Err(MaidenError::UndefinedPronoun { line: current_line });
-                            }
-                            pronoun.clone().unwrap()
-                        }
-                        _ => {
-                            return Err(MaidenError::BadIs {
-                                sequence: symbols.to_vec(),
-                                line: current_line,
-                            });
-                        }
-                    };
-                    let expression_seq: Vec<&SymbolType> = symbols.iter().skip(2).collect();
-                    let expression = parse_expression(&expression_seq, current_line)?;
-                    pronoun = Some(target.clone());
-                    commands.push(CommandLine {
-                        cmd: Command::Assignment {
-                            target,
-                            value: expression,
-                        },
-                        line: current_line,
-                    });
-                } else if symbols[0] == SymbolType::Until && symbols.len() > 1 {
-                    block_starts.push(BlockStart::Loop(commands.len()));
-                    let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
-                    let expression = parse_expression(&expression_seq, current_line)?;
-                    commands.push(CommandLine {
-                        cmd: Command::Until {
-                            expression,
-                            loop_end: None,
-                        },
-                        line: current_line,
-                    });
-                } else if symbols[0] == SymbolType::While && symbols.len() > 1 {
-                    block_starts.push(BlockStart::Loop(commands.len()));
-                    let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
-                    let expression = parse_expression(&expression_seq, current_line)?;
-                    commands.push(CommandLine {
-                        cmd: Command::While {
-                            expression,
-                            loop_end: None,
-                        },
-                        line: current_line,
-                    });
-                } else if symbols[0] == SymbolType::If && symbols.len() > 1 {
-                    block_starts.push(BlockStart::If(commands.len()));
-                    let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
-                    let expression = parse_expression(&expression_seq, current_line)?;
-                    commands.push(CommandLine {
-                        cmd: Command::If {
-                            expression,
-                            if_end: None,
-                            else_loc: None,
-                        },
-                        line: current_line,
-                    });
-                } else if symbols.len() > 3
-                    && symbols[0] == SymbolType::Put
-                    && symbols[symbols.len() - 2] == SymbolType::Where
-                {
-                    let target = match symbols[symbols.len() - 1] {
-                        SymbolType::Variable(ref target) => target.to_string(),
-                        SymbolType::Pronoun => {
-                            if pronoun.is_none() {
-                                return Err(MaidenError::UndefinedPronoun { line: current_line });
-                            }
-                            pronoun.clone().unwrap()
-                        }
-                        _ => {
-                            return Err(MaidenError::BadPut {
-                                sequence: symbols.to_vec(),
-                                line: current_line,
-                            });
-                        }
-                    };
-                    let expression_seq: Vec<&SymbolType> =
-                        symbols.iter().skip(1).take(symbols.len() - 3).collect();
-                    let expression = parse_expression(&expression_seq, current_line)?;
-                    pronoun = Some(target.clone());
-                    commands.push(CommandLine {
-                        cmd: Command::Assignment {
-                            target,
-                            value: expression,
-                        },
-                        line: current_line,
-                    });
-                } else if symbols[0] == SymbolType::Return && symbols.len() > 1 {
-                    let expression_seq: Vec<&SymbolType> = symbols.iter().skip(1).collect();
-                    let expression = parse_expression(&expression_seq, current_line)?;
-                    commands.push(CommandLine {
-                        cmd: Command::Return {
-                            return_value: expression,
-                        },
-                        line: current_line,
-                    });
-                } else {
-                    return Err(MaidenError::BadCommandSequence {
-                        sequence: symbols.to_vec(),
-                        line: current_line,
-                    });
-                }
+            } else if count == 1 {
+                eprintln!("{}Depairing {:?}", level_string, rule);
+                depair(&mut original.into_inner(), level + 1)?
+            } else {
+                eprintln!("{}List rule: {:?}", level_string, rule);
+                depair(&mut original.into_inner(), level + 1)?
             }
         }
-    }
-    return Ok(Program {
-        commands,
-        functions,
-    });
+    };
+    Ok(res)
 }
 
-#[cfg(any(target_arch = "wasm32", test))]
-fn print_command(command: &Command) -> String {
-    format!("{:?}", command)
-}
-
-#[cfg(any(target_arch = "wasm32", test))]
-pub fn print_program(program: &Program) -> String {
-    let mut res = String::new();
-    let mut indent = 0;
-    let mut last_line = 0;
-    let max_line: f32 = (program.commands.iter().fold(0, |acc, x| acc.max(x.line))) as f32;
-    let max_number_length: usize = (max_line + 1.0).log10().ceil() as usize;
-    for command in &program.commands {
-        match command.cmd {
-            Command::EndFunction | Command::Else { .. } | Command::EndIf | Command::Next { .. } => {
-                indent -= 1;
-            }
-            _ => {}
+fn depair<'i, I>(pairs: &'i mut I, level: usize) -> Result<Item, MaidenError>
+where
+    I: Iterator<Item = pest::iterators::Pair<'i, Rule>>,
+{
+    let mut items = vec![];
+    let level_string = format!("({}){}", level, "  ".repeat(level));
+    for pair in pairs {
+        let item = depair_core(pair, level)?;
+        if item == SymbolType::Empty.into() {
+            continue;
         }
-        while last_line < command.line - 1 {
-            last_line += 1;
-            res += &format!("{:0width$}:\n", last_line, width = max_number_length);
+        items.push(item);
+    }
+    match items.len() {
+        0 => {
+            eprintln!("{}Empty", level_string);
+            Ok(SymbolType::Empty.into())
         }
-        last_line = command.line;
-        res += &format!("{:0width$}: ", command.line, width = max_number_length);
-        for _ in 0..indent {
-            res += "  ";
-        }
-        res += &(print_command(&command.cmd) + "\n");
-        match command.cmd {
-            Command::FunctionDeclaration { .. }
-            | Command::If { .. }
-            | Command::While { .. }
-            | Command::Else { .. }
-            | Command::Until { .. } => {
-                indent += 1;
-            }
-            _ => {}
+        1 => Ok(items.remove(0)),
+        _ => {
+            panic!("{}Many! {:?}", level_string, items);
         }
     }
-    return res;
+}
+
+fn depair_seq<'i, I>(pairs: &'i mut I, level: usize) -> Result<Vec<Item>, MaidenError>
+where
+    I: Iterator<Item = pest::iterators::Pair<'i, Rule>>,
+{
+    let mut items = vec![];
+    for pair in pairs {
+        items.push(depair_core(pair, level)?);
+    }
+    return Ok(items);
+}
+
+pub fn parse(buffer: &str) -> Result<Program, MaidenError> {
+    let mut parsed =
+        Rockstar::parse(Rule::program, &buffer).map_err(|e| MaidenError::Pest { kind: e })?;
+    return depair_program(&mut parsed, &buffer);
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use pretty_assertions::assert_eq;
-    use pretty_env_logger;
+    use super::{parse, MaidenError};
 
     #[test]
-    fn multi_word_quote_parse() {
-        let (span, tokens) = line(Span::new(CompleteStr("say \"shout let it all out\""))).unwrap();
-        assert_eq!(CompleteStr(""), span.fragment);
-        assert_eq!(
-            vec![
-                SymbolType::Say,
-                SymbolType::String("shout let it all out".to_string())
-            ],
-            tokens.into_iter().map(|t| t.symbol).collect::<Vec<_>>()
-        );
-    }
-
-    #[test]
-    fn check_evaluate() {
-        pretty_env_logger::try_init().unwrap_or(());
-        assert_eq!(
-            evaluate(
-                &SymbolType::Words(vec![
-                    "a".to_string(),
-                    "lovestruck".to_string(),
-                    "ladykiller".to_string()
-                ]),
-                0
-            )
-            .unwrap(),
-            Expression::Floating(100f64)
-        );
-    }
-
-    #[test]
-    fn check_full_expression_parse() {
-        pretty_env_logger::try_init().unwrap_or(());
-        let expression = Expression::And(
-            Box::new(Expression::Is(
-                Box::new(Expression::Call(
-                    "Midnight".to_string(),
-                    vec![
-                        Expression::Variable("my world".to_string()),
-                        Expression::Variable("Fire".to_string()),
-                    ],
-                )),
-                Box::new(Expression::Null),
-            )),
-            Box::new(Expression::Is(
-                Box::new(Expression::Call(
-                    "Midnight".to_string(),
-                    vec![
-                        Expression::Variable("my world".to_string()),
-                        Expression::Variable("Hate".to_string()),
-                    ],
-                )),
-                Box::new(Expression::Null),
-            )),
-        );
-        let commands = vec![CommandLine {
-            cmd: Command::If {
-                expression: expression,
-                if_end: None,
-                else_loc: None,
-            },
-            line: 1,
-        }];
-        let functions = HashMap::new();
-        assert_eq!(
-            parse("If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing")
-                .unwrap(),
-            Program { commands, functions }
-        );
-    }
-
-    fn lines_tokens_check(input: &str, tokens: Vec<SymbolType>) {
-        pretty_env_logger::try_init().unwrap_or(());
-        let mut raw_lines = lines(input).unwrap();
-        assert_eq!(raw_lines.0.fragment, CompleteStr(""), "{:?}", raw_lines);
-        assert_eq!(raw_lines.1.len(), 1, "{:?}", raw_lines.1);
-        assert_eq!(
-            raw_lines
-                .1
-                .remove(0)
-                .into_iter()
-                .map(|t| t.symbol)
-                .collect::<Vec<_>>(),
-            tokens
-        );
-    }
-
-    #[test]
-    fn check_expression_parse() {
-        lines_tokens_check(
-            "If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing",
-            vec![
-                SymbolType::If,
-                SymbolType::Taking{target:"Midnight".to_string(), args: vec![SymbolType::Variable("my world".to_string()), SymbolType::Variable("Fire".to_string())]},
-                SymbolType::Is,
-                SymbolType::Null,
-                SymbolType::And,
-                SymbolType::Taking{target:"Midnight".to_string(), args: vec![SymbolType::Variable("my world".to_string()), SymbolType::Variable("Hate".to_string())]},
-                SymbolType::Is,
-                SymbolType::Null,
-            ],
-        );
-    }
-
-    #[test]
-    fn negative_numbers() {
-        lines_tokens_check("-3", vec![SymbolType::Integer("-3".to_string())]);
-    }
-
-    #[test]
-    fn floating_point_numbers() {
-        lines_tokens_check(
-            "say .5",
-            vec![SymbolType::Say, SymbolType::Floating(".5".to_string())],
-        );
-    }
-
-    #[test]
-    fn comment_parsing() {
-        assert_eq!(
-            parse("(foo bar baz)").unwrap(),
-            Program {
-                commands: vec![],
-                functions: HashMap::new()
-            }
-        );
-    }
-
-    #[test]
-    fn empty_program() {
-        assert_eq!(
-            parse("").unwrap(),
-            Program {
-                commands: vec![],
-                functions: HashMap::new()
-            }
-        );
-    }
-
-    #[test]
-    fn apostrophe_parsing() {
-        let commands = vec![CommandLine {
-            cmd: Command::Assignment {
-                target: "Bar".to_string(),
-                value: Expression::Floating(4f64),
-            },
-            line: 1,
-        }];
-        let functions = HashMap::new();
-        assert_eq!(
-            parse("Bar is foo'd").unwrap(),
-            Program {
-                commands,
-                functions
-            }
-        );
-    }
-
-    #[test]
-    fn multi_word_proper_variable() {
-        lines_tokens_check(
-            "Liftin High takes the spirit and Foo",
-            vec![SymbolType::Takes {
-                name: "Liftin High".to_string(),
-                args: vec!["the spirit".to_string(), "Foo".to_string()],
-            }],
-        );
-    }
-
-    #[test]
-    fn not_proper_variable() {
-        lines_tokens_check(
-            "Until Counter is Limit",
-            vec![
-                SymbolType::Until,
-                SymbolType::Variable("Counter".to_string()),
-                SymbolType::Is,
-                SymbolType::Variable("Limit".to_string()),
-            ],
-        );
-    }
-
-    #[test]
-    fn split_nothing() {
-        lines_tokens_check(
-            "If a thought is greater than Nothinggggggggg",
-            vec![
-                SymbolType::If,
-                SymbolType::Variable("a thought".to_string()),
-                SymbolType::GreaterThan,
-                SymbolType::Variable("Nothinggggggggg".to_string()),
-            ],
-        );
-    }
-
-    #[test]
-    fn literal_words() {
-        lines_tokens_check(
-            "My world is nothing without your love",
-            vec![
-                SymbolType::Variable("My world".to_string()),
-                SymbolType::Is,
-                SymbolType::Null,
-                SymbolType::Subtract,
-                SymbolType::Variable("your love".to_string()),
-            ],
-        );
-    }
-
-    #[test]
-    fn non_alphabetic_literal() {
-        lines_tokens_check(
-            "A nightmare is decimated, destroyed; sparkling, sinuously perfected",
-            vec![
-                SymbolType::Variable("A nightmare".to_string()),
-                SymbolType::Is,
-                SymbolType::Words(vec![
-                    "decimated".to_string(),
-                    "destroyed".to_string(),
-                    "sparkling".to_string(),
-                    "sinuously".to_string(),
-                    "perfected".to_string(),
-                ]),
-            ],
-        );
-    }
-
-    #[test]
-    fn keyword_named_func() {
-        lines_tokens_check(
-            "TrueFunc takes Ignored",
-            vec![SymbolType::Takes {
-                name: "TrueFunc".to_string(),
-                args: vec!["Ignored".to_string()],
-            }],
-        );
-    }
-
-    #[test]
-    fn nor_usage() {
-        lines_tokens_check(
-            "Say true nor true",
-            vec![
-                SymbolType::Say,
-                SymbolType::True,
-                SymbolType::Nor,
-                SymbolType::True,
-            ],
-        );
-    }
-
-    #[test]
-    fn great_davy() {
-        pretty_env_logger::try_init().unwrap_or(());
-        let expression = Expression::Aint(
-            Box::new(Expression::Variable("Davy".to_string())),
-            Box::new(Expression::Variable("Greatness".to_string())),
-        );
-        let commands = vec![CommandLine {
-            cmd: Command::While {
-                expression,
-                loop_end: None,
-            },
-            line: 1,
-        }];
-        let functions = HashMap::new();
-        assert_eq!(
-            parse("While Davy ain't Greatness").unwrap(),
-            Program {
-                commands,
-                functions
-            }
-        );
-    }
-
-    #[test]
-    fn permitted_apostrophes() {
-        pretty_env_logger::try_init().unwrap_or(());
-        let functions = HashMap::new();
-        let commands = vec![CommandLine {
-            cmd: Command::Say {
-                value: Expression::String("This ain't not allowed!".to_string()),
-            },
-            line: 1,
-        }];
-        assert_eq!(
-            parse("Shout \"This ain't not allowed!\"").unwrap(),
-            Program {
-                commands,
-                functions
-            }
-        );
-    }
-
-    #[test]
-    fn everyone_taking_the_bait() {
-        pretty_env_logger::try_init().unwrap_or(());
-        let commands = vec![CommandLine {
-            cmd: Command::Assignment {
-                target: "Foo".to_string(),
-                value: Expression::Subtract(
-                    Box::new(Expression::Call(
-                        "Everyone".to_string(),
-                        vec![Expression::Variable("the bait".to_string())],
-                    )),
-                    Box::new(Expression::Floating(1f64)),
-                ),
-            },
-            line: 1,
-        }];
-        let functions = HashMap::new();
-        assert_eq!(
-            parse("Put Everyone taking the bait without 1 into Foo").unwrap(),
-            Program {
-                commands,
-                functions
-            }
-        );
-    }
-
-    #[test]
-    fn pretty_print() {
-        assert_eq!(
-            print_program(&parse("Absolute takes a thought").unwrap()),
-            "1: FunctionDeclaration { name: \"Absolute\", args: [\"a thought\"], func_end: None }\n"
-        )
-    }
-
-    #[test]
-    fn bad_fragment() {
-        pretty_env_logger::try_init().unwrap_or(());
-        let err = parse("2 is 1").err().unwrap();
-        if let MaidenError::BadIs {
-            sequence: symbols,
-            line,
-        } = err
-        {
-            assert_eq!(
-                symbols,
-                vec![
-                    SymbolType::Integer("2".to_string()),
-                    SymbolType::Is,
-                    SymbolType::Integer("1".to_string()),
-                ]
-            );
+    fn end_of_if() {
+        let err = parse("if 1 is 2");
+        if let Err(MaidenError::NoEndOfIf { line }) = err {
             assert_eq!(line, 1);
         } else {
             assert!(false, format!("{:?}", err));
         }
-    }
-
-    #[test]
-    fn bad_expression() {
-        pretty_env_logger::try_init().unwrap_or(());
-        let err = parse("if 1 is").err().unwrap();
-        if let MaidenError::UnparsedText {
-            text: content,
-            line,
-        } = err
-        {
-            assert_eq!(content, " is");
-            assert_eq!(line, 1);
-        } else {
-            assert!(false, format!("{:?}", err));
-        }
-    }
-
-    #[test]
-    fn bad_put() {
-        pretty_env_logger::try_init().unwrap_or(());
-        let err = parse("put 1 into 3").err().unwrap();
-        if let MaidenError::BadPut {
-            sequence: expression,
-            line,
-        } = err
-        {
-            assert_eq!(
-                expression,
-                vec![
-                    SymbolType::Put,
-                    SymbolType::Integer("1".to_string()),
-                    SymbolType::Where,
-                    SymbolType::Integer("3".to_string())
-                ]
-            );
-            assert_eq!(line, 1);
-        } else {
-            assert!(false, format!("{:?}", err));
-        }
-    }
-
-    // test sequence of use of empty line between else and while
-    #[test]
-    fn if_while_exit_sequence() {
-        pretty_env_logger::try_init().unwrap_or(());
-        let functions = HashMap::new();
-        let commands = vec![
-            CommandLine {
-                cmd: Command::If {
-                    expression: Expression::False,
-                    if_end: Some(6),
-                    else_loc: Some(2),
-                },
-                line: 1,
-            },
-            CommandLine {
-                cmd: Command::Say {
-                    value: Expression::String("bar".to_string()),
-                },
-                line: 2,
-            },
-            CommandLine {
-                cmd: Command::Else { if_start: 0 },
-                line: 3,
-            },
-            CommandLine {
-                cmd: Command::While {
-                    expression: Expression::True,
-                    loop_end: Some(5),
-                },
-                line: 4,
-            },
-            CommandLine {
-                cmd: Command::Say {
-                    value: Expression::String("foo".to_string()),
-                },
-                line: 5,
-            },
-            CommandLine {
-                cmd: Command::Next { loop_start: 3 },
-                line: 6,
-            },
-            CommandLine {
-                cmd: Command::EndIf,
-                line: 7,
-            },
-        ];
-        assert_eq!(
-            parse("if false\nsay \"bar\"\nelse\nwhile true\nsay \"foo\"\n\n").unwrap(),
-            Program {
-                commands,
-                functions
-            }
-        );
-    }
-
-    #[test]
-    fn comment_on_same_line() {
-        pretty_env_logger::try_init().unwrap_or(());
-        let functions = HashMap::new();
-        let commands = vec![CommandLine {
-            cmd: Command::Assignment {
-                target: "Cold Steel".to_string(),
-                value: Expression::Floating(1.0),
-            },
-            line: 1,
-        }];
-        assert_eq!(
-            parse("Cold Steel is liquidizing (The ceiling starts spinning)").unwrap(),
-            Program {
-                commands,
-                functions
-            }
-        );
     }
 }

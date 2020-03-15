@@ -41,37 +41,12 @@ pub enum Expression {
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum SymbolType {
-    Dummy,
-    And,
-    Or,
-    Nor,
     Is,
     Up,
     Down,
-    Build {
-        target: String,
-        count: usize,
-    },
-    Knock {
-        target: String,
-        count: usize,
-    },
     Until,
     While,
-    Next,
-    Continue,
     Return,
-    Say,
-    If,
-    Taking {
-        target: String,
-        args: Vec<SymbolType>,
-    },
-    Takes {
-        name: String,
-        args: Vec<String>,
-    },
-    Comma,
     GreaterThanOrEqual,
     GreaterThan,
     LessThan,
@@ -79,25 +54,8 @@ pub enum SymbolType {
     Add,
     Subtract,
     Times,
-    Put,
-    Where,
-    Newline,
     Aint,
-    Else,
-    Variable(String),
-    String(String),
-    Words(Vec<String>),
-    Integer(String),
-    Floating(String),
-    Listen,
     Divide,
-    True,
-    False,
-    Null,
-    Mysterious,
-    Pronoun,
-    Not(Box<SymbolType>),
-    Break,
     Empty,
     VariableList(Vec<String>),
     ArgsList(Vec<Expression>),
@@ -109,8 +67,6 @@ pub struct Token {
     pub line: usize,
     pub symbol: SymbolType,
 }
-
-pub static LOWEST_PRECDENCE: SymbolType = SymbolType::Dummy;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Block {
@@ -136,7 +92,6 @@ pub enum Command {
         then: Option<Block>,
         otherwise: Option<Block>,
     },
-    EndIf,
     Increment {
         target: String,
         count: f64,
@@ -145,7 +100,6 @@ pub enum Command {
         target: String,
         count: f64,
     },
-    Next,
     Continue,
     Break,
     Say {
@@ -162,13 +116,9 @@ pub enum Command {
     Return {
         return_value: Expression,
     },
-    EndFunction,
     Call {
         name: String,
         args: Vec<Expression>,
-    },
-    Else {
-        if_start: usize,
     },
 }
 
@@ -191,6 +141,7 @@ pub struct Program {
 }
 
 #[derive(Debug, Fail)]
+#[allow(dead_code)]
 pub enum MaidenError {
     #[fail(display = "parsing error: {:?}", kind)]
     Pest { kind: pest::error::Error<peg::Rule> },

@@ -658,27 +658,11 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                     break;
                 }
             },
-            Command::Next | Command::Continue => {
+            Command::Continue => {
                 return Ok(Expression::Continue);
             }
             Command::Break => {
                 return Ok(Expression::Break);
-                // let loop_cmd = &program.commands[loop_start];
-                // match loop_cmd.cmd {
-                //     Command::While { loop_end, .. } => match loop_end {
-                //         Some(val) => {
-                //             pc = val;
-                //         }
-                //         None => {
-                //             return Err(MaidenError::NoEndLoop {
-                //                 line: state.current_line,
-                //             })
-                //         }
-                //     },
-                //     _ => {
-                //         panic!("Matched break with non-while");
-                //     }
-                // }
             }
             Command::Say { ref value } => {
                 let resolve = run_expression(state, program, &value)?;
@@ -700,9 +684,6 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
             }
             Command::Return { ref return_value } => {
                 return run_expression(state, program, &return_value);
-            }
-            Command::EndFunction => {
-                return run_expression(state, program, &Expression::Nothing);
             }
             Command::If {
                 ref expression,
@@ -741,28 +722,9 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                     }
                 }
             }
-            Command::Else { if_start } => {
-                let if_cmd = &program.commands[if_start];
-                match if_cmd.cmd {
-                    // Command::If { if_end, .. } => match if_end {
-                    //     Some(val) => {
-                    //         pc = val;
-                    //     }
-                    //     None => {
-                    //         return Err(MaidenError::NoEndOfIf {
-                    //             line: state.current_line,
-                    //         })
-                    //     }
-                    // },
-                    _ => {
-                        panic!("Matched else with non-if");
-                    }
-                }
-            }
             Command::Call { ref name, ref args } => {
                 call_function(state, program, &name, &args)?;
             }
-            Command::EndIf => {}
             Command::Listen {
                 target: ref opt_target,
             } => {

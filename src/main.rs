@@ -1,26 +1,30 @@
-#![allow(warnings)]
+#![recursion_limit = "5000"]
+#![deny(warnings)]
+#![allow(clippy::needless_return)]
 
-use clap::{App, Arg};
-use pest::iterators::Pair;
-use pest::Parser;
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::{self, Read};
+#[cfg(target_arch = "wasm32")]
+use stdweb::web::IParentNode;
+#[cfg(target_arch = "wasm32")]
+use yew::prelude::*;
 
 mod common;
+mod parser;
 mod peg;
 mod runner;
 
-use crate::common::{
-    Block, Command, CommandLine, Expression, Function, MaidenError, Program, SymbolType,
-};
-use crate::peg::{Rockstar, Rule};
+#[cfg(not(target_arch = "wasm32"))]
+use clap::{App, Arg};
+#[cfg(not(target_arch = "wasm32"))]
+use std::fs::File;
+#[cfg(not(target_arch = "wasm32"))]
+use std::io::{self, Read};
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() -> common::Result<()> {
     pretty_env_logger::try_init().unwrap_or(());
     let matches = App::new("Maiden")
         .version("1.0")
-        .author("Tom Parker-Shemilt <palfrey@tevp.net>")
+        .author("Tom Parker <palfrey@tevp.net>")
         .about("Rockstar interpreter")
         .arg(
             Arg::with_name("INPUT")
@@ -32,653 +36,233 @@ fn main() -> common::Result<()> {
     let mut f = File::open(matches.value_of("INPUT").unwrap())?;
     let mut buffer = String::new();
     f.read_to_string(&mut buffer)?;
-    let mut parsed =
-        Rockstar::parse(Rule::program, &buffer).map_err(|e| MaidenError::Pest { kind: e })?;
-    let mut program = depair_program(&mut parsed, &buffer)?;
-    eprintln!("{:#?}", program);
-    eprintln!("{:#?}", runner::run(&mut program, &mut io::stdout())?);
-    return Ok(());
+
+    let mut program = parser::parse(&buffer)?;
+    runner::run(&mut program, &mut io::stdout())?;
+    Ok(())
 }
 
-#[derive(Debug, Clone, PartialEq)]
-enum Item {
-    Expression(Expression),
-    Symbol(SymbolType),
-    Command(Command),
-    Block(Block),
+#[cfg(target_arch = "wasm32")]
+mod web;
+
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    yew::initialize();
+    let app: App<web::Model> = App::new();
+    let app_element = stdweb::web::document()
+        .query_selector("#app")
+        .unwrap()
+        .unwrap();
+    app.mount(app_element);
+    yew::run_loop();
 }
 
-impl Item {
-    fn expr(self) -> Expression {
-        if let Item::Expression(e) = self {
-            e
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::Expression;
+    use log::{debug, info};
+    use pretty_assertions::assert_eq;
+    use std::collections::HashMap;
+    use std::io::Cursor;
+
+    fn test_program(code: &str, end_variables: HashMap<String, Expression>, expected_output: &str) {
+        pretty_env_logger::try_init().unwrap_or(());
+        let mut program = parser::parse(code).unwrap();
+        info!("Commands: {:?}", program.commands);
+        let mut writer = Cursor::new(Vec::new());
+        let variables = runner::run(&mut program, &mut writer).unwrap();
+        writer.set_position(0);
+        let res = std::str::from_utf8(writer.get_ref()).unwrap();
+        if res != "" {
+            debug!("{}", res);
+        }
+        assert_eq!(expected_output, res);
+        assert_eq!(end_variables, variables);
+    }
+
+    // https://gist.github.com/DmitrySoshnikov/8439eac0a09d9fafe55a83c88d049117
+    macro_rules! hashmap(
+        { $($key:expr => $value:expr),+, } => {
+            {
+                let mut m = ::std::collections::HashMap::new();
+                $(
+                    m.insert($key.to_string(), $value);
+                )+
+                m
+            }
+        };
+    );
+
+    #[test]
+    fn test_counting() {
+        let program = "Limit is 100
+    Counter is 0
+    Fizz is 3
+    Buzz is 5
+    Until Counter is Limit
+        Build Counter up
+    ";
+        let end_variables = hashmap! {
+            "buzz" => Expression::Floating(5f64),
+            "limit" => Expression::Floating(100f64),
+            "counter" => Expression::Floating(100f64),
+            "fizz" => Expression::Floating(3f64),
+        };
+        test_program(program, end_variables, "");
+    }
+
+    #[test]
+    fn test_rocking_counting() {
+        let program = "Desire is a lovestruck ladykiller
+    My world is nothing
+    Fire is ice
+    Hate is water
+    Until my world is Desire,
+    Build my world up
+    ";
+        let end_variables = hashmap! {
+            "my world" => Expression::Floating(100f64),
+            "fire" => Expression::Floating(3f64),
+            "hate" => Expression::Floating(5f64),
+            "desire" => Expression::Floating(100f64),
+        };
+        test_program(program, end_variables, "");
+    }
+
+    #[test]
+    fn rocking_fizzbuzz() {
+        let program = "Midnight takes your heart & your soul
+    While your heart is as high as your soul
+    Put your heart without your soul into your heart
+
+    Give back your heart
+
+    Desire is a lovestruck ladykiller
+    My world is nothing
+    Fire is ice
+    Hate is water
+    Until my world is Desire,
+    Build my world up
+    If Midnight taking my world, Fire is nothing and Midnight taking my world, Hate is nothing
+    Shout \"FizzBuzz!\"
+    Take it to the top
+
+    If Midnight taking my world, Fire is nothing
+    Shout \"Fizz!\"
+    Take it to the top
+
+    If Midnight taking my world, Hate is nothing
+    Say \"Buzz!\"
+    Take it to the top
+
+    Whisper my world
+    ";
+        let end_variables = hashmap! {
+            "my world" => Expression::Floating(100f64),
+            "fire" => Expression::Floating(3f64),
+            "hate" => Expression::Floating(5f64),
+            "desire" => Expression::Floating(100f64),
+        };
+        test_program(
+            program,
+            end_variables,
+            concat!(
+                "1\n2\nFizz!\n4\nBuzz!\nFizz!\n7\n8\nFizz!\nBuzz!\n11\nFizz!\n13\n14\nFizzBuzz!\n16\n17\nFizz!\n",
+                "19\nBuzz!\nFizz!\n22\n23\nFizz!\nBuzz!\n26\nFizz!\n28\n29\nFizzBuzz!\n31\n32\nFizz!\n34\nBuzz!\n",
+                "Fizz!\n37\n38\nFizz!\nBuzz!\n41\nFizz!\n43\n44\nFizzBuzz!\n46\n47\nFizz!\n49\nBuzz!\nFizz!\n52\n",
+                "53\nFizz!\nBuzz!\n56\nFizz!\n58\n59\nFizzBuzz!\n61\n62\nFizz!\n64\nBuzz!\nFizz!\n67\n68\nFizz!\n",
+                "Buzz!\n71\nFizz!\n73\n74\nFizzBuzz!\n76\n77\nFizz!\n79\nBuzz!\nFizz!\n82\n83\nFizz!\nBuzz!\n86\n",
+                "Fizz!\n88\n89\nFizzBuzz!\n91\n92\nFizz!\n94\nBuzz!\nFizz!\n97\n98\nFizz!\nBuzz!\n"
+            ),
+        );
+    }
+
+    #[test]
+    fn multi_word_say() {
+        let end_variables = HashMap::new();
+        test_program(
+            "say \"shout let it all out\"",
+            end_variables,
+            "shout let it all out\n",
+        );
+    }
+
+    #[test]
+    fn multiple_uppercase_proper_variable() {
+        let end_variables = hashmap! {
+            "id" => Expression::Floating(3f64),
+        };
+        test_program("put 3 into ID", end_variables, "");
+    }
+
+    #[test]
+    fn double_increment() {
+        let end_variables = hashmap! {
+            "my world" => Expression::Floating(2f64),
+        };
+        test_program(
+            "Put 0 into my world\nBuild my world up, up",
+            end_variables,
+            "",
+        );
+    }
+
+    #[test]
+    fn double_decrement() {
+        let end_variables = hashmap! {
+            "the walls" => Expression::Floating(-2f64),
+        };
+        test_program(
+            "Put 0 into the walls\nKnock the walls down, down",
+            end_variables,
+            "",
+        );
+    }
+
+    #[test]
+    fn skip_else() {
+        let end_variables = hashmap! {
+            "foo" => Expression::String("foo".to_string()),
+        };
+        test_program(
+            "if nothing is nothing
+        Foo says foo
+        Else
+        Bar says bar
+
+        ",
+            end_variables,
+            "",
+        );
+    }
+
+    #[test]
+    fn numeric_args() {
+        let err = test_error("Multiply taking 3, 5");
+        if let common::MaidenError::MissingFunction { name, line } = err {
+            assert_eq!(name, "Multiply");
+            assert_eq!(line, 1);
         } else {
-            panic!("Not an expression: {:?}", self)
+            assert!(false, err);
         }
     }
-    fn symbol(self) -> SymbolType {
-        if let Item::Symbol(e) = self {
-            e
+
+    fn test_error(input: &str) -> common::MaidenError {
+        pretty_env_logger::try_init().unwrap_or(());
+        let mut program = parser::parse(input).unwrap();
+        let mut writer = Cursor::new(Vec::new());
+        runner::run(&mut program, &mut writer).err().unwrap()
+    }
+
+    #[test]
+    fn missing_variable() {
+        let err = test_error("Put Desire into my world");
+        if let common::MaidenError::MissingVariable { name, line } = err {
+            assert_eq!(name, "Desire");
+            assert_eq!(line, 1);
         } else {
-            panic!("Not a symboltype: {:?}", self)
+            assert!(false, err);
         }
     }
-    fn command(self) -> Command {
-        if let Item::Command(e) = self {
-            e
-        } else {
-            panic!("Not a command: {:?}", self)
-        }
-    }
-    fn block(self) -> Block {
-        if let Item::Block(e) = self {
-            e
-        } else {
-            panic!("Not a block: {:?}", self)
-        }
-    }
-}
-
-fn depair_program<'i, I>(pairs: &'i mut I, content: &'i str) -> Result<Program, MaidenError>
-where
-    I: Iterator<Item = pest::iterators::Pair<'i, Rule>>,
-{
-    let pair = pairs.next().expect("one pair");
-    if pair.as_rule() != Rule::program {
-        panic!("Bad rule: {:?}", pair.as_rule());
-    }
-    let span = pair.as_span();
-    if span.start() != 0 {
-        panic!("Non-zero start");
-    }
-    if span.end() != content.len() {
-        return Err(MaidenError::UnparsedText {
-            text: content[span.end()..].to_string(),
-            line: span.end_pos().line_col().0,
-        });
-    }
-    let mut commands = vec![];
-    let mut functions = HashMap::new();
-    for line in pair.into_inner() {
-        if line.as_rule() != Rule::line {
-            panic!("Bad rule: {:?}", line.as_rule());
-        }
-        let (line_no, _) = line.as_span().start_pos().line_col();
-        let depaired = depair(&mut line.into_inner(), 0);
-        match depaired {
-            Item::Command(command) => {
-                commands.push(CommandLine {
-                    cmd: command,
-                    line: line_no,
-                });
-            }
-            Item::Symbol(SymbolType::Empty) => {}
-            Item::Expression(Expression::Call(name, args)) => {
-                commands.push(CommandLine {
-                    cmd: Command::Call { name, args },
-                    line: line_no,
-                });
-            }
-            item => {
-                println!("Something else {:?}", item);
-            }
-        }
-    }
-    Ok(common::Program {
-        commands,
-        functions,
-    })
-}
-
-impl From<Expression> for Item {
-    fn from(exp: Expression) -> Item {
-        Item::Expression(exp)
-    }
-}
-
-impl From<SymbolType> for Item {
-    fn from(sym: SymbolType) -> Item {
-        Item::Symbol(sym)
-    }
-}
-
-impl From<Command> for Item {
-    fn from(command: Command) -> Item {
-        Item::Command(command)
-    }
-}
-
-impl From<Block> for Item {
-    fn from(block: Block) -> Item {
-        Item::Block(block)
-    }
-}
-
-fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
-    let rule = pair.as_rule();
-    let level_string = format!("({}){}", level, "  ".repeat(level));
-    match rule {
-        Rule::EOI => SymbolType::Empty.into(),
-        Rule::common_variable | Rule::proper_variable | Rule::simple_variable => {
-            Expression::Variable(pair.as_span().as_str().to_string()).into()
-        }
-        Rule::true_kw => Expression::True.into(),
-        Rule::false_kw => Expression::False.into(),
-        Rule::is_kw | Rule::is => SymbolType::Is.into(),
-        Rule::output => {
-            let value = depair(&mut pair.into_inner(), level + 1).expr();
-            Command::Say { value }.into()
-        }
-        Rule::string => {
-            let mut value = pair.as_str();
-            value = &value[1..value.len() - 1];
-            Expression::String(value.to_string()).into()
-        }
-        Rule::number => {
-            let mut value = pair.as_str();
-            Expression::Floating(value.parse::<f64>().unwrap()).into()
-        }
-        Rule::conditional => {
-            let mut pairs: Vec<_> = pair.into_inner().collect();
-            let expression = depair_core(pairs.remove(0), level + 1).expr();
-            let first = pairs.remove(0);
-            let consequent;
-            let mut alternate;
-            match first.as_rule() {
-                Rule::consequent => {
-                    consequent = Some(depair_core(first, level + 1).block());
-                    alternate = if pairs.is_empty() {
-                        None
-                    } else {
-                        Some(depair_core(pairs.remove(0), level + 1).block())
-                    };
-                }
-                Rule::alternate => {
-                    consequent = None;
-                    alternate = Some(depair_core(first, level + 1).block());
-                }
-                rule => {
-                    panic!("Bad rule: {:?}", rule);
-                }
-            }
-            Command::If {
-                expression,
-                then: consequent,
-                otherwise: alternate,
-            }
-            .into()
-        }
-        Rule::block => {
-            eprintln!("{}Depairing Block", level_string);
-            let items = depair_seq(&mut pair.into_inner(), level + 1);
-            let mut commands = vec![];
-            for item in items {
-                commands.push(CommandLine {
-                    cmd: item.command(),
-                    line: 0,
-                });
-            }
-            Block { commands }.into()
-        }
-        Rule::equality_check => {
-            eprintln!("{}Depairing equality_check", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            if items.len() == 1 {
-                return items.remove(0);
-            }
-            let is = items.remove(1);
-            let first = Box::new(items.remove(0).expr());
-            let second = Box::new(items.remove(0).expr());
-            match is {
-                Item::Symbol(SymbolType::Is) => Expression::Is(first, second),
-                Item::Symbol(SymbolType::Aint) => Expression::Aint(first, second),
-                _ => panic!("Not is: {:?}", is),
-            }
-            .into()
-        }
-        Rule::statement => {
-            let item = depair(&mut pair.into_inner(), level + 1);
-            if let Item::Expression(Expression::Is(target, value)) = item {
-                return Command::Assignment {
-                    target: *target,
-                    value: *value,
-                }
-                .into();
-            }
-            item
-        }
-        Rule::not => {
-            let mut pairs = pair.into_inner();
-            let compare = pairs.peek().unwrap().as_rule() == Rule::comparison;
-            let item = depair(&mut pairs, level + 1);
-            if compare {
-                item
-            } else {
-                Expression::Not(Box::new(item.expr())).into()
-            }
-        }
-        Rule::put_assignment => {
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            let value = items.remove(0).expr();
-            let target = items.remove(0).expr();
-            Command::Assignment { target, value }.into()
-        }
-        Rule::assignment => {
-            eprintln!("{}Depairing assignment", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            if items.len() == 0 {
-                panic!("Empty assignment!");
-            }
-            let target = items.remove(0).expr();
-            match items.len() {
-                1 => Command::Assignment {
-                    target,
-                    value: items.remove(0).expr(),
-                }
-                .into(),
-                2 => {
-                    let operator = items.remove(0).symbol();
-                    let first = Box::new(target.clone());
-                    let second = items.remove(0).expr();
-                    match operator {
-                        SymbolType::Add => {
-                            let expr = Expression::Add(first, Box::new(second));
-                            Command::Assignment {
-                                target,
-                                value: expr,
-                            }
-                            .into()
-                        }
-                        SymbolType::Subtract => {
-                            let expr = Expression::Subtract(first, Box::new(second));
-                            Command::Assignment {
-                                target,
-                                value: expr,
-                            }
-                            .into()
-                        }
-                        SymbolType::Divide => {
-                            let expr = Expression::Divide(first, Box::new(second));
-                            Command::Assignment {
-                                target,
-                                value: expr,
-                            }
-                            .into()
-                        }
-                        SymbolType::Is => Command::Assignment {
-                            target,
-                            value: second,
-                        }
-                        .into(),
-                        _ => {
-                            panic!("Bad assignment operator: {:?}", operator);
-                        }
-                    }
-                }
-                _ => {
-                    panic!("Bad assignment: {:?}", items);
-                }
-            }
-        }
-        Rule::arithmetic | Rule::product => {
-            eprintln!("{}Depairing arithmetic", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            if items.len() % 2 != 1 {
-                panic!("Weird arithmetic: {:?}", items);
-            };
-            let mut first = items.remove(0).expr();
-            while !items.is_empty() {
-                let operator = items.remove(0).symbol();
-                let apply_operator = move |first, other| match operator {
-                    SymbolType::Add => Expression::Add(Box::new(first), Box::new(other)),
-                    SymbolType::Subtract => Expression::Subtract(Box::new(first), Box::new(other)),
-                    SymbolType::Times => Expression::Times(Box::new(first), Box::new(other)),
-                    SymbolType::Divide => Expression::Divide(Box::new(first), Box::new(other)),
-                    _ => {
-                        panic!("Unknown operator: {:?}", operator);
-                    }
-                };
-                match items.remove(0) {
-                    Item::Expression(second) => {
-                        first = apply_operator(first, second);
-                    }
-                    Item::Symbol(SymbolType::ExpressionList(mut multiple)) => {
-                        for second in multiple.drain(0..) {
-                            first = apply_operator(first, second);
-                        }
-                    }
-                    item => {
-                        panic!("Other item for arithmetic: {:?}", item);
-                    }
-                };
-            }
-            first.into()
-        }
-        Rule::and => {
-            eprintln!("{}Depairing and", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            if items.len() == 1 {
-                return items.remove(0);
-            }
-            Expression::And(
-                Box::new(items.remove(0).expr()),
-                Box::new(items.remove(0).expr()),
-            )
-            .into()
-        }
-        Rule::or => {
-            eprintln!("{}Depairing or", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            if items.len() == 1 {
-                return items.remove(0);
-            }
-            Expression::Or(
-                Box::new(items.remove(0).expr()),
-                Box::new(items.remove(0).expr()),
-            )
-            .into()
-        }
-        Rule::nor => {
-            eprintln!("{}Depairing nor", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            if items.len() == 1 {
-                return items.remove(0);
-            }
-            Expression::Nor(
-                Box::new(items.remove(0).expr()),
-                Box::new(items.remove(0).expr()),
-            )
-            .into()
-        }
-        Rule::add => SymbolType::Add.into(),
-        Rule::subtract => SymbolType::Subtract.into(),
-        Rule::multiply => SymbolType::Times.into(),
-        Rule::divide => SymbolType::Divide.into(),
-        Rule::pronoun => Expression::Pronoun.into(),
-        Rule::ne => SymbolType::Aint.into(),
-        Rule::return_kw => SymbolType::Return.into(),
-        Rule::function_return => {
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            Command::Return {
-                return_value: items.remove(1).expr(),
-            }
-            .into()
-        }
-        Rule::poetic_number => {
-            let value = pair.as_str();
-            let mut number: f64 = 0.0;
-            let mut decimal = false;
-            let mut decimal_places = 0;
-            for raw_word in value.split_whitespace() {
-                let mut word = raw_word.to_string();
-                word.retain(|c| c.is_alphabetic());
-                if word.len() == 0 {
-                    continue;
-                }
-                if number > 0.0 {
-                    number *= 10.0;
-                }
-                number += (word.len() % 10) as f64;
-                if decimal {
-                    decimal_places += 1;
-                }
-                if raw_word.ends_with(".") {
-                    decimal = true;
-                }
-            }
-            if decimal_places > 0 {
-                number /= 10.0_f64.powf(decimal_places as f64);
-            }
-            eprintln!("number '{}' parsed as {}", value, number);
-            Expression::Floating(number).into()
-        }
-        Rule::poetic_string => Expression::String(pair.as_str().to_string()).into(),
-        Rule::null => Expression::Null.into(),
-        Rule::mysterious => Expression::Mysterious.into(),
-        Rule::readline => {
-            eprintln!("{}Depairing listen", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            if items.is_empty() {
-                return Command::Listen { target: None }.into();
-            }
-            if items.len() != 1 {
-                panic!("listen: {:?}", items);
-            }
-            if let Item::Expression(Expression::Variable(name)) = items.remove(0) {
-                return Command::Listen { target: Some(name) }.into();
-            }
-            panic!("listen: {:?}", items);
-        }
-        Rule::variable_list => {
-            eprintln!("{}Depairing variable_list", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            let mut variables = vec![];
-            for item in items.drain(0..) {
-                match item {
-                    Item::Symbol(SymbolType::Empty) => {}
-                    Item::Expression(Expression::Variable(name)) => {
-                        variables.push(name);
-                    }
-                    Item::Symbol(SymbolType::VariableList(vars)) => {
-                        variables.extend(vars);
-                    }
-                    _ => {
-                        panic!("Non-variable in variable list: {:?}", item);
-                    }
-                }
-            }
-            SymbolType::VariableList(variables).into()
-        }
-        Rule::args_list => {
-            eprintln!("{}Depairing args_list", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            let mut expressions = vec![];
-            for item in items.drain(0..) {
-                match item {
-                    Item::Symbol(SymbolType::Empty) => {}
-                    Item::Expression(expr) => {
-                        expressions.push(expr);
-                    }
-                    Item::Symbol(SymbolType::ArgsList(exprs))
-                    | Item::Symbol(SymbolType::ExpressionList(exprs)) => {
-                        expressions.extend(exprs);
-                    }
-                    _ => {
-                        panic!("Non-expression in expr list: {:?}", item);
-                    }
-                }
-            }
-            SymbolType::ArgsList(expressions).into()
-        }
-        Rule::expression_list => {
-            eprintln!("{}Depairing expression_list", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            let mut expressions = vec![];
-            if items.len() == 1 {
-                return items.remove(0);
-            }
-            for item in items.drain(0..) {
-                match item {
-                    Item::Symbol(SymbolType::Empty) => {}
-                    Item::Expression(expr) => {
-                        expressions.push(expr);
-                    }
-                    Item::Symbol(SymbolType::ExpressionList(exprs)) => {
-                        expressions.extend(exprs);
-                    }
-                    _ => {
-                        panic!("Non-expression in expr list: {:?}", item);
-                    }
-                }
-            }
-            SymbolType::ExpressionList(expressions).into()
-        }
-        Rule::function => {
-            eprintln!("{}Depairing function", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            let name = if let Expression::Variable(n) = items.remove(0).expr() {
-                n
-            } else {
-                panic!("Non-variable name for function");
-            };
-            let args = if let SymbolType::VariableList(variables) = items.remove(0).symbol() {
-                variables
-            } else {
-                panic!("Non-variable list for function");
-            };
-            let block = items.remove(0).block();
-            Command::FunctionDeclaration { name, args, block }.into()
-        }
-        Rule::function_call => {
-            eprintln!("{}Depairing function_call", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            let name = if let Expression::Variable(n) = items.remove(0).expr() {
-                n
-            } else {
-                panic!("Non-variable name for function_call");
-            };
-            let args_list = items.remove(0).symbol();
-            if let SymbolType::ArgsList(variables) = args_list {
-                Expression::Call(name, variables).into()
-            } else {
-                panic!("Non-args list: {:?}", args_list);
-            }
-        }
-        Rule::up_kw => SymbolType::Up.into(),
-        Rule::down_kw => SymbolType::Down.into(),
-        Rule::increment => {
-            eprintln!("{}Depairing increment", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            let name = if let Expression::Variable(n) = items.remove(0).expr() {
-                n
-            } else {
-                panic!("Non-variable name for increment");
-            };
-            Command::Increment {
-                target: name,
-                count: items.len() as f64,
-            }
-            .into()
-        }
-        Rule::decrement => {
-            eprintln!("{}Depairing decrement", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            let name = if let Expression::Variable(n) = items.remove(0).expr() {
-                n
-            } else {
-                panic!("Non-variable name for decrement");
-            };
-            Command::Decrement {
-                target: name,
-                count: items.len() as f64,
-            }
-            .into()
-        }
-        Rule::variable_list_separator | Rule::expression_list_separator => SymbolType::Empty.into(),
-        Rule::greater => SymbolType::GreaterThan.into(),
-        Rule::great => SymbolType::GreaterThanOrEqual.into(),
-        Rule::smaller => SymbolType::LessThan.into(),
-        Rule::small => SymbolType::LessThanOrEqual.into(),
-        Rule::comparison => {
-            eprintln!("{}Depairing comparison", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            if items.len() == 1 {
-                return items.remove(0);
-            }
-            let first = Box::new(items.remove(0).expr());
-            let operator = items.remove(0).symbol();
-            let second = Box::new(items.remove(0).expr());
-            match operator {
-                SymbolType::GreaterThan => Expression::GreaterThan(first, second),
-                SymbolType::GreaterThanOrEqual => Expression::GreaterThanOrEqual(first, second),
-                SymbolType::LessThan => Expression::LessThan(first, second),
-                SymbolType::LessThanOrEqual => Expression::LessThanOrEqual(first, second),
-                _ => {
-                    panic!("Unknown operator: {:?}", operator);
-                }
-            }
-            .into()
-        }
-        Rule::while_kw => SymbolType::While.into(),
-        Rule::until_kw => SymbolType::Until.into(),
-        Rule::continue_kw => Command::Continue.into(),
-        Rule::loop_kw => {
-            eprintln!("{}Depairing loop", level_string);
-            let mut items = depair_seq(&mut pair.into_inner(), level + 1);
-            let kind = items.remove(0).symbol();
-            let condition = items.remove(0).expr();
-            let block = items.remove(0).block();
-            match kind {
-                SymbolType::While => Command::While {
-                    expression: condition,
-                    block,
-                },
-                SymbolType::Until => Command::Until {
-                    expression: condition,
-                    block,
-                },
-                _ => {
-                    panic!("Unrecognised block type: {:?}", kind);
-                }
-            }
-            .into()
-        }
-        rule => {
-            let original = pair.clone();
-            let inner = pair.into_inner();
-            let count = inner.count();
-            if count == 0 {
-                if rule == Rule::alternate {
-                    return Block { commands: vec![] }.into();
-                }
-                let (line_no, col_no) = original.as_span().start_pos().line_col();
-                panic!(
-                    "{}Empty pair at {}, {}: {:?}",
-                    level_string, line_no, col_no, original
-                );
-            } else if count == 1 {
-                eprintln!("{}Depairing {:?}", level_string, rule);
-                depair(&mut original.into_inner(), level + 1)
-            } else {
-                eprintln!("{}List rule: {:?}", level_string, rule);
-                depair(&mut original.into_inner(), level + 1)
-            }
-        }
-    }
-}
-
-fn depair<'i, I>(pairs: &'i mut I, level: usize) -> Item
-where
-    I: Iterator<Item = pest::iterators::Pair<'i, Rule>>,
-{
-    let mut items = vec![];
-    let level_string = format!("({}){}", level, "  ".repeat(level));
-    for pair in pairs {
-        let item = depair_core(pair, level);
-        if item == SymbolType::Empty.into() {
-            continue;
-        }
-        items.push(item);
-    }
-    match items.len() {
-        0 => {
-            eprintln!("{}Empty", level_string);
-            SymbolType::Empty.into()
-        }
-        1 => items.get(0).unwrap().clone(),
-        _ => {
-            panic!("{}Many! {:?}", level_string, items);
-        }
-    }
-}
-
-fn depair_seq<'i, I>(pairs: &'i mut I, level: usize) -> Vec<Item>
-where
-    I: Iterator<Item = pest::iterators::Pair<'i, Rule>>,
-{
-    let mut items = vec![];
-    for pair in pairs {
-        items.push(depair_core(pair, level));
-    }
-    return items;
 }
