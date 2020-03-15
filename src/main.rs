@@ -34,7 +34,7 @@ fn main() -> common::Result<()> {
     f.read_to_string(&mut buffer)?;
     let mut parsed =
         Rockstar::parse(Rule::program, &buffer).map_err(|e| MaidenError::Pest { kind: e })?;
-    let program = depair_program(&mut parsed);
+    let program = depair_program(&mut parsed, &buffer)?;
     eprintln!("{:#?}", program);
     eprintln!("{:#?}", runner::run(&program, &mut io::stdout())?);
     return Ok(());
@@ -79,13 +79,23 @@ impl Item {
     }
 }
 
-fn depair_program<'i, I>(pairs: &'i mut I) -> Program
+fn depair_program<'i, I>(pairs: &'i mut I, content: &'i str) -> Result<Program, MaidenError>
 where
     I: Iterator<Item = pest::iterators::Pair<'i, Rule>>,
 {
     let pair = pairs.next().expect("one pair");
     if pair.as_rule() != Rule::program {
         panic!("Bad rule: {:?}", pair.as_rule());
+    }
+    let span = pair.as_span();
+    if span.start() != 0 {
+        panic!("Non-zero start");
+    }
+    if span.end() != content.len() {
+        return Err(MaidenError::UnparsedText {
+            text: content[span.end()..].to_string(),
+            line: span.end_pos().line_col().0,
+        });
     }
     let mut commands = vec![];
     let mut functions = HashMap::new();
@@ -111,10 +121,10 @@ where
             }
         }
     }
-    common::Program {
+    Ok(common::Program {
         commands,
         functions,
-    }
+    })
 }
 
 impl From<Expression> for Item {
