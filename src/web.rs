@@ -1,7 +1,9 @@
-use crate::common;
+use crate::common::{Command, MaidenError, Program};
 use crate::parser;
 use crate::runner;
 use std;
+use stdweb::js;
+use yew::html;
 use yew::prelude::*;
 use yew::services::ConsoleService;
 
@@ -28,8 +30,8 @@ impl Model {
         }
     }
 
-    fn nicer_error(&self, err: &common::MaidenError) -> String {
-        let line = common::get_error_line(err);
+    fn nicer_error(&self, err: &MaidenError) -> String {
+        let line = get_error_line(err);
         format!(
             "{} at line {}: \"{}\"",
             err,
@@ -58,11 +60,11 @@ impl Model {
                 self.parse_error = true;
                 self.res = "".to_string()
             }
-            Ok(val) => {
-                self.program = parser::print_program(&val);
+            Ok(mut val) => {
+                self.program = print_program(&val);
                 self.parse_error = false;
                 let mut writer = std::io::Cursor::new(Vec::new());
-                let res = runner::run(&val, &mut writer);
+                let res = runner::run(&mut val, &mut writer);
                 self.res = "".into();
                 if let Err(err) = res {
                     self.res += &self.nicer_error(&err);
@@ -86,7 +88,7 @@ impl Component for Model {
 
     fn create(_: Self::Properties, mut link: ComponentLink<Self>) -> Self {
         let mut res = Self {
-            value: include_str!("../tests/modulo.rock").into(),
+            value: include_str!("../tests/local/modulo.rock").into(),
             program: "".into(),
             parse_error: false,
             res: "".into(),
@@ -176,5 +178,71 @@ impl Renderable<Model> for Model {
                 </div>
             </div>
         }
+    }
+}
+
+fn print_command(command: &Command) -> String {
+    format!("{:?}", command)
+}
+
+pub fn print_program(program: &Program) -> String {
+    let mut res = String::new();
+    let mut indent = 0;
+    let mut last_line = 0;
+    let max_line: f32 = (program.commands.iter().fold(0, |acc, x| acc.max(x.line))) as f32;
+    let max_number_length: usize = (max_line + 1.0).log10().ceil() as usize;
+    for command in &program.commands {
+        // match command.cmd {
+        //     Command::Else { .. } | Command::EndIf  => {
+        //         indent -= 1;
+        //     }
+        //     _ => {}
+        // }
+        while last_line < command.line - 1 {
+            last_line += 1;
+            res += &format!("{:0width$}:\n", last_line, width = max_number_length);
+        }
+        last_line = command.line;
+        res += &format!("{:0width$}: ", command.line, width = max_number_length);
+        for _ in 0..indent {
+            res += "  ";
+        }
+        res += &(print_command(&command.cmd) + "\n");
+        match command.cmd {
+            Command::FunctionDeclaration { .. }
+            | Command::If { .. }
+            | Command::While { .. }
+            | Command::Until { .. } => {
+                indent += 1;
+            }
+            _ => {}
+        }
+    }
+    return res;
+}
+
+fn get_error_line(e: &MaidenError) -> usize {
+    match e {
+        MaidenError::MissingVariable { line, .. } => line.clone(),
+        MaidenError::UnparsedText { line, .. } => line.clone(),
+        MaidenError::MissingFunction { line, .. } => line.clone(),
+        MaidenError::WrongArgCount { line, .. } => line.clone(),
+        MaidenError::UnbalancedExpression { line, .. } => line.clone(),
+        MaidenError::BadCommandSequence { line, .. } => line.clone(),
+        MaidenError::ParseNumberError { line, .. } => line.clone(),
+        MaidenError::BadIs { line, .. } => line.clone(),
+        MaidenError::BadPut { line, .. } => line.clone(),
+        MaidenError::NoEndOfIf { line } => line.clone(),
+        MaidenError::ElseWithNoIf { line } => line.clone(),
+        MaidenError::MultipleElse { line } => line.clone(),
+        MaidenError::NoEndFunction { line } => line.clone(),
+        MaidenError::NoEndLoop { line } => line.clone(),
+        MaidenError::BadBooleanResolve { line, .. } => line.clone(),
+        MaidenError::Unimplemented { line, .. } => line.clone(),
+        MaidenError::StackOverflow { line, .. } => line.clone(),
+        MaidenError::InstructionLimit { line } => line.clone(),
+        MaidenError::UndefinedPronoun { line } => line.clone(),
+        MaidenError::Infinity { line, .. } => line.clone(),
+        _ => 0,
     }
 }

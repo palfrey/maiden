@@ -221,30 +221,3 @@ impl From<std::io::Error> for MaidenError {
         return MaidenError::Io { io_error: err };
     }
 }
-
-#[cfg(target_arch = "wasm32")]
-pub fn get_error_line(e: &MaidenError) -> u32 {
-    match e {
-        MaidenError::MissingVariable { line, .. } => line.clone(),
-        MaidenError::UnparsedText { line, .. } => line.clone(),
-        MaidenError::MissingFunction { line, .. } => line.clone(),
-        MaidenError::WrongArgCount { line, .. } => line.clone(),
-        MaidenError::UnbalancedExpression { line, .. } => line.clone(),
-        MaidenError::BadCommandSequence { line, .. } => line.clone(),
-        MaidenError::ParseNumberError { line, .. } => line.clone(),
-        MaidenError::BadIs { line, .. } => line.clone(),
-        MaidenError::BadPut { line, .. } => line.clone(),
-        MaidenError::NoEndOfIf { line } => line.clone(),
-        MaidenError::ElseWithNoIf { line } => line.clone(),
-        MaidenError::MultipleElse { line } => line.clone(),
-        MaidenError::NoEndFunction { line } => line.clone(),
-        MaidenError::NoEndLoop { line } => line.clone(),
-        MaidenError::BadBooleanResolve { line, .. } => line.clone(),
-        MaidenError::Unimplemented { line, .. } => line.clone(),
-        MaidenError::StackOverflow { line, .. } => line.clone(),
-        MaidenError::InstructionLimit { line } => line.clone(),
-        MaidenError::UndefinedPronoun { line } => line.clone(),
-        MaidenError::Infinity { line, .. } => line.clone(),
-        _ => 0,
-    }
-}
