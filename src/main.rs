@@ -11,7 +11,9 @@ mod common;
 mod peg;
 mod runner;
 
-use crate::common::{Block, Command, CommandLine, Expression, Function, Program, SymbolType};
+use crate::common::{
+    Block, Command, CommandLine, Expression, Function, MaidenError, Program, SymbolType,
+};
 use crate::peg::{Rockstar, Rule};
 
 fn main() -> common::Result<()> {
@@ -30,7 +32,8 @@ fn main() -> common::Result<()> {
     let mut f = File::open(matches.value_of("INPUT").unwrap())?;
     let mut buffer = String::new();
     f.read_to_string(&mut buffer)?;
-    let mut parsed = Rockstar::parse(Rule::program, &buffer).unwrap_or_else(|e| panic!("{}", e));
+    let mut parsed =
+        Rockstar::parse(Rule::program, &buffer).map_err(|e| MaidenError::Pest { kind: e })?;
     let program = depair_program(&mut parsed);
     eprintln!("{:#?}", program);
     eprintln!("{:#?}", runner::run(&program, &mut io::stdout())?);

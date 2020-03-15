@@ -1,6 +1,8 @@
 use failure::Fail;
 use std::collections::HashMap;
 
+use crate::peg;
+
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
 pub enum Expression {
     // Single items
@@ -190,8 +192,8 @@ pub struct Program {
 
 #[derive(Debug, Fail)]
 pub enum MaidenError {
-    //#[fail(display = "parsing error: {:?}", kind)]
-    //Nom { kind: nom::ErrorKind },
+    #[fail(display = "parsing error: {:?}", kind)]
+    Pest { kind: pest::error::Error<peg::Rule> },
     #[fail(display = "IO Error")]
     Io {
         #[fail(cause)]
