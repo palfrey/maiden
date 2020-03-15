@@ -115,7 +115,7 @@ product     = { (simple_expression ~ ((multiply | divide) ~ expression_list)+) |
 add 		= { "+" | "plus " | "with " }
 subtract 	= { "-" | "minus " | "without " }
 multiply 	= { "*" | "times " | "of " }
-divide 		= {"|" | "over " | "between " }
+divide 		= {"/" | "over " | "between " }
 
 compoundable_operator = { add | subtract | multiply | divide }
 
