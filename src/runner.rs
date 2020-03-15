@@ -293,7 +293,7 @@ fn call_function(
 
     return run_core(
         &mut new_state,
-        &Program {
+        &mut Program {
             commands: func.block.commands.clone(),
             functions: program.functions.clone(),
         },
@@ -463,7 +463,7 @@ fn run_expression(
     };
 }
 
-pub fn run(program: &Program, writer: &mut dyn Write) -> Result<HashMap<String, Expression>> {
+pub fn run(program: &mut Program, writer: &mut dyn Write) -> Result<HashMap<String, Expression>> {
     let pc = 0;
     let mut variables: HashMap<String, Expression> = HashMap::new();
     let mut state = State {
@@ -572,7 +572,7 @@ fn alter_variable(
     return Ok(());
 }
 
-fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expression> {
+fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<Expression> {
     let mut total_instr = 0;
     loop {
         total_instr += 1;
@@ -629,7 +629,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
                 }
                 run_core(
                     state,
-                    &Program {
+                    &mut Program {
                         commands: block.commands.clone(),
                         functions: program.functions.clone(),
                     },
@@ -647,7 +647,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
                 }
                 let res = run_core(
                     state,
-                    &Program {
+                    &mut Program {
                         commands: block.commands.clone(),
                         functions: program.functions.clone(),
                     },
@@ -685,7 +685,19 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
                 let x = get_printable(&resolve, state)?;
                 writeln!(state.writer, "{}", x)?;
             }
-            Command::FunctionDeclaration { .. } => {}
+            Command::FunctionDeclaration {
+                ref name,
+                ref args,
+                ref block,
+            } => {
+                program.functions.insert(
+                    name.to_string(),
+                    Function {
+                        args: args.to_vec(),
+                        block: block.clone(),
+                    },
+                );
+            }
             Command::Return { ref return_value } => {
                 return run_expression(state, program, &return_value);
             }
@@ -703,7 +715,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
                     if let Some(block) = then {
                         let res = run_core(
                             state,
-                            &Program {
+                            &mut Program {
                                 commands: block.commands.clone(),
                                 functions: program.functions.clone(),
                             },
@@ -717,7 +729,7 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
                 } else if let Some(block) = otherwise {
                     let res = run_core(
                         state,
-                        &Program {
+                        &mut Program {
                             commands: block.commands.clone(),
                             functions: program.functions.clone(),
                         },

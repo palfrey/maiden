@@ -34,9 +34,9 @@ fn main() -> common::Result<()> {
     f.read_to_string(&mut buffer)?;
     let mut parsed =
         Rockstar::parse(Rule::program, &buffer).map_err(|e| MaidenError::Pest { kind: e })?;
-    let program = depair_program(&mut parsed, &buffer)?;
+    let mut program = depair_program(&mut parsed, &buffer)?;
     eprintln!("{:#?}", program);
-    eprintln!("{:#?}", runner::run(&program, &mut io::stdout())?);
+    eprintln!("{:#?}", runner::run(&mut program, &mut io::stdout())?);
     return Ok(());
 }
 
@@ -106,9 +106,6 @@ where
         let (line_no, _) = line.as_span().start_pos().line_col();
         let depaired = depair(&mut line.into_inner(), 0);
         match depaired {
-            Item::Command(Command::FunctionDeclaration { name, args, block }) => {
-                functions.insert(name, Function { args, block });
-            }
             Item::Command(command) => {
                 commands.push(CommandLine {
                     cmd: command,
