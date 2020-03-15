@@ -482,7 +482,8 @@ fn depair_core<'i>(pair: Pair<'i, Rule>, level: usize) -> Item {
                     Item::Expression(expr) => {
                         expressions.push(expr);
                     }
-                    Item::Symbol(SymbolType::ArgsList(exprs)) => {
+                    Item::Symbol(SymbolType::ArgsList(exprs))
+                    | Item::Symbol(SymbolType::ExpressionList(exprs)) => {
                         expressions.extend(exprs);
                     }
                     _ => {

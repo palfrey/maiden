@@ -23,7 +23,7 @@ continue_kw = {(^"continue" ~ ignore_rest_of_line) | ^"take it to the top"}
 
 function = { variable ~ ^"takes" ~ variable_list ~ EOL ~ block ~ EOL }
 
-expression_list_separator = { ", and" | "'&" | "," | "'n'" }
+expression_list_separator = { ", and" | "&" | "," | "'n'" }
 
 variable_list_separator   = { expression_list_separator | "and" }
 
