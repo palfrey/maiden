@@ -116,6 +116,12 @@ where
                 });
             }
             Item::Symbol(SymbolType::Empty) => {}
+            Item::Expression(Expression::Call(name, args)) => {
+                commands.push(CommandLine {
+                    cmd: Command::Call { name, args },
+                    line: line_no,
+                });
+            }
             item => {
                 println!("Something else {:?}", item);
             }
