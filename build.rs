@@ -36,6 +36,9 @@ fn main() {
             if test_name.contains("math_rounding") {
                 continue; // don't support rounding yet
             }
+            if test_name.contains("types_parsing") {
+                continue; // don't support casts yet
+            }
 
             let function = if name.contains("failures") {
                 "parse_fail_file_test"
