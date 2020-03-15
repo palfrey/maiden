@@ -38,7 +38,7 @@ return_kw = { ^"return" | ^"give back" }
 
 function_return = { return_kw ~ expression }
 
-operation = { readline | output | crement | assignment | put_assignment }
+operation = { readline | output | crement | mutation | assignment | put_assignment }
 
 readline = { (^"listen to" ~ variable) | ^"listen" }
 
@@ -141,11 +141,17 @@ letter = { uppercase_letter | lowercase_letter}
 common_variable = @{common_prefix ~ WHITESPACE ~ letter+}
 
 is = {"\'s" | "=''" | ^"'s " | ^"is " | ^"was " | ^"are " | ^"were "}
+
+target = { ^"into" ~ assignable }
+
+indexer = { ^"at" ~ expression }
+assignable = { variable ~ indexer? }
+
 put_assignment = { ^"put" ~ expression ~ ^"into " ~ variable }
-assignment = { (variable ~ is ~ (literal | poetic_number))
-  | (variable ~ ^"says " ~ poetic_string)
-  | (^"let" ~ variable ~ ^"be " ~ compoundable_operator ~ expression)
-  | (^"let" ~ variable ~ ^"be " ~ expression)
+assignment = { (assignable ~ is ~ (literal | poetic_number))
+  | (assignable ~ ^"says " ~ poetic_string)
+  | (^"let" ~ assignable ~ ^"be " ~ compoundable_operator ~ expression)
+  | (^"let" ~ assignable ~ ^"be " ~ expression)
 }
 
 poetic_string = @{ (!"\n" ~ ANY)+ }
@@ -155,7 +161,7 @@ poetic_number = @{ poetic_digit_separator* ~ poetic_digits ~ poetic_digit_separa
 poetic_decimal = { ("." ~ poetic_decimal_digit_separator* ~ poetic_decimal_digits ~ poetic_decimal_digit_separator*) |
                 ("." ~ poetic_decimal_digit_separator*)}
 
-poetic_digit_separator = { ASCII_DIGIT |"\"" | "'" |"," |";" |":" |"?" |"!" |"+" |"_" |"\\" |"-" |"|" | WHITESPACE }
+poetic_digit_separator = { ASCII_DIGIT |"\"" | "'" |"," |";" |":" |"?" |"!" |"+" |"_" |"\\" |"|" | WHITESPACE }
 
 poetic_digits =
   { (poetic_digit ~ poetic_digit_separator+ ~ poetic_digits)
@@ -177,8 +183,8 @@ kw7 = { ^"between" | ^"greater" | ^"nothing" | ^"nowhere" | ^"smaller" | ^"whisp
 kw6 = { ^"ain't" | ^"bigger" | ^"listen" | ^"nobody" | ^"return" | ^"scream" | ^"taking" | ^"weaker" | ^"higher"
     | ^"strong"}
 kw5 = { ^"break" | ^"build" | ^"empty" | ^"false" | ^"great" | ^"knock" | ^"lower" | ^"right" | ^"shout" | ^"small"
-    | ^"take " | ^"takes" | ^"times" | ^"until" | ^"while" | ^"wrong" | ^"minus"}
-kw4 = { ^"aint" | ^"back" | ^"down" | ^"else" | ^"give" | ^"gone" | ^"high" | ^"into" | ^"less" | ^"lies" | ^"null"
+    | ^"take " | ^"takes" | ^"times" | ^"until" | ^"unite" | ^"while" | ^"wrong" | ^"minus"}
+kw4 = { ^"aint" | ^"back" | ^"cast" | ^"burn" | ^"join" | ^"down" | ^"else" | ^"give" | ^"gone" | ^"high" | ^"into" | ^"less" | ^"lies" | ^"null"
     | ^"plus" | ^"says" | ^"than" | ^"them" | ^"they" | ^"true" | ^"weak" | ^"were" | ^"your" | ^"over" | ^"with"}
 kw3 = { ^"and" | ^"big" | ^"her" | ^"him" | ^"hir" | ^"it " | ^"low" | ^"nor" | ^"not" | ^"put" | ^"say" | ^"she"
     | ^"the" | ^"top" | ^"ver" | ^"was" | ^"xem" | ^"yes" | ^"zie" | ^"zir"}
@@ -202,3 +208,25 @@ increment = { ^"build" ~ variable ~ (up_kw ~ noise*)+ }
 
 down_kw = {^"down"}
 decrement = { ^"knock" ~ variable ~ (down_kw ~ noise*)+ }
+
+split = {^"cut" | ^"split" | ^"shatter"}
+cast = {^"cast" | ^"burn"}
+join = {^"join" | ^"unite"}
+
+mutator = { split | cast | join }
+modifier =  { (^"with" | ^"using") ~ expression }
+
+mutation
+    = { mutator ~ expression ~ target ~ modifier | mutator ~ assignable ~ modifier? }
+
+rounding = { floor | ceil | math_round }
+
+floor = { ^"turn" ~ variable ~ ^"down" | ^"turn" ~ ^"down" ~ variable }
+
+ceil
+  = {^"turn" ~ variable ~ ^"up"
+  | ^"turn" ~ ^"up" ~ variable }
+
+math_round
+  = {^"turn" ~ variable ~ (^"round" | ^"around")
+  | ^"turn" ~ (^"round" ~ ^"around") ~  variable }
