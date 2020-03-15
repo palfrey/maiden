@@ -140,7 +140,7 @@ letter = { uppercase_letter | lowercase_letter}
 
 common_variable = @{common_prefix ~ WHITESPACE ~ letter+}
 
-is = {"\'s" | "=''" | ^"'s " | ^"is " | ^"was " | ^"are " | ^"were "}
+is = { "=''" | ^"'s " | ^"is " | ^"was " | ^"are " | ^"were "}
 
 target = { ^"into" ~ assignable }
 
