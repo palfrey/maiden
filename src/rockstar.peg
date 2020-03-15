@@ -2,7 +2,7 @@
 PEG grammar for Rockstar (https://codewithrockstar.com)
 */
 
-program     = { line* }
+program     = { line+ | EOI }
 
 line = { (statement ~ (EOL | EOI)) | EOL }
 
