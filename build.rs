@@ -33,6 +33,9 @@ fn main() {
             if test_name == "upstream_fixtures_operators_list_expressions_arithmetic_rock" {
                 continue; // haven't fully implemented list expressions
             }
+            if test_name.contains("math_rounding") {
+                continue; // don't support rounding yet
+            }
 
             let function = if name.contains("failures") {
                 "parse_fail_file_test"
