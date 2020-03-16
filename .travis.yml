@@ -42,6 +42,10 @@ jobs:
   - stage: test
     rust: nightly
     script: cargo build --all && cargo test --all
+  - name: minimal versions check
+    stage: test
+    rust: nightly
+    script: rm Cargo.lock && cargo build -Z minimal-versions
   - stage: deploy
     if: branch = master AND type != pull_request
     rust: stable
