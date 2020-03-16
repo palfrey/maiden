@@ -354,6 +354,7 @@ dependencies = [
  "log",
  "pest",
  "pest_derive",
+ "pest_meta",
  "pretty_assertions",
  "pretty_env_logger",
  "regex",
