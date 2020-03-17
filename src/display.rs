@@ -5,15 +5,16 @@ use crate::common::{Command, CommandLine, Program};
 fn print_command(
     command: &Command,
     last_line: usize,
-    indent: u16,
+    indent: usize,
     max_number_length: usize,
 ) -> String {
     match command {
         Command::FunctionDeclaration { name, args, block } => format!(
-            "FunctionDeclaration {{ name: \"{}\", args: {:?}, block: Block {{\n{}",
+            "FunctionDeclaration {{ name: \"{}\", args: {:?}, block: Block {{\n{}{}}}}}",
             name,
             args,
-            print_commands(&block.commands, last_line, indent + 1, max_number_length)
+            print_commands(&block.commands, last_line, indent + 1, max_number_length),
+            "  ".repeat(indent)
         ),
         _ => format!("{:?}", command),
     }
@@ -23,7 +24,7 @@ fn print_command(
 fn print_commands(
     commands: &Vec<CommandLine>,
     mut last_line: usize,
-    mut indent: u16,
+    mut indent: usize,
     max_number_length: usize,
 ) -> String {
     let mut res = String::new();
@@ -34,9 +35,7 @@ fn print_commands(
         }
         last_line = command.line;
         res += &format!("{:0width$}: ", command.line, width = max_number_length);
-        for _ in 0..indent {
-            res += "  ";
-        }
+        res += &"  ".repeat(indent);
         res += &(print_command(&command.cmd, last_line, indent, max_number_length) + "\n");
         match command.cmd {
             Command::If { .. } | Command::While { .. } | Command::Until { .. } => {
@@ -70,7 +69,8 @@ mod tests {
         let program = parser::parse(code).unwrap();
         let expected = "1: FunctionDeclaration { name: \"Midnight\", args: [\"your heart\", \"your soul\"], block: Block {
 2:   Return { return_value: Variable(\"your heart\") }
-        }}\n";
+}}
+";
         assert_eq!(expected, print_program(&program));
     }
 }

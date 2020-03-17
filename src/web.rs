@@ -1,4 +1,4 @@
-use crate::common::{Command, MaidenError, Program};
+use crate::common::MaidenError;
 use crate::display;
 use crate::parser;
 use crate::runner;
