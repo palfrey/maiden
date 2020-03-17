@@ -53,8 +53,17 @@ where
     I: Iterator<Item = pest::iterators::Pair<'i, Rule>>,
 {
     let pair = pairs.next().expect("one pair");
-    if pair.as_rule() != Rule::program {
-        panic!("Bad rule: {:?}", pair.as_rule());
+    match pair.as_rule() {
+        Rule::program => {}
+        Rule::EOI => {
+            return Ok(Program {
+                commands: vec![],
+                functions: HashMap::new(),
+            })
+        }
+        rule => {
+            panic!("Bad rule (program): {:?}", rule);
+        }
     }
     let span = pair.as_span();
     if span.start() != 0 {
@@ -71,8 +80,11 @@ where
     }
     let mut commands = vec![];
     for line in pair.into_inner() {
-        if line.as_rule() != Rule::line {
-            panic!("Bad rule: {:?}", line.as_rule());
+        match line.as_rule() {
+            Rule::line | Rule::EOI => {}
+            rule => {
+                panic!("Bad rule (lines): {:?}", rule);
+            }
         }
         let (line_no, _) = line.as_span().start_pos().line_col();
         let depaired = depair(&mut line.into_inner(), 0)?;
