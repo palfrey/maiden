@@ -8,7 +8,7 @@ use std::collections::HashMap;
 enum Item {
     Expression(Expression),
     Symbol(SymbolType),
-    Command(Command),
+    Command(CommandLine),
     Block(Block),
 }
 
@@ -27,7 +27,7 @@ impl Item {
             panic!("Not a symboltype: {:?}", self)
         }
     }
-    fn command(self) -> Command {
+    fn command(self) -> CommandLine {
         if let Item::Command(e) = self {
             e
         } else {
@@ -41,6 +41,10 @@ impl Item {
             panic!("Not a block: {:?}", self)
         }
     }
+}
+
+fn pair_line(pair: &Pair<Rule>) -> usize {
+    pair.as_span().start_pos().line_col().0
 }
 
 fn depair_program<'i, I>(pairs: &'i mut I, content: &'i str) -> Result<Program, MaidenError>
@@ -73,10 +77,7 @@ where
         let depaired = depair(&mut line.into_inner(), 0)?;
         match depaired {
             Item::Command(command) => {
-                commands.push(CommandLine {
-                    cmd: command,
-                    line: line_no,
-                });
+                commands.push(command);
             }
             Item::Symbol(SymbolType::Empty) => {}
             Item::Expression(Expression::Call(name, args)) => {
@@ -108,8 +109,8 @@ impl From<SymbolType> for Item {
     }
 }
 
-impl From<Command> for Item {
-    fn from(command: Command) -> Item {
+impl From<CommandLine> for Item {
+    fn from(command: CommandLine) -> Item {
         Item::Command(command)
     }
 }
@@ -120,10 +121,18 @@ impl From<Block> for Item {
     }
 }
 
+fn pair_to_command_line(pair: &Pair<Rule>, command: Command) -> Item {
+    CommandLine {
+        cmd: command,
+        line: pair_line(pair),
+    }
+    .into()
+}
+
 // FIXME: Split this up
 #[allow(clippy::cognitive_complexity)]
 fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> {
-    let line = pair.as_span().start_pos().line_col().0;
+    let line = pair_line(&pair);
     let rule = pair.as_rule();
     let level_string = format!("({}){}", level, "  ".repeat(level));
     let res = match rule {
@@ -136,7 +145,11 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
         Rule::is_kw | Rule::is => SymbolType::Is.into(),
         Rule::output => {
             let value = depair(&mut pair.into_inner(), level + 1)?.expr();
-            Command::Say { value }.into()
+            CommandLine {
+                cmd: Command::Say { value },
+                line,
+            }
+            .into()
         }
         Rule::string => {
             let mut value = pair.as_str();
@@ -173,10 +186,13 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
                     panic!("Bad rule: {:?}", rule);
                 }
             }
-            Command::If {
-                expression,
-                then: consequent,
-                otherwise: alternate,
+            CommandLine {
+                cmd: Command::If {
+                    expression,
+                    then: consequent,
+                    otherwise: alternate,
+                },
+                line,
             }
             .into()
         }
@@ -185,11 +201,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             let items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let mut commands = vec![];
             for item in items {
-                let span = pair.as_span();
-                commands.push(CommandLine {
-                    cmd: item.command(),
-                    line: span.end_pos().line_col().0,
-                });
+                commands.push(item.command());
             }
             Block { commands }.into()
         }
@@ -212,9 +224,12 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
         Rule::statement => {
             let item = depair(&mut pair.into_inner(), level + 1)?;
             if let Item::Expression(Expression::Is(target, value)) = item {
-                return Ok(Command::Assignment {
-                    target: *target,
-                    value: *value,
+                return Ok(CommandLine {
+                    cmd: Command::Assignment {
+                        target: *target,
+                        value: *value,
+                    },
+                    line,
                 }
                 .into());
             }
@@ -234,7 +249,11 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let value = items.remove(0).expr();
             let target = items.remove(0).expr();
-            Command::Assignment { target, value }.into()
+            CommandLine {
+                cmd: Command::Assignment { target, value },
+                line,
+            }
+            .into()
         }
         Rule::assignment => {
             eprintln!("{}Depairing assignment", level_string);
@@ -244,9 +263,12 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             }
             let target = items.remove(0).expr();
             match items.len() {
-                1 => Command::Assignment {
-                    target,
-                    value: items.remove(0).expr(),
+                1 => CommandLine {
+                    cmd: Command::Assignment {
+                        target,
+                        value: items.remove(0).expr(),
+                    },
+                    line,
                 }
                 .into(),
                 2 => {
@@ -256,31 +278,43 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
                     match operator {
                         SymbolType::Add => {
                             let expr = Expression::Add(first, Box::new(second));
-                            Command::Assignment {
-                                target,
-                                value: expr,
+                            CommandLine {
+                                cmd: Command::Assignment {
+                                    target,
+                                    value: expr,
+                                },
+                                line,
                             }
                             .into()
                         }
                         SymbolType::Subtract => {
                             let expr = Expression::Subtract(first, Box::new(second));
-                            Command::Assignment {
-                                target,
-                                value: expr,
+                            CommandLine {
+                                cmd: Command::Assignment {
+                                    target,
+                                    value: expr,
+                                },
+                                line,
                             }
                             .into()
                         }
                         SymbolType::Divide => {
                             let expr = Expression::Divide(first, Box::new(second));
-                            Command::Assignment {
-                                target,
-                                value: expr,
+                            CommandLine {
+                                cmd: Command::Assignment {
+                                    target,
+                                    value: expr,
+                                },
+                                line,
                             }
                             .into()
                         }
-                        SymbolType::Is => Command::Assignment {
-                            target,
-                            value: second,
+                        SymbolType::Is => CommandLine {
+                            cmd: Command::Assignment {
+                                target,
+                                value: second,
+                            },
+                            line,
                         }
                         .into(),
                         _ => {
@@ -372,8 +406,11 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
         Rule::return_kw => SymbolType::Return.into(),
         Rule::function_return => {
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
-            Command::Return {
-                return_value: items.remove(1).expr(),
+            CommandLine {
+                cmd: Command::Return {
+                    return_value: items.remove(1).expr(),
+                },
+                line,
             }
             .into()
         }
@@ -412,13 +449,21 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             eprintln!("{}Depairing listen", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             if items.is_empty() {
-                return Ok(Command::Listen { target: None }.into());
+                return Ok(CommandLine {
+                    cmd: Command::Listen { target: None },
+                    line,
+                }
+                .into());
             }
             if items.len() != 1 {
                 panic!("listen: {:?}", items);
             }
             if let Item::Expression(Expression::Variable(name)) = items.remove(0) {
-                Command::Listen { target: Some(name) }.into()
+                CommandLine {
+                    cmd: Command::Listen { target: Some(name) },
+                    line,
+                }
+                .into()
             } else {
                 panic!("listen: {:?}", items);
             }
@@ -501,7 +546,11 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
                 panic!("Non-variable list for function");
             };
             let block = items.remove(0).block();
-            Command::FunctionDeclaration { name, args, block }.into()
+            CommandLine {
+                cmd: Command::FunctionDeclaration { name, args, block },
+                line,
+            }
+            .into()
         }
         Rule::function_call => {
             eprintln!("{}Depairing function_call", level_string);
@@ -528,9 +577,12 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             } else {
                 panic!("Non-variable name for increment");
             };
-            Command::Increment {
-                target: name,
-                count: items.len() as f64,
+            CommandLine {
+                cmd: Command::Increment {
+                    target: name,
+                    count: items.len() as f64,
+                },
+                line,
             }
             .into()
         }
@@ -542,9 +594,12 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             } else {
                 panic!("Non-variable name for decrement");
             };
-            Command::Decrement {
-                target: name,
-                count: items.len() as f64,
+            CommandLine {
+                cmd: Command::Decrement {
+                    target: name,
+                    count: items.len() as f64,
+                },
+                line,
             }
             .into()
         }
@@ -578,26 +633,29 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
         }
         Rule::while_kw => SymbolType::While.into(),
         Rule::until_kw => SymbolType::Until.into(),
-        Rule::continue_kw => Command::Continue.into(),
-        Rule::break_kw => Command::Break.into(),
+        Rule::continue_kw => pair_to_command_line(&pair, Command::Continue),
+        Rule::break_kw => pair_to_command_line(&pair, Command::Break),
         Rule::loop_kw => {
             eprintln!("{}Depairing loop", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let kind = items.remove(0).symbol();
             let condition = items.remove(0).expr();
             let block = items.remove(0).block();
-            match kind {
-                SymbolType::While => Command::While {
-                    expression: condition,
-                    block,
+            CommandLine {
+                cmd: match kind {
+                    SymbolType::While => Command::While {
+                        expression: condition,
+                        block,
+                    },
+                    SymbolType::Until => Command::Until {
+                        expression: condition,
+                        block,
+                    },
+                    _ => {
+                        panic!("Unrecognised block type: {:?}", kind);
+                    }
                 },
-                SymbolType::Until => Command::Until {
-                    expression: condition,
-                    block,
-                },
-                _ => {
-                    panic!("Unrecognised block type: {:?}", kind);
-                }
+                line,
             }
             .into()
         }
