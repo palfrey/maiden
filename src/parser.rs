@@ -1,5 +1,6 @@
 use crate::common::{Block, Command, CommandLine, Expression, MaidenError, Program, SymbolType};
 use crate::peg::{Rockstar, Rule};
+use log::debug;
 use pest::iterators::Pair;
 use pest::Parser;
 use std::collections::HashMap;
@@ -197,7 +198,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             .into()
         }
         Rule::block => {
-            eprintln!("{}Depairing Block", level_string);
+            debug!("{}Depairing Block", level_string);
             let items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let mut commands = vec![];
             for item in items {
@@ -206,7 +207,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             Block { commands }.into()
         }
         Rule::equality_check => {
-            eprintln!("{}Depairing equality_check", level_string);
+            debug!("{}Depairing equality_check", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             if items.len() == 1 {
                 return Ok(items.remove(0));
@@ -256,7 +257,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             .into()
         }
         Rule::assignment => {
-            eprintln!("{}Depairing assignment", level_string);
+            debug!("{}Depairing assignment", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             if items.is_empty() {
                 panic!("Empty assignment!");
@@ -328,7 +329,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             }
         }
         Rule::arithmetic | Rule::product => {
-            eprintln!("{}Depairing arithmetic", level_string);
+            debug!("{}Depairing arithmetic", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             if items.len() % 2 != 1 {
                 panic!("Weird arithmetic: {:?}", items);
@@ -362,7 +363,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             first.into()
         }
         Rule::and => {
-            eprintln!("{}Depairing and", level_string);
+            debug!("{}Depairing and", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             if items.len() == 1 {
                 return Ok(items.remove(0));
@@ -374,7 +375,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             .into()
         }
         Rule::or => {
-            eprintln!("{}Depairing or", level_string);
+            debug!("{}Depairing or", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             if items.len() == 1 {
                 return Ok(items.remove(0));
@@ -386,7 +387,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             .into()
         }
         Rule::nor => {
-            eprintln!("{}Depairing nor", level_string);
+            debug!("{}Depairing nor", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             if items.len() == 1 {
                 return Ok(items.remove(0));
@@ -439,14 +440,14 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             if decimal_places > 0 {
                 number /= 10.0_f64.powf(decimal_places as f64);
             }
-            eprintln!("number '{}' parsed as {}", value, number);
+            debug!("number '{}' parsed as {}", value, number);
             Expression::Floating(number).into()
         }
         Rule::poetic_string => Expression::String(pair.as_str().to_string()).into(),
         Rule::null => Expression::Null.into(),
         Rule::mysterious => Expression::Mysterious.into(),
         Rule::readline => {
-            eprintln!("{}Depairing listen", level_string);
+            debug!("{}Depairing listen", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             if items.is_empty() {
                 return Ok(CommandLine {
@@ -469,7 +470,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             }
         }
         Rule::variable_list => {
-            eprintln!("{}Depairing variable_list", level_string);
+            debug!("{}Depairing variable_list", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let mut variables = vec![];
             for item in items.drain(0..) {
@@ -489,7 +490,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             SymbolType::VariableList(variables).into()
         }
         Rule::args_list => {
-            eprintln!("{}Depairing args_list", level_string);
+            debug!("{}Depairing args_list", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let mut expressions = vec![];
             for item in items.drain(0..) {
@@ -510,7 +511,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             SymbolType::ArgsList(expressions).into()
         }
         Rule::expression_list => {
-            eprintln!("{}Depairing expression_list", level_string);
+            debug!("{}Depairing expression_list", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let mut expressions = vec![];
             if items.len() == 1 {
@@ -533,7 +534,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             SymbolType::ExpressionList(expressions).into()
         }
         Rule::function => {
-            eprintln!("{}Depairing function", level_string);
+            debug!("{}Depairing function", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let name = if let Expression::Variable(n) = items.remove(0).expr() {
                 n
@@ -553,7 +554,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             .into()
         }
         Rule::function_call => {
-            eprintln!("{}Depairing function_call", level_string);
+            debug!("{}Depairing function_call", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let name = if let Expression::Variable(n) = items.remove(0).expr() {
                 n
@@ -570,7 +571,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
         Rule::up_kw => SymbolType::Up.into(),
         Rule::down_kw => SymbolType::Down.into(),
         Rule::increment => {
-            eprintln!("{}Depairing increment", level_string);
+            debug!("{}Depairing increment", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let name = if let Expression::Variable(n) = items.remove(0).expr() {
                 n
@@ -587,7 +588,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             .into()
         }
         Rule::decrement => {
-            eprintln!("{}Depairing decrement", level_string);
+            debug!("{}Depairing decrement", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let name = if let Expression::Variable(n) = items.remove(0).expr() {
                 n
@@ -609,7 +610,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
         Rule::smaller => SymbolType::LessThan.into(),
         Rule::small => SymbolType::LessThanOrEqual.into(),
         Rule::comparison => {
-            eprintln!("{}Depairing comparison", level_string);
+            debug!("{}Depairing comparison", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             if items.len() == 1 {
                 return Ok(items.remove(0));
@@ -636,7 +637,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
         Rule::continue_kw => pair_to_command_line(&pair, Command::Continue),
         Rule::break_kw => pair_to_command_line(&pair, Command::Break),
         Rule::loop_kw => {
-            eprintln!("{}Depairing loop", level_string);
+            debug!("{}Depairing loop", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let kind = items.remove(0).symbol();
             let condition = items.remove(0).expr();
@@ -673,10 +674,10 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
                     level_string, line_no, col_no, original
                 );
             } else if count == 1 {
-                eprintln!("{}Depairing {:?}", level_string, rule);
+                debug!("{}Depairing {:?}", level_string, rule);
                 depair(&mut original.into_inner(), level + 1)?
             } else {
-                eprintln!("{}List rule: {:?}", level_string, rule);
+                debug!("{}List rule: {:?}", level_string, rule);
                 depair(&mut original.into_inner(), level + 1)?
             }
         }
@@ -699,7 +700,7 @@ where
     }
     match items.len() {
         0 => {
-            eprintln!("{}Empty", level_string);
+            debug!("{}Empty", level_string);
             Ok(SymbolType::Empty.into())
         }
         1 => Ok(items.remove(0)),
