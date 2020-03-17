@@ -1,4 +1,5 @@
 use crate::common::{Command, MaidenError, Program};
+use crate::display;
 use crate::parser;
 use crate::runner;
 use std;
@@ -61,7 +62,7 @@ impl Model {
                 self.res = "".to_string()
             }
             Ok(mut val) => {
-                self.program = print_program(&val);
+                self.program = display::print_program(&val);
                 self.parse_error = false;
                 let mut writer = std::io::Cursor::new(Vec::new());
                 let res = runner::run(&mut val, &mut writer);
@@ -179,46 +180,6 @@ impl Renderable<Model> for Model {
             </div>
         }
     }
-}
-
-fn print_command(command: &Command) -> String {
-    format!("{:?}", command)
-}
-
-pub fn print_program(program: &Program) -> String {
-    let mut res = String::new();
-    let mut indent = 0;
-    let mut last_line = 0;
-    let max_line: f32 = (program.commands.iter().fold(0, |acc, x| acc.max(x.line))) as f32;
-    let max_number_length: usize = (max_line + 1.0).log10().ceil() as usize;
-    for command in &program.commands {
-        // match command.cmd {
-        //     Command::Else { .. } | Command::EndIf  => {
-        //         indent -= 1;
-        //     }
-        //     _ => {}
-        // }
-        while last_line < command.line - 1 {
-            last_line += 1;
-            res += &format!("{:0width$}:\n", last_line, width = max_number_length);
-        }
-        last_line = command.line;
-        res += &format!("{:0width$}: ", command.line, width = max_number_length);
-        for _ in 0..indent {
-            res += "  ";
-        }
-        res += &(print_command(&command.cmd) + "\n");
-        match command.cmd {
-            Command::FunctionDeclaration { .. }
-            | Command::If { .. }
-            | Command::While { .. }
-            | Command::Until { .. } => {
-                indent += 1;
-            }
-            _ => {}
-        }
-    }
-    return res;
 }
 
 fn get_error_line(e: &MaidenError) -> usize {

@@ -185,9 +185,10 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             let items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let mut commands = vec![];
             for item in items {
+                let span = pair.as_span();
                 commands.push(CommandLine {
                     cmd: item.command(),
-                    line: 0,
+                    line: span.end_pos().line_col().0,
                 });
             }
             Block { commands }.into()

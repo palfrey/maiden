@@ -8,6 +8,7 @@ use stdweb::web::IParentNode;
 use yew::prelude::*;
 
 mod common;
+mod display;
 mod parser;
 mod peg;
 mod runner;
