@@ -1,4 +1,6 @@
-use crate::common::{Block, Command, CommandLine, Expression, MaidenError, Program, SymbolType};
+use crate::common::{
+    Block, Command, CommandLine, Expression, MaidenError, Program, Result, SymbolType,
+};
 use crate::peg::{Rockstar, Rule};
 use log::debug;
 use pest::iterators::Pair;
@@ -14,30 +16,30 @@ enum Item {
 }
 
 impl Item {
-    fn expr(self) -> Expression {
+    fn expr(self) -> Result<Expression> {
         if let Item::Expression(e) = self {
-            e
+            Ok(e)
         } else {
             panic!("Not an expression: {:?}", self)
         }
     }
-    fn symbol(self) -> SymbolType {
+    fn symbol(self) -> Result<SymbolType> {
         if let Item::Symbol(e) = self {
-            e
+            Ok(e)
         } else {
             panic!("Not a symboltype: {:?}", self)
         }
     }
-    fn command(self) -> CommandLine {
+    fn command(self) -> Result<CommandLine> {
         if let Item::Command(e) = self {
-            e
+            Ok(e)
         } else {
             panic!("Not a command: {:?}", self)
         }
     }
-    fn block(self) -> Block {
+    fn block(self) -> Result<Block> {
         if let Item::Block(e) = self {
-            e
+            Ok(e)
         } else {
             panic!("Not a block: {:?}", self)
         }
@@ -48,7 +50,7 @@ fn pair_line(pair: &Pair<Rule>) -> usize {
     pair.as_span().start_pos().line_col().0
 }
 
-fn depair_program<'i, I>(pairs: &'i mut I, content: &'i str) -> Result<Program, MaidenError>
+fn depair_program<'i, I>(pairs: &'i mut I, content: &'i str) -> Result<Program>
 where
     I: Iterator<Item = pest::iterators::Pair<'i, Rule>>,
 {
@@ -144,7 +146,7 @@ fn pair_to_command_line(pair: &Pair<Rule>, command: Command) -> Item {
 
 // FIXME: Split this up
 #[allow(clippy::cognitive_complexity)]
-fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> {
+fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
     let line = pair_line(&pair);
     let rule = pair.as_rule();
     let level_string = format!("({}){}", level, "  ".repeat(level));
@@ -157,7 +159,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
         Rule::false_kw => Expression::False.into(),
         Rule::is_kw | Rule::is => SymbolType::Is.into(),
         Rule::output => {
-            let value = depair(&mut pair.into_inner(), level + 1)?.expr();
+            let value = depair(&mut pair.into_inner(), level + 1)?.expr()?;
             CommandLine {
                 cmd: Command::Say { value },
                 line,
@@ -175,7 +177,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
         }
         Rule::conditional => {
             let mut pairs: Vec<_> = pair.into_inner().collect();
-            let expression = depair_core(pairs.remove(0), level + 1)?.expr();
+            let expression = depair_core(pairs.remove(0), level + 1)?.expr()?;
             if pairs.is_empty() {
                 return Err(MaidenError::NoEndOfIf { line });
             }
@@ -184,19 +186,19 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             let alternate;
             match first.as_rule() {
                 Rule::consequent => {
-                    consequent = Some(depair_core(first, level + 1)?.block());
+                    consequent = Some(depair_core(first, level + 1)?.block()?);
                     alternate = if pairs.is_empty() {
                         None
                     } else {
-                        Some(depair_core(pairs.remove(0), level + 1)?.block())
+                        Some(depair_core(pairs.remove(0), level + 1)?.block()?)
                     };
                 }
                 Rule::alternate => {
                     consequent = None;
-                    alternate = Some(depair_core(first, level + 1)?.block());
+                    alternate = Some(depair_core(first, level + 1)?.block()?);
                 }
                 rule => {
-                    panic!("Bad rule: {:?}", rule);
+                    panic!("Bad rule (conditional): {:?}", rule);
                 }
             }
             CommandLine {
@@ -214,7 +216,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             let items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let mut commands = vec![];
             for item in items {
-                commands.push(item.command());
+                commands.push(item.command()?);
             }
             Block { commands }.into()
         }
@@ -225,8 +227,8 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
                 return Ok(items.remove(0));
             }
             let is = items.remove(1);
-            let first = Box::new(items.remove(0).expr());
-            let second = Box::new(items.remove(0).expr());
+            let first = Box::new(items.remove(0).expr()?);
+            let second = Box::new(items.remove(0).expr()?);
             match is {
                 Item::Symbol(SymbolType::Is) => Expression::Is(first, second),
                 Item::Symbol(SymbolType::Aint) => Expression::Aint(first, second),
@@ -255,13 +257,13 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             if compare {
                 item
             } else {
-                Expression::Not(Box::new(item.expr())).into()
+                Expression::Not(Box::new(item.expr()?)).into()
             }
         }
         Rule::put_assignment => {
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
-            let value = items.remove(0).expr();
-            let target = items.remove(0).expr();
+            let value = items.remove(0).expr()?;
+            let target = items.remove(0).expr()?;
             CommandLine {
                 cmd: Command::Assignment { target, value },
                 line,
@@ -274,20 +276,20 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             if items.is_empty() {
                 panic!("Empty assignment!");
             }
-            let target = items.remove(0).expr();
+            let target = items.remove(0).expr()?;
             match items.len() {
                 1 => CommandLine {
                     cmd: Command::Assignment {
                         target,
-                        value: items.remove(0).expr(),
+                        value: items.remove(0).expr()?,
                     },
                     line,
                 }
                 .into(),
                 2 => {
-                    let operator = items.remove(0).symbol();
+                    let operator = items.remove(0).symbol()?;
                     let first = Box::new(target.clone());
-                    let second = items.remove(0).expr();
+                    let second = items.remove(0).expr()?;
                     match operator {
                         SymbolType::Add => {
                             let expr = Expression::Add(first, Box::new(second));
@@ -346,9 +348,9 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             if items.len() % 2 != 1 {
                 panic!("Weird arithmetic: {:?}", items);
             };
-            let mut first = items.remove(0).expr();
+            let mut first = items.remove(0).expr()?;
             while !items.is_empty() {
-                let operator = items.remove(0).symbol();
+                let operator = items.remove(0).symbol()?;
                 let apply_operator = move |first, other| match operator {
                     SymbolType::Add => Expression::Add(Box::new(first), Box::new(other)),
                     SymbolType::Subtract => Expression::Subtract(Box::new(first), Box::new(other)),
@@ -381,8 +383,8 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
                 return Ok(items.remove(0));
             }
             Expression::And(
-                Box::new(items.remove(0).expr()),
-                Box::new(items.remove(0).expr()),
+                Box::new(items.remove(0).expr()?),
+                Box::new(items.remove(0).expr()?),
             )
             .into()
         }
@@ -393,8 +395,8 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
                 return Ok(items.remove(0));
             }
             Expression::Or(
-                Box::new(items.remove(0).expr()),
-                Box::new(items.remove(0).expr()),
+                Box::new(items.remove(0).expr()?),
+                Box::new(items.remove(0).expr()?),
             )
             .into()
         }
@@ -405,8 +407,8 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
                 return Ok(items.remove(0));
             }
             Expression::Nor(
-                Box::new(items.remove(0).expr()),
-                Box::new(items.remove(0).expr()),
+                Box::new(items.remove(0).expr()?),
+                Box::new(items.remove(0).expr()?),
             )
             .into()
         }
@@ -421,7 +423,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             CommandLine {
                 cmd: Command::Return {
-                    return_value: items.remove(1).expr(),
+                    return_value: items.remove(1).expr()?,
                 },
                 line,
             }
@@ -548,17 +550,17 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
         Rule::function => {
             debug!("{}Depairing function", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
-            let name = if let Expression::Variable(n) = items.remove(0).expr() {
+            let name = if let Expression::Variable(n) = items.remove(0).expr()? {
                 n
             } else {
                 panic!("Non-variable name for function");
             };
-            let args = if let SymbolType::VariableList(variables) = items.remove(0).symbol() {
+            let args = if let SymbolType::VariableList(variables) = items.remove(0).symbol()? {
                 variables
             } else {
                 panic!("Non-variable list for function");
             };
-            let block = items.remove(0).block();
+            let block = items.remove(0).block()?;
             CommandLine {
                 cmd: Command::FunctionDeclaration { name, args, block },
                 line,
@@ -568,12 +570,12 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
         Rule::function_call => {
             debug!("{}Depairing function_call", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
-            let name = if let Expression::Variable(n) = items.remove(0).expr() {
+            let name = if let Expression::Variable(n) = items.remove(0).expr()? {
                 n
             } else {
                 panic!("Non-variable name for function_call");
             };
-            let args_list = items.remove(0).symbol();
+            let args_list = items.remove(0).symbol()?;
             if let SymbolType::ArgsList(variables) = args_list {
                 Expression::Call(name, variables).into()
             } else {
@@ -585,7 +587,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
         Rule::increment => {
             debug!("{}Depairing increment", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
-            let name = if let Expression::Variable(n) = items.remove(0).expr() {
+            let name = if let Expression::Variable(n) = items.remove(0).expr()? {
                 n
             } else {
                 panic!("Non-variable name for increment");
@@ -602,7 +604,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
         Rule::decrement => {
             debug!("{}Depairing decrement", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
-            let name = if let Expression::Variable(n) = items.remove(0).expr() {
+            let name = if let Expression::Variable(n) = items.remove(0).expr()? {
                 n
             } else {
                 panic!("Non-variable name for decrement");
@@ -630,9 +632,9 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
             if items.len() != 3 {
                 panic!("Bad comparison: {:?}", items);
             }
-            let first = Box::new(items.remove(0).expr());
-            let operator = items.remove(0).symbol();
-            let second = Box::new(items.remove(0).expr());
+            let first = Box::new(items.remove(0).expr()?);
+            let operator = items.remove(0).symbol()?;
+            let second = Box::new(items.remove(0).expr()?);
             match operator {
                 SymbolType::GreaterThan => Expression::GreaterThan(first, second),
                 SymbolType::GreaterThanOrEqual => Expression::GreaterThanOrEqual(first, second),
@@ -651,9 +653,9 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
         Rule::loop_kw => {
             debug!("{}Depairing loop", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
-            let kind = items.remove(0).symbol();
-            let condition = items.remove(0).expr();
-            let block = items.remove(0).block();
+            let kind = items.remove(0).symbol()?;
+            let condition = items.remove(0).expr()?;
+            let block = items.remove(0).block()?;
             CommandLine {
                 cmd: match kind {
                     SymbolType::While => Command::While {
@@ -697,7 +699,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item, MaidenError> 
     Ok(res)
 }
 
-fn depair<'i, I>(pairs: &'i mut I, level: usize) -> Result<Item, MaidenError>
+fn depair<'i, I>(pairs: &'i mut I, level: usize) -> Result<Item>
 where
     I: Iterator<Item = pest::iterators::Pair<'i, Rule>>,
 {
@@ -722,7 +724,7 @@ where
     }
 }
 
-fn depair_seq<'i, I>(pairs: &'i mut I, level: usize) -> Result<Vec<Item>, MaidenError>
+fn depair_seq<'i, I>(pairs: &'i mut I, level: usize) -> Result<Vec<Item>>
 where
     I: Iterator<Item = pest::iterators::Pair<'i, Rule>>,
 {
@@ -733,7 +735,7 @@ where
     return Ok(items);
 }
 
-pub fn parse(buffer: &str) -> Result<Program, MaidenError> {
+pub fn parse(buffer: &str) -> Result<Program> {
     let mut parsed =
         Rockstar::parse(Rule::program, &buffer).map_err(|e| MaidenError::Pest { kind: e })?;
     return depair_program(&mut parsed, &buffer);
@@ -741,7 +743,7 @@ pub fn parse(buffer: &str) -> Result<Program, MaidenError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse, MaidenError};
+    use super::parse;
 
     #[test]
     fn end_of_if() {
