@@ -743,7 +743,7 @@ pub fn parse(buffer: &str) -> Result<Program> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse;
+    use super::{parse, MaidenError};
 
     #[test]
     fn end_of_if() {
