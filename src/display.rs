@@ -10,11 +10,12 @@ fn print_command(
 ) -> String {
     match command {
         Command::FunctionDeclaration { name, args, block } => format!(
-            "FunctionDeclaration {{ name: \"{}\", args: {:?}, block: Block {{\n{}{}}}}}",
+            "FunctionDeclaration {{ name: \"{}\", args: {:?}, block: Block {{\n{}{}{}}}}}",
             name,
             args,
             print_commands(&block.commands, last_line, indent + 1, max_number_length),
-            "  ".repeat(indent)
+            "  ".repeat(indent),
+            " ".repeat(max_number_length + 2 + indent * 2) // <number> + ": " + <indent>
         ),
         _ => format!("{:?}", command),
     }
@@ -61,16 +62,20 @@ mod tests {
     use super::print_program;
     use crate::parser;
 
+    fn test_print(code: &str, expected: &str) {
+        let program = parser::parse(code).unwrap();
+        assert_eq!(expected, print_program(&program));
+    }
+
     #[test]
     fn test_print_function() {
         let code = "Midnight takes your heart & your soul
         Give back your heart
         ";
-        let program = parser::parse(code).unwrap();
         let expected = "1: FunctionDeclaration { name: \"Midnight\", args: [\"your heart\", \"your soul\"], block: Block {
 2:   Return { return_value: Variable(\"your heart\") }
-}}
+   }}
 ";
-        assert_eq!(expected, print_program(&program));
+        test_print(code, expected);
     }
 }
