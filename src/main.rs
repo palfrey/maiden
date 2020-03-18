@@ -1,4 +1,3 @@
-#![recursion_limit = "5000"]
 #![deny(warnings)]
 #![allow(clippy::needless_return)]
 
