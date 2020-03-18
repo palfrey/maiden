@@ -213,8 +213,11 @@ pub enum MaidenError {
     #[fail(display = "Got infinity on divide between {} and {}", x, y)]
     Infinity { x: String, y: String, line: usize },
 
-    #[fail(display = "Expected another item, but didn't get one at line {}", line)]
+    #[fail(display = "Expected another item, but didn't get one")]
     Incomplete { line: usize },
+
+    #[fail(display = "Bad string. Expected length at least 2 and got {}", length)]
+    BadString { length: usize, line: usize },
 }
 
 pub type Result<T> = ::core::result::Result<T, MaidenError>;

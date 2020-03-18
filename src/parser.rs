@@ -176,6 +176,12 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
         }
         Rule::string => {
             let mut value = pair.as_str();
+            if value.len() < 2 {
+                return Err(MaidenError::BadString {
+                    length: value.len(),
+                    line,
+                });
+            }
             value = &value[1..value.len() - 1];
             Expression::String(value.to_string()).into()
         }
