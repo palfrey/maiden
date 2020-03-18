@@ -373,8 +373,10 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
                         first = apply_operator(first, second);
                     }
                     Item::Symbol(SymbolType::ExpressionList(mut multiple)) => {
-                        for second in multiple.drain(0..) {
-                            first = apply_operator(first, second);
+                        if !multiple.is_empty() {
+                            for second in multiple.drain(0..) {
+                                first = apply_operator(first, second);
+                            }
                         }
                     }
                     item => {
@@ -495,17 +497,19 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             debug!("{}Depairing variable_list", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let mut variables = vec![];
-            for item in items.drain(0..) {
-                match item {
-                    Item::Symbol(SymbolType::Empty) => {}
-                    Item::Expression(Expression::Variable(name)) => {
-                        variables.push(name);
-                    }
-                    Item::Symbol(SymbolType::VariableList(vars)) => {
-                        variables.extend(vars);
-                    }
-                    _ => {
-                        panic!("Non-variable in variable list: {:?}", item);
+            if !items.is_empty() {
+                for item in items.drain(0..) {
+                    match item {
+                        Item::Symbol(SymbolType::Empty) => {}
+                        Item::Expression(Expression::Variable(name)) => {
+                            variables.push(name);
+                        }
+                        Item::Symbol(SymbolType::VariableList(vars)) => {
+                            variables.extend(vars);
+                        }
+                        _ => {
+                            panic!("Non-variable in variable list: {:?}", item);
+                        }
                     }
                 }
             }
@@ -515,18 +519,20 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             debug!("{}Depairing args_list", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let mut expressions = vec![];
-            for item in items.drain(0..) {
-                match item {
-                    Item::Symbol(SymbolType::Empty) => {}
-                    Item::Expression(expr) => {
-                        expressions.push(expr);
-                    }
-                    Item::Symbol(SymbolType::ArgsList(exprs))
-                    | Item::Symbol(SymbolType::ExpressionList(exprs)) => {
-                        expressions.extend(exprs);
-                    }
-                    _ => {
-                        panic!("Non-expression in expr list: {:?}", item);
+            if !items.is_empty() {
+                for item in items.drain(0..) {
+                    match item {
+                        Item::Symbol(SymbolType::Empty) => {}
+                        Item::Expression(expr) => {
+                            expressions.push(expr);
+                        }
+                        Item::Symbol(SymbolType::ArgsList(exprs))
+                        | Item::Symbol(SymbolType::ExpressionList(exprs)) => {
+                            expressions.extend(exprs);
+                        }
+                        _ => {
+                            panic!("Non-expression in expr list: {:?}", item);
+                        }
                     }
                 }
             }
@@ -539,17 +545,19 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             if items.len() == 1 {
                 return Ok(remove(&mut items, 0, line)?);
             }
-            for item in items.drain(0..) {
-                match item {
-                    Item::Symbol(SymbolType::Empty) => {}
-                    Item::Expression(expr) => {
-                        expressions.push(expr);
-                    }
-                    Item::Symbol(SymbolType::ExpressionList(exprs)) => {
-                        expressions.extend(exprs);
-                    }
-                    _ => {
-                        panic!("Non-expression in expr list: {:?}", item);
+            if !items.is_empty() {
+                for item in items.drain(0..) {
+                    match item {
+                        Item::Symbol(SymbolType::Empty) => {}
+                        Item::Expression(expr) => {
+                            expressions.push(expr);
+                        }
+                        Item::Symbol(SymbolType::ExpressionList(exprs)) => {
+                            expressions.extend(exprs);
+                        }
+                        _ => {
+                            panic!("Non-expression in expr list: {:?}", item);
+                        }
                     }
                 }
             }
