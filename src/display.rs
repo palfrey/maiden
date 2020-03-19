@@ -4,7 +4,7 @@ use crate::common::{Command, CommandLine, Program};
 #[cfg(any(test, target_arch = "wasm32"))]
 fn print_command(
     command: &Command,
-    last_line: usize,
+    last_line: &mut usize,
     indent: usize,
     max_number_length: usize,
 ) -> String {
@@ -60,17 +60,17 @@ fn print_command(
 #[cfg(any(test, target_arch = "wasm32"))]
 fn print_commands(
     commands: &Vec<CommandLine>,
-    mut last_line: usize,
+    last_line: &mut usize,
     mut indent: usize,
     max_number_length: usize,
 ) -> String {
     let mut res = String::new();
     for command in commands {
-        while command.line != 0 && last_line < command.line - 1 {
-            last_line += 1;
-            res += &format!("{:0width$}:\n", last_line, width = max_number_length);
+        while command.line != 0 && *last_line < command.line - 1 {
+            *last_line += 1;
+            res += &format!("{:0width$}:\n", *last_line, width = max_number_length);
         }
-        last_line = command.line;
+        *last_line = command.line;
         res += &format!("{:0width$}: ", command.line, width = max_number_length);
         res += &"  ".repeat(indent);
         res += &(print_command(&command.cmd, last_line, indent, max_number_length) + "\n");
@@ -87,10 +87,10 @@ fn print_commands(
 #[cfg(any(test, target_arch = "wasm32"))]
 pub fn print_program(program: &Program) -> String {
     let indent = 0;
-    let last_line = 0;
+    let mut last_line = 0;
     let max_line: f32 = (program.commands.iter().fold(0, |acc, x| acc.max(x.line))) as f32;
     let max_number_length: usize = (max_line + 1.0).log10().ceil() as usize;
-    print_commands(&program.commands, last_line, indent, max_number_length)
+    print_commands(&program.commands, &mut last_line, indent, max_number_length)
 }
 
 #[cfg(test)]
