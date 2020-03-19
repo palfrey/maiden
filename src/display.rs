@@ -26,7 +26,7 @@ fn print_command(
             then,
             otherwise,
         } => format!(
-            "If {{ expression: {:?}, then: Block {{{}}}}}, otherwise: Block {{{}}}}}",
+            "If {{ expression: {:?}, then: Block {{{}}}, otherwise: Block {{{}}}}}",
             expression,
             if then.is_some() {
                 String::from("\n")
@@ -123,7 +123,7 @@ mod tests {
         let expected =
             "1: If { expression: GreaterThan(Variable(\"a thought\"), Null), then: Block {
 2:   Return { return_value: Variable(\"a thought\") }
-   }}, otherwise: Block {}}
+   }, otherwise: Block {}}
 ";
         test_print(code, expected);
     }
