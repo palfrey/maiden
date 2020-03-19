@@ -54,6 +54,7 @@ if( typeof Rust === "undefined" ) {
 
 // This is based on code from Emscripten's preamble.js.
 Module.STDWEB_PRIVATE.to_utf8 = function to_utf8( str, addr ) {
+    var HEAPU8 = Module.HEAPU8;
     for( var i = 0; i < str.length; ++i ) {
         // Gotcha: charCodeAt returns a 16-bit word that is a UTF-16 encoded code unit, not a Unicode code point of the character! So decode UTF16->UTF32->UTF8.
         // See http://unicode.org/faq/utf_bom.html#utf16-3
@@ -96,26 +97,26 @@ Module.STDWEB_PRIVATE.to_utf8 = function to_utf8( str, addr ) {
 
 Module.STDWEB_PRIVATE.noop = function() {};
 Module.STDWEB_PRIVATE.to_js = function to_js( address ) {
-    var kind = HEAPU8[ address + 12 ];
+    var kind = Module.HEAPU8[ address + 12 ];
     if( kind === 0 ) {
         return undefined;
     } else if( kind === 1 ) {
         return null;
     } else if( kind === 2 ) {
-        return HEAP32[ address / 4 ];
+        return Module.HEAP32[ address / 4 ];
     } else if( kind === 3 ) {
-        return HEAPF64[ address / 8 ];
+        return Module.HEAPF64[ address / 8 ];
     } else if( kind === 4 ) {
-        var pointer = HEAPU32[ address / 4 ];
-        var length = HEAPU32[ (address + 4) / 4 ];
+        var pointer = Module.HEAPU32[ address / 4 ];
+        var length = Module.HEAPU32[ (address + 4) / 4 ];
         return Module.STDWEB_PRIVATE.to_js_string( pointer, length );
     } else if( kind === 5 ) {
         return false;
     } else if( kind === 6 ) {
         return true;
     } else if( kind === 7 ) {
-        var pointer = Module.STDWEB_PRIVATE.arena + HEAPU32[ address / 4 ];
-        var length = HEAPU32[ (address + 4) / 4 ];
+        var pointer = Module.STDWEB_PRIVATE.arena + Module.HEAPU32[ address / 4 ];
+        var length = Module.HEAPU32[ (address + 4) / 4 ];
         var output = [];
         for( var i = 0; i < length; ++i ) {
             output.push( Module.STDWEB_PRIVATE.to_js( pointer + i * 16 ) );
@@ -123,24 +124,24 @@ Module.STDWEB_PRIVATE.to_js = function to_js( address ) {
         return output;
     } else if( kind === 8 ) {
         var arena = Module.STDWEB_PRIVATE.arena;
-        var value_array_pointer = arena + HEAPU32[ address / 4 ];
-        var length = HEAPU32[ (address + 4) / 4 ];
-        var key_array_pointer = arena + HEAPU32[ (address + 8) / 4 ];
+        var value_array_pointer = arena + Module.HEAPU32[ address / 4 ];
+        var length = Module.HEAPU32[ (address + 4) / 4 ];
+        var key_array_pointer = arena + Module.HEAPU32[ (address + 8) / 4 ];
         var output = {};
         for( var i = 0; i < length; ++i ) {
-            var key_pointer = HEAPU32[ (key_array_pointer + i * 8) / 4 ];
-            var key_length = HEAPU32[ (key_array_pointer + 4 + i * 8) / 4 ];
+            var key_pointer = Module.HEAPU32[ (key_array_pointer + i * 8) / 4 ];
+            var key_length = Module.HEAPU32[ (key_array_pointer + 4 + i * 8) / 4 ];
             var key = Module.STDWEB_PRIVATE.to_js_string( key_pointer, key_length );
             var value = Module.STDWEB_PRIVATE.to_js( value_array_pointer + i * 16 );
             output[ key ] = value;
         }
         return output;
     } else if( kind === 9 ) {
-        return Module.STDWEB_PRIVATE.acquire_js_reference( HEAP32[ address / 4 ] );
+        return Module.STDWEB_PRIVATE.acquire_js_reference( Module.HEAP32[ address / 4 ] );
     } else if( kind === 10 || kind === 12 || kind === 13 ) {
-        var adapter_pointer = HEAPU32[ address / 4 ];
-        var pointer = HEAPU32[ (address + 4) / 4 ];
-        var deallocator_pointer = HEAPU32[ (address + 8) / 4 ];
+        var adapter_pointer = Module.HEAPU32[ address / 4 ];
+        var pointer = Module.HEAPU32[ (address + 4) / 4 ];
+        var deallocator_pointer = Module.HEAPU32[ (address + 8) / 4 ];
         var num_ongoing_calls = 0;
         var drop_queued = false;
         var output = function() {
@@ -202,31 +203,31 @@ Module.STDWEB_PRIVATE.to_js = function to_js( address ) {
 
         return output;
     } else if( kind === 14 ) {
-        var pointer = HEAPU32[ address / 4 ];
-        var length = HEAPU32[ (address + 4) / 4 ];
-        var array_kind = HEAPU32[ (address + 8) / 4 ];
+        var pointer = Module.HEAPU32[ address / 4 ];
+        var length = Module.HEAPU32[ (address + 4) / 4 ];
+        var array_kind = Module.HEAPU32[ (address + 8) / 4 ];
         var pointer_end = pointer + length;
 
         switch( array_kind ) {
             case 0:
-                return HEAPU8.subarray( pointer, pointer_end );
+                return Module.HEAPU8.subarray( pointer, pointer_end );
             case 1:
-                return HEAP8.subarray( pointer, pointer_end );
+                return Module.HEAP8.subarray( pointer, pointer_end );
             case 2:
-                return HEAPU16.subarray( pointer, pointer_end );
+                return Module.HEAPU16.subarray( pointer, pointer_end );
             case 3:
-                return HEAP16.subarray( pointer, pointer_end );
+                return Module.HEAP16.subarray( pointer, pointer_end );
             case 4:
-                return HEAPU32.subarray( pointer, pointer_end );
+                return Module.HEAPU32.subarray( pointer, pointer_end );
             case 5:
-                return HEAP32.subarray( pointer, pointer_end );
+                return Module.HEAP32.subarray( pointer, pointer_end );
             case 6:
-                return HEAPF32.subarray( pointer, pointer_end );
+                return Module.HEAPF32.subarray( pointer, pointer_end );
             case 7:
-                return HEAPF64.subarray( pointer, pointer_end );
+                return Module.HEAPF64.subarray( pointer, pointer_end );
         }
     } else if( kind === 15 ) {
-        return Module.STDWEB_PRIVATE.get_raw_value( HEAPU32[ address / 4 ] );
+        return Module.STDWEB_PRIVATE.get_raw_value( Module.HEAPU32[ address / 4 ] );
     }
 };
 
@@ -235,10 +236,10 @@ Module.STDWEB_PRIVATE.serialize_object = function serialize_object( address, val
     var length = keys.length;
     var key_array_pointer = Module.STDWEB_PRIVATE.alloc( length * 8 );
     var value_array_pointer = Module.STDWEB_PRIVATE.alloc( length * 16 );
-    HEAPU8[ address + 12 ] = 8;
-    HEAPU32[ address / 4 ] = value_array_pointer;
-    HEAPU32[ (address + 4) / 4 ] = length;
-    HEAPU32[ (address + 8) / 4 ] = key_array_pointer;
+    Module.HEAPU8[ address + 12 ] = 8;
+    Module.HEAPU32[ address / 4 ] = value_array_pointer;
+    Module.HEAPU32[ (address + 4) / 4 ] = length;
+    Module.HEAPU32[ (address + 8) / 4 ] = key_array_pointer;
     for( var i = 0; i < length; ++i ) {
         var key = keys[ i ];
         var key_address = key_array_pointer + i * 8;
@@ -251,9 +252,9 @@ Module.STDWEB_PRIVATE.serialize_object = function serialize_object( address, val
 Module.STDWEB_PRIVATE.serialize_array = function serialize_array( address, value ) {
     var length = value.length;
     var pointer = Module.STDWEB_PRIVATE.alloc( length * 16 );
-    HEAPU8[ address + 12 ] = 7;
-    HEAPU32[ address / 4 ] = pointer;
-    HEAPU32[ (address + 4) / 4 ] = length;
+    Module.HEAPU8[ address + 12 ] = 7;
+    Module.HEAPU32[ address / 4 ] = pointer;
+    Module.HEAPU32[ (address + 4) / 4 ] = length;
     for( var i = 0; i < length; ++i ) {
         Module.STDWEB_PRIVATE.from_js( pointer + i * 16, value[ i ] );
     }
@@ -276,11 +277,11 @@ if ( cachedEncoder != null ) {
 
         if ( length > 0 ) {
             pointer = Module.STDWEB_PRIVATE.alloc( length );
-            HEAPU8.set( buffer, pointer );
+            Module.HEAPU8.set( buffer, pointer );
         }
 
-        HEAPU32[ address / 4 ] = pointer;
-        HEAPU32[ (address + 4) / 4 ] = length;
+        Module.HEAPU32[ address / 4 ] = pointer;
+        Module.HEAPU32[ (address + 4) / 4 ] = length;
     };
 
 } else {
@@ -293,40 +294,40 @@ if ( cachedEncoder != null ) {
             Module.STDWEB_PRIVATE.to_utf8( value, pointer );
         }
 
-        HEAPU32[ address / 4 ] = pointer;
-        HEAPU32[ (address + 4) / 4 ] = length;
+        Module.HEAPU32[ address / 4 ] = pointer;
+        Module.HEAPU32[ (address + 4) / 4 ] = length;
     };
 }
 
 Module.STDWEB_PRIVATE.from_js = function from_js( address, value ) {
     var kind = Object.prototype.toString.call( value );
     if( kind === "[object String]" ) {
-        HEAPU8[ address + 12 ] = 4;
+        Module.HEAPU8[ address + 12 ] = 4;
         Module.STDWEB_PRIVATE.to_utf8_string( address, value );
     } else if( kind === "[object Number]" ) {
         if( value === (value|0) ) {
-            HEAPU8[ address + 12 ] = 2;
-            HEAP32[ address / 4 ] = value;
+            Module.HEAPU8[ address + 12 ] = 2;
+            Module.HEAP32[ address / 4 ] = value;
         } else {
-            HEAPU8[ address + 12 ] = 3;
-            HEAPF64[ address / 8 ] = value;
+            Module.HEAPU8[ address + 12 ] = 3;
+            Module.HEAPF64[ address / 8 ] = value;
         }
     } else if( value === null ) {
-        HEAPU8[ address + 12 ] = 1;
+        Module.HEAPU8[ address + 12 ] = 1;
     } else if( value === undefined ) {
-        HEAPU8[ address + 12 ] = 0;
+        Module.HEAPU8[ address + 12 ] = 0;
     } else if( value === false ) {
-        HEAPU8[ address + 12 ] = 5;
+        Module.HEAPU8[ address + 12 ] = 5;
     } else if( value === true ) {
-        HEAPU8[ address + 12 ] = 6;
+        Module.HEAPU8[ address + 12 ] = 6;
     } else if( kind === "[object Symbol]" ) {
         var id = Module.STDWEB_PRIVATE.register_raw_value( value );
-        HEAPU8[ address + 12 ] = 15;
-        HEAP32[ address / 4 ] = id;
+        Module.HEAPU8[ address + 12 ] = 15;
+        Module.HEAP32[ address / 4 ] = id;
     } else {
         var refid = Module.STDWEB_PRIVATE.acquire_rust_reference( value );
-        HEAPU8[ address + 12 ] = 9;
-        HEAP32[ address / 4 ] = refid;
+        Module.HEAPU8[ address + 12 ] = 9;
+        Module.HEAP32[ address / 4 ] = refid;
     }
 };
 
@@ -341,13 +342,14 @@ var cachedDecoder = ( typeof TextDecoder === "function"
 
 if ( cachedDecoder != null ) {
     Module.STDWEB_PRIVATE.to_js_string = function to_js_string( index, length ) {
-        return cachedDecoder.decode( HEAPU8.subarray( index, index + length ) );
+        return cachedDecoder.decode( Module.HEAPU8.subarray( index, index + length ) );
     };
 
 } else {
     // This is ported from Rust's stdlib; it's faster than
     // the string conversion from Emscripten.
     Module.STDWEB_PRIVATE.to_js_string = function to_js_string( index, length ) {
+        var HEAPU8 = Module.HEAPU8;
         index = index|0;
         length = length|0;
         var end = (index|0) + (length|0);
@@ -565,14 +567,17 @@ Module.STDWEB_PRIVATE.acquire_tmp = function( dummy ) {
             "__cargo_web_snippet_199d5eb25dfe761687bcd487578eb7e636bd9650": function($0) {
                 $0 = Module.STDWEB_PRIVATE.to_js($0);console.log(($0));
             },
-            "__cargo_web_snippet_351b27505bc97d861c3914c20421b6277babb53b": function($0) {
-                var o = Module.STDWEB_PRIVATE.acquire_js_reference( $0 );return (o instanceof Node) | 0;
+            "__cargo_web_snippet_2908dbb08792df5e699e324eec3e29fd6a57c2c9": function($0) {
+                var o = Module.STDWEB_PRIVATE.acquire_js_reference( $0 );return (o instanceof HTMLInputElement);
             },
-            "__cargo_web_snippet_352943ae98b2eeb817e36305c3531d61c7e1a52b": function($0) {
-                var o = Module.STDWEB_PRIVATE.acquire_js_reference( $0 );return (o instanceof Element) | 0;
+            "__cargo_web_snippet_3c5e83d16a83fc7147ec91e2506438012952f55a": function($0) {
+                var o = Module.STDWEB_PRIVATE.acquire_js_reference( $0 );return (o instanceof Element);
             },
             "__cargo_web_snippet_46518012593da937dd5f35c2fc1c5e1dcade260b": function($0, $1, $2, $3) {
                 $1 = Module.STDWEB_PRIVATE.to_js($1);$2 = Module.STDWEB_PRIVATE.to_js($2);$3 = Module.STDWEB_PRIVATE.to_js($3);Module.STDWEB_PRIVATE.from_js($0, (function(){try{return{value:function(){return($1).insertBefore(($2),($3));}(),success:true};}catch(error){return{error:error,success:false};}})());
+            },
+            "__cargo_web_snippet_465ffdf4814bf5d08a3abdf8fe5e61a220b98c34": function($0) {
+                var o = Module.STDWEB_PRIVATE.acquire_js_reference( $0 );return (o instanceof Node);
             },
             "__cargo_web_snippet_614a3dd2adb7e9eac4a0ec6e59d37f87e0521c3b": function($0, $1) {
                 $1 = Module.STDWEB_PRIVATE.to_js($1);Module.STDWEB_PRIVATE.from_js($0, (function(){return($1).error;})());
@@ -597,9 +602,6 @@ Module.STDWEB_PRIVATE.acquire_tmp = function( dummy ) {
             },
             "__cargo_web_snippet_80d6d56760c65e49b7be8b6b01c1ea861b046bf0": function($0) {
                 Module.STDWEB_PRIVATE.decrement_refcount( $0 );
-            },
-            "__cargo_web_snippet_8545f3ba2883a49a2afd23c48c5d24ef3f9b0071": function($0) {
-                var o = Module.STDWEB_PRIVATE.acquire_js_reference( $0 );return (o instanceof HTMLTextAreaElement) | 0;
             },
             "__cargo_web_snippet_8a049af1e4867892fca647811a9472e4c5832053": function($0, $1) {
                 $0 = Module.STDWEB_PRIVATE.to_js($0);$1 = Module.STDWEB_PRIVATE.to_js($1);($0).add(($1));
@@ -637,14 +639,14 @@ Module.STDWEB_PRIVATE.acquire_tmp = function( dummy ) {
             "__cargo_web_snippet_c26ddf75f581148e029dfcd95c037bb50d502e43": function($0, $1) {
                 $0 = Module.STDWEB_PRIVATE.to_js($0);$1 = Module.STDWEB_PRIVATE.to_js($1);($0).value=($1);
             },
-            "__cargo_web_snippet_cb392b71162553130760deeb3964fa828c078f74": function($0) {
-                var o = Module.STDWEB_PRIVATE.acquire_js_reference( $0 );return (o instanceof HTMLInputElement) | 0;
-            },
             "__cargo_web_snippet_cd41a77d0178ae27c833ef2950e5f1a48a1455c1": function($0, $1, $2) {
                 $1 = Module.STDWEB_PRIVATE.to_js($1);$2 = Module.STDWEB_PRIVATE.to_js($2);Module.STDWEB_PRIVATE.from_js($0, (function(){try{return{value:function(){return($1).removeChild(($2));}(),success:true};}catch(error){return{error:error,success:false};}})());
             },
             "__cargo_web_snippet_da2febd72f9938d90bc2bf2905643f595b07abd9": function($0, $1, $2) {
                 $0 = Module.STDWEB_PRIVATE.to_js($0);$1 = Module.STDWEB_PRIVATE.to_js($1);$2 = Module.STDWEB_PRIVATE.to_js($2);($0).setAttribute(($1),($2));
+            },
+            "__cargo_web_snippet_db12d53e9596e9bc7860a8231ec85044629926e7": function($0) {
+                var o = Module.STDWEB_PRIVATE.acquire_js_reference( $0 );return (o instanceof HTMLTextAreaElement);
             },
             "__cargo_web_snippet_dc2fd915bd92f9e9c6a3bd15174f1414eee3dbaf": function() {
                 console.error( 'Encountered a panic!' );
