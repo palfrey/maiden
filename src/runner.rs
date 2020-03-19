@@ -1,4 +1,5 @@
 use crate::common::*;
+use log::debug;
 use std;
 use std::collections::HashMap;
 use std::io::{self, Write};
@@ -7,7 +8,7 @@ use std::ops::Deref;
 struct State<'a> {
     writer: &'a mut dyn Write,
     variables: &'a mut HashMap<String, Expression>,
-    current_line: u32,
+    current_line: usize,
     depth: u32,
     pronoun: Option<String>,
 }
@@ -27,7 +28,8 @@ fn run_binop(
     }
 }
 
-fn expression_to_number(inp: Expression, line: u32) -> Result<Expression> {
+fn expression_to_number(inp: Expression, line: usize) -> Result<Expression> {
+    debug!("x to number: {:?}", inp);
     return match inp {
         Expression::Floating(_) => Ok(inp),
         Expression::Null => Ok(Expression::Floating(0.0)),
@@ -87,6 +89,9 @@ fn run_binop_shortcut(
         Expression::String(_) => {
             if let Expression::String(_) = res_second {
                 return Ok(f(state, &res_first, &res_second)?);
+            }
+            if Expression::Null == res_second {
+                return Ok(false);
             }
         }
         Expression::Mysterious => {
@@ -229,21 +234,10 @@ fn to_boolean(state: &State, expression: &Expression) -> Result<bool> {
                 Ok(true)
             }
         }
-        Expression::String(ref val) => match val.to_lowercase().as_str() {
-            "" => Ok(true),
-            "lies" => Ok(false),
-            "true" => Ok(true),
-            "right" => Ok(true),
-            "false" => Ok(false),
-            "wrong" => Ok(false),
-            _ => {
-                Ok(true)
-                // return Err(MaidenError::BadBooleanResolve(
-                //     format!("{:?}", expression),
-                //     state.current_line
-                // ));
-            }
-        },
+        Expression::String(ref val) => Ok(match val.to_lowercase().as_str() {
+            "" => false,
+            _ => true,
+        }),
         Expression::Object(_) => Ok(true),
         _ => {
             return Err(MaidenError::BadBooleanResolve {
@@ -296,7 +290,15 @@ fn call_function(
             .variables
             .insert(func.args[i].to_lowercase(), value);
     }
-    return run_core(&mut new_state, program, func.location + 1);
+
+    return run_core(
+        &mut new_state,
+        &mut Program {
+            commands: func.block.commands.clone(),
+            functions: program.functions.clone(),
+        },
+        0,
+    );
 }
 
 #[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
@@ -461,7 +463,7 @@ fn run_expression(
     };
 }
 
-pub fn run(program: &Program, writer: &mut dyn Write) -> Result<HashMap<String, Expression>> {
+pub fn run(program: &mut Program, writer: &mut dyn Write) -> Result<HashMap<String, Expression>> {
     let pc = 0;
     let mut variables: HashMap<String, Expression> = HashMap::new();
     let mut state = State {
@@ -570,7 +572,7 @@ fn alter_variable(
     return Ok(());
 }
 
-fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expression> {
+fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<Expression> {
     let mut total_instr = 0;
     loop {
         total_instr += 1;
@@ -591,8 +593,19 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
                 ref value,
             } => {
                 let val = run_expression(state, program, &value)?;
-                state.pronoun = Some(target.clone());
-                state.variables.insert(target.to_lowercase(), val);
+                match target {
+                    Expression::Variable(name) => {
+                        state.pronoun = Some(name.clone());
+                        state.variables.insert(name.to_lowercase(), val);
+                    }
+                    Expression::Pronoun => {
+                        let pronoun = state.pronoun.as_ref().unwrap();
+                        state.variables.insert(pronoun.to_lowercase(), val);
+                    }
+                    _ => {
+                        panic!("Don't know how to assign to {:?}", target);
+                    }
+                }
             }
             Command::Increment {
                 ref target,
@@ -608,129 +621,110 @@ fn run_core(state: &mut State, program: &Program, mut pc: usize) -> Result<Expre
             }
             Command::Until {
                 ref expression,
-                loop_end,
-            } => {
+                ref block,
+            } => loop {
                 let resolve = run_expression(state, program, &expression)?;
                 if to_boolean(state, &resolve)? {
-                    match loop_end {
-                        Some(val) => {
-                            pc = val;
-                        }
-                        None => {
-                            return Err(MaidenError::NoEndLoop {
-                                line: state.current_line,
-                            })
-                        }
-                    }
+                    break;
                 }
-            }
+                run_core(
+                    state,
+                    &mut Program {
+                        commands: block.commands.clone(),
+                        functions: program.functions.clone(),
+                    },
+                    0,
+                )
+                .unwrap();
+            },
             Command::While {
                 ref expression,
-                loop_end,
-            } => {
+                ref block,
+            } => loop {
                 let resolve = run_expression(state, program, &expression)?;
                 if !to_boolean(state, &resolve)? {
-                    match loop_end {
-                        Some(val) => {
-                            pc = val;
-                        }
-                        None => {
-                            return Err(MaidenError::NoEndLoop {
-                                line: state.current_line,
-                            })
-                        }
-                    }
+                    break;
                 }
-            }
-            Command::Next { loop_start } | Command::Continue { loop_start } => {
-                pc = loop_start - 1;
-            }
-            Command::Break { loop_start } => {
-                let loop_cmd = &program.commands[loop_start];
-                match loop_cmd.cmd {
-                    Command::While { loop_end, .. } => match loop_end {
-                        Some(val) => {
-                            pc = val;
-                        }
-                        None => {
-                            return Err(MaidenError::NoEndLoop {
-                                line: state.current_line,
-                            })
-                        }
+                let res = run_core(
+                    state,
+                    &mut Program {
+                        commands: block.commands.clone(),
+                        functions: program.functions.clone(),
                     },
-                    _ => {
-                        panic!("Matched break with non-while");
-                    }
+                    0,
+                )
+                .unwrap();
+                if res == Expression::Break {
+                    break;
                 }
+            },
+            Command::Continue => {
+                return Ok(Expression::Continue);
+            }
+            Command::Break => {
+                return Ok(Expression::Break);
             }
             Command::Say { ref value } => {
                 let resolve = run_expression(state, program, &value)?;
                 let x = get_printable(&resolve, state)?;
                 writeln!(state.writer, "{}", x)?;
             }
-            Command::FunctionDeclaration { func_end, .. } => match func_end {
-                Some(val) => {
-                    pc = val;
-                }
-                None => {
-                    return Err(MaidenError::NoEndFunction {
-                        line: state.current_line,
-                    })
-                }
-            },
+            Command::FunctionDeclaration {
+                ref name,
+                ref args,
+                ref block,
+            } => {
+                program.functions.insert(
+                    name.to_string(),
+                    Function {
+                        args: args.to_vec(),
+                        block: block.clone(),
+                    },
+                );
+            }
             Command::Return { ref return_value } => {
                 return run_expression(state, program, &return_value);
             }
-            Command::EndFunction => {
-                return run_expression(state, program, &Expression::Nothing);
-            }
             Command::If {
                 ref expression,
-                if_end,
-                else_loc,
+                ref then,
+                ref otherwise,
             } => {
                 let resolve = run_expression(state, program, &expression)?;
                 debug!("if: {:?} {:?}", &resolve, expression);
-                if !to_boolean(state, &resolve)? {
-                    match else_loc {
-                        Some(val) => {
-                            pc = val;
+                if to_boolean(state, &resolve)? {
+                    if let Some(block) = then {
+                        let res = run_core(
+                            state,
+                            &mut Program {
+                                commands: block.commands.clone(),
+                                functions: program.functions.clone(),
+                            },
+                            0,
+                        )
+                        .unwrap();
+                        if res != Expression::Nothing {
+                            return Ok(res);
                         }
-                        None => match if_end {
-                            Some(val) => {
-                                pc = val;
-                            }
-                            None => {
-                                return Err(MaidenError::NoEndOfIf {
-                                    line: state.current_line,
-                                })
-                            }
-                        },
                     }
-                }
-            }
-            Command::Else { if_start } => {
-                let if_cmd = &program.commands[if_start];
-                match if_cmd.cmd {
-                    Command::If { if_end, .. } => match if_end {
-                        Some(val) => {
-                            pc = val;
-                        }
-                        None => {
-                            return Err(MaidenError::NoEndOfIf {
-                                line: state.current_line,
-                            })
-                        }
-                    },
-                    _ => {
-                        panic!("Matched else with non-if");
+                } else if let Some(block) = otherwise {
+                    let res = run_core(
+                        state,
+                        &mut Program {
+                            commands: block.commands.clone(),
+                            functions: program.functions.clone(),
+                        },
+                        0,
+                    )
+                    .unwrap();
+                    if res != Expression::Nothing {
+                        return Ok(res);
                     }
                 }
             }
             Command::Call { ref name, ref args } => {
                 call_function(state, program, &name, &args)?;
             }
-            Command::EndIf => {}
             Command::Listen {
                 target: ref opt_target,
             } => {

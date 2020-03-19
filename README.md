@@ -10,7 +10,7 @@ Well given that Rockstar is about hard rock from the 1980s, [Iron Maiden](https:
 
 Status
 ------
-Rockstar is still very much in active flux, but we target the [full "correct" test suite](https://github.com/dylanbeattie/rockstar/tree/reference-implementation/tests/correct) from the reference implementation (excepting [some issues](https://github.com/dylanbeattie/rockstar/issues/168) in it)
+Rockstar is still very much in active flux, but we target the [full "fixtures" test suite](https://github.com/RockstarLang/rockstar/tree/master/tests) from the reference implementation (excepting [some issues](https://github.com/dylanbeattie/rockstar/issues/168) in it)
 
 Usage
 -----
@@ -20,5 +20,5 @@ Web version
 -----------
 There's a deployed edition at https://palfrey.github.io/maiden/. To work with it
 1. [Install cargo web](https://github.com/koute/cargo-web#installation) (0.6.24 or above, because of stdweb)
-2. Run `cargo web start --auto-reload`
+2. Run `cargo web start --auto-reload --release` (weird bugs with debug config for some reasons)
 3. Goto http://localhost:8000/

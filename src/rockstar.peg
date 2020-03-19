@@ -1,0 +1,232 @@
+/*
+PEG grammar for Rockstar (https://codewithrockstar.com)
+*/
+
+program     = { line+ | EOI }
+
+line = { (statement ~ (EOL | EOI)) | EOL }
+
+WHITESPACE  =  _{" " | "\t" }
+COMMENT     =  _{"(" ~ (!")" ~ ANY)* ~ ")"}
+
+noise 	= _{ WHITESPACE|";"|","|"?"|"!"|"&"|"." }
+EOL = _{ noise* ~ NEWLINE }
+
+ignore_rest_of_line = _{(!"\n" ~ ANY)*}
+
+statement   = { break_kw | continue_kw | function | function_call
+			| function_return | loop_kw | conditional | operation | expression}
+
+break_kw = {^"break" ~ ignore_rest_of_line}
+
+continue_kw = {(^"continue" ~ ignore_rest_of_line) | ^"take it to the top"}
+
+function = { variable ~ ^"takes" ~ variable_list ~ EOL ~ block ~ EOL }
+
+expression_list_separator = { ", and" | "&" | "," | "'n'" }
+
+variable_list_separator   = { expression_list_separator | "and" }
+
+variable_list = { (variable ~ variable_list_separator ~ variable_list) | variable }
+
+args_list = { expression_list }
+function_call = { variable ~ ^"taking" ~ args_list }
+
+expression_list = { (simple_expression ~ expression_list_separator ~ expression_list) | simple_expression }
+
+return_kw = { ^"return" | ^"give back" }
+
+function_return = { return_kw ~ expression }
+
+operation = { readline | output | crement | mutation | assignment | put_assignment }
+
+readline = { (^"listen to" ~ variable) | ^"listen" }
+
+continuation = { EOL ~ statement }
+
+block 	= { (statement ~ continuation+) | statement }
+
+consequent 	= { statement | (EOL ~ block) }
+
+alternate 	= { (^"else" ~ statement) | (EOL+ ~ "^else" ~ statement) | (EOL+ ~ ^"else" ~ EOL ~ block) | EOL }
+
+conditional = {^"if" ~ expression ~ consequent? ~ alternate? }
+
+loopable 	= { statement | (EOL ~ block ~ EOL) }
+
+while_kw = {^"while"}
+until_kw = {^"until"}
+loop_kw 	= { (while_kw ~ expression ~ loopable) | (until_kw ~ expression ~ loopable) }
+output  = {(^"say" |^"shout"|^"whisper"|^"scream") ~ expression}
+
+simple_expression = { function_call | constant | lookup | literal | pronoun }
+
+literal = { constant | number | string}
+
+constant = {null | true_kw | false_kw | mysterious}
+
+true_kw 	= @{(^"true" | ^"ok" | ^"right" | ^"yes") ~ !letter }
+
+false_kw = @{(^"false" | ^"lies" | ^"wrong" | ^"no") ~ !letter }
+
+null 	= {^"null" | ^"nothing" | ^"nowhere" | ^"nobody" | ^"empty" | ^"gone" }
+
+mysterious = {"mysterious"}
+
+number      = @{(("-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)?) ~ "."?) | ("." ~ ASCII_DIGIT+) }
+
+string      = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+
+expression = { boolean }
+
+boolean = { nor }
+
+nor = { (or ~ "nor" ~ nor) | or }
+or = { (and ~ "or" ~ or) | and }
+and = { (equality_check ~ "and" ~ and) | equality_check }
+
+ne = {^"aint" | "ain\'t" }
+is_kw = {^"is"}
+eq = { ne | is_kw }
+
+equality_check = { (not ~ eq ~ equality_check) | not }
+
+not = { (^"not " ~ not) | comparison }
+
+comparison = { (arithmetic ~ comparator ~ comparison) | arithmetic }
+
+greater 	= {^"higher" |^"greater" | ^"bigger" | ^"stronger"}
+smaller	 	= {^"lower" |^"less" | ^"smaller" | ^"weaker"}
+great	= {^"high" | ^"great" | ^"big" | ^"strong"}
+small	= {^"low" | ^"small" | ^"weak"}
+
+comparator 	= { (^"is" ~ greater ~ ^"than")
+            | (^"is" ~ smaller ~ ^"than")
+            |	(^"is" ~ ^"as" ~ great ~ ^"as")
+            |	(^"is" ~ ^"as" ~ small ~ ^"as")}
+
+
+arithmetic    = { (product ~ ((add | subtract) ~ product)+) | product }
+
+product     = { (simple_expression ~ ((multiply | divide) ~ expression_list)+) | expression_list }
+
+// Note that operator aliases explicitly include a trailing space,
+// otherwise "with" is a prefix code for "without" and confuses the parser.
+add 		= { "+" | "plus " | "with " }
+subtract 	= { "-" | "minus " | "without " }
+multiply 	= { "*" | "times " | "of " }
+divide 		= {"/" | "over " | "between " }
+
+compoundable_operator = { add | subtract | multiply | divide }
+
+pronoun = {
+    // Longest pronouns first to avoid prefix coding errors.
+    // 4-letter pronouns
+    ^"they" | ^"them"
+    // 3-letter pronouns
+    | ^"she" | ^"him" | ^"her" | ^"hir" | ^"zie" | ^"zir" | ^"xem" | ^"ver"
+    // 2-letter pronouns
+    | ^"ze" | ^"ve" | ^"xe" | ^"it" | ^"he"
+}
+
+lookup = { variable }
+
+common_prefix = { ^"an" | ^"a" | ^"the" | ^"my" | ^"your" }
+
+uppercase_letter = { UPPERCASE_LETTER }
+lowercase_letter = { LOWERCASE_LETTER }
+
+letter = { uppercase_letter | lowercase_letter}
+
+common_variable = @{common_prefix ~ WHITESPACE ~ letter+}
+
+is = { "=''" | ^"'s " | ^"is " | ^"was " | ^"are " | ^"were "}
+
+target = { ^"into" ~ assignable }
+
+indexer = { ^"at" ~ expression }
+assignable = { variable ~ indexer? }
+
+put_assignment = { ^"put" ~ expression ~ ^"into " ~ variable }
+assignment = { (assignable ~ is ~ (literal | poetic_number))
+  | (assignable ~ ^"says " ~ poetic_string)
+  | (^"let" ~ assignable ~ ^"be " ~ compoundable_operator ~ expression)
+  | (^"let" ~ assignable ~ ^"be " ~ expression)
+}
+
+poetic_string = @{ (!"\n" ~ ANY)+ }
+
+poetic_number = @{ poetic_digit_separator* ~ poetic_digits ~ poetic_digit_separator* ~ poetic_decimal? ~ poetic_digit_separator* }
+
+poetic_decimal = { ("." ~ poetic_decimal_digit_separator* ~ poetic_decimal_digits ~ poetic_decimal_digit_separator*) |
+                ("." ~ poetic_decimal_digit_separator*)}
+
+poetic_digit_separator = { ASCII_DIGIT |"\"" | "'" |"," |";" |":" |"?" |"!" |"+" |"_" |"\\" |"|" | WHITESPACE }
+
+poetic_digits =
+  { (poetic_digit ~ poetic_digit_separator+ ~ poetic_digits)
+  | poetic_digit}
+
+poetic_decimal_digit_separator = { poetic_digit_separator | "." }
+poetic_decimal_digits = {
+  (poetic_decimal_digit_separator* ~ poetic_digit ~ poetic_decimal_digit_separator+ ~ poetic_decimal_digits)
+  | poetic_digit}
+
+poetic_digit = @{(ASCII_ALPHA | "'" | "-")+ }
+
+// To disallow identifiers like "My back is hurting" (which is illegal because "back" is a keyword)
+// we need to explicitly define all language keywords, and they MUST be matched in descending order of length
+// because of Complicated Weird Parser Reasons.
+kw10 = { ^"mysterious" }
+kw8 = { ^"stronger" | ^"continue"}
+kw7 = { ^"between" | ^"greater" | ^"nothing" | ^"nowhere" | ^"smaller" | ^"whisper" | ^"without"}
+kw6 = { ^"ain't" | ^"bigger" | ^"listen" | ^"nobody" | ^"return" | ^"scream" | ^"taking" | ^"weaker" | ^"higher"
+    | ^"strong"}
+kw5 = { ^"break" | ^"build" | ^"empty" | ^"false" | ^"great" | ^"knock" | ^"lower" | ^"right" | ^"shout" | ^"small"
+    | ^"take " | ^"takes" | ^"times" | ^"until" | ^"unite" | ^"while" | ^"wrong" | ^"minus"}
+kw4 = { ^"aint" | ^"back" | ^"cast" | ^"burn" | ^"join" | ^"down" | ^"else" | ^"give" | ^"gone" | ^"high" | ^"into" | ^"less" | ^"lies" | ^"null"
+    | ^"plus" | ^"says" | ^"than" | ^"them" | ^"they" | ^"true" | ^"weak" | ^"were" | ^"your" | ^"over" | ^"with"}
+kw3 = { ^"and" | ^"big" | ^"her" | ^"him" | ^"hir" | ^"it " | ^"low" | ^"nor" | ^"not" | ^"put" | ^"say" | ^"she"
+    | ^"the" | ^"top" | ^"ver" | ^"was" | ^"xem" | ^"yes" | ^"zie" | ^"zir"}
+kw2 = { ^"an" | ^"as" | ^"he" | ^"if" | ^"is" | ^"it" | ^"my" | ^"no" | ^"of" | ^"ok" | ^"or" | ^"to" | ^"up" | ^"ve"
+    | ^"xe" | ^"ze" }
+kw1 = { ^"a" }
+
+keyword = @{(kw10 | kw8 | kw7 | kw6 | kw5 | kw5 | kw4 | kw3 | kw2 | kw1) ~ !letter }
+
+variable = {common_variable | proper_variable | pronoun | simple_variable }
+
+simple_variable = @{!keyword ~ letter+ }
+
+proper_noun = @{!keyword ~ uppercase_letter ~ letter*}
+proper_variable = @{ proper_noun ~ (" " ~ proper_noun)* }
+
+crement = { increment | decrement }
+
+up_kw = {^"up"}
+increment = { ^"build" ~ variable ~ (up_kw ~ noise*)+ }
+
+down_kw = {^"down"}
+decrement = { ^"knock" ~ variable ~ (down_kw ~ noise*)+ }
+
+split = {^"cut" | ^"split" | ^"shatter"}
+cast = {^"cast" | ^"burn"}
+join = {^"join" | ^"unite"}
+
+mutator = { split | cast | join }
+modifier =  { (^"with" | ^"using") ~ expression }
+
+mutation
+    = { mutator ~ expression ~ target ~ modifier | mutator ~ assignable ~ modifier? }
+
+rounding = { floor | ceil | math_round }
+
+floor = { ^"turn" ~ variable ~ ^"down" | ^"turn" ~ ^"down" ~ variable }
+
+ceil
+  = {^"turn" ~ variable ~ ^"up"
+  | ^"turn" ~ ^"up" ~ variable }
+
+math_round
+  = {^"turn" ~ variable ~ (^"round" | ^"around")
+  | ^"turn" ~ (^"round" ~ ^"around") ~  variable }

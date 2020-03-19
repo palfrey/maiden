@@ -1,8 +1,7 @@
-use nom::types::CompleteStr;
-use nom_locate::LocatedSpan;
-use std::collections::HashMap;
-pub type Span<'a> = LocatedSpan<CompleteStr<'a>>;
 use failure::Fail;
+use std::collections::HashMap;
+
+use crate::peg;
 
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
 pub enum Expression {
@@ -20,6 +19,10 @@ pub enum Expression {
     Pronoun,
     Not(Box<Expression>),
 
+    // needed by loops
+    Break,
+    Continue,
+
     // binary operators
     Is(Box<Expression>, Box<Expression>),
     Aint(Box<Expression>, Box<Expression>),
@@ -36,37 +39,14 @@ pub enum Expression {
     LessThan(Box<Expression>, Box<Expression>),
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum SymbolType {
-    Dummy,
-    And,
-    Or,
-    Nor,
     Is,
-    Build {
-        target: String,
-        count: usize,
-    },
-    Knock {
-        target: String,
-        count: usize,
-    },
+    Up,
+    Down,
     Until,
     While,
-    Next,
-    Continue,
     Return,
-    Say,
-    If,
-    Taking {
-        target: String,
-        args: Vec<SymbolType>,
-    },
-    Takes {
-        name: String,
-        args: Vec<String>,
-    },
-    Comma,
     GreaterThanOrEqual,
     GreaterThan,
     LessThan,
@@ -74,55 +54,44 @@ pub enum SymbolType {
     Add,
     Subtract,
     Times,
-    Put,
-    Where,
-    Newline,
     Aint,
-    Else,
-    Variable(String),
-    String(String),
-    Words(Vec<String>),
-    Integer(String),
-    Floating(String),
-    Listen,
     Divide,
-    True,
-    False,
-    Null,
-    Mysterious,
-    Pronoun,
-    Not(Box<SymbolType>),
-    Break,
+    Empty,
+    VariableList(Vec<String>),
+    ArgsList(Vec<Expression>),
+    ExpressionList(Vec<Expression>),
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Token {
-    pub line: u32,
+    pub line: usize,
     pub symbol: SymbolType,
 }
 
-pub static LOWEST_PRECDENCE: SymbolType = SymbolType::Dummy;
+#[derive(Debug, PartialEq, Clone)]
+pub struct Block {
+    pub commands: Vec<CommandLine>,
+}
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Command {
     Assignment {
-        target: String,
+        target: Expression,
         value: Expression,
     },
     Until {
         expression: Expression,
-        loop_end: Option<usize>,
+        block: Block,
     },
     While {
         expression: Expression,
-        loop_end: Option<usize>,
+        block: Block,
     },
     If {
         expression: Expression,
-        if_end: Option<usize>,
-        else_loc: Option<usize>,
+        then: Option<Block>,
+        otherwise: Option<Block>,
     },
-    EndIf,
     Increment {
         target: String,
         count: f64,
@@ -131,15 +100,8 @@ pub enum Command {
         target: String,
         count: f64,
     },
-    Next {
-        loop_start: usize,
-    },
-    Continue {
-        loop_start: usize,
-    },
-    Break {
-        loop_start: usize,
-    },
+    Continue,
+    Break,
     Say {
         value: Expression,
     },
@@ -149,31 +111,27 @@ pub enum Command {
     FunctionDeclaration {
         name: String,
         args: Vec<String>,
-        func_end: Option<usize>,
+        block: Block,
     },
     Return {
         return_value: Expression,
     },
-    EndFunction,
     Call {
         name: String,
         args: Vec<Expression>,
     },
-    Else {
-        if_start: usize,
-    },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Function {
-    pub location: usize,
     pub args: Vec<String>,
+    pub block: Block,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CommandLine {
     pub cmd: Command,
-    pub line: u32,
+    pub line: usize,
 }
 
 #[derive(Debug, PartialEq)]
@@ -183,20 +141,21 @@ pub struct Program {
 }
 
 #[derive(Debug, Fail)]
+#[allow(dead_code)]
 pub enum MaidenError {
     #[fail(display = "parsing error: {:?}", kind)]
-    Nom { kind: nom::ErrorKind },
+    Pest { kind: pest::error::Error<peg::Rule> },
     #[fail(display = "IO Error")]
     Io {
         #[fail(cause)]
         io_error: std::io::Error,
     },
     #[fail(display = "Unparsed text '{}'", text)]
-    UnparsedText { text: String, line: u32 },
+    UnparsedText { text: String, line: usize },
     #[fail(display = "Missing variable '{}'", name)]
-    MissingVariable { name: String, line: u32 },
+    MissingVariable { name: String, line: usize },
     #[fail(display = "Missing function '{}'", name)]
-    MissingFunction { name: String, line: u32 },
+    MissingFunction { name: String, line: usize },
     #[fail(
         display = "Wrong argument count to function (expected {}, got {})",
         expected, got
@@ -204,55 +163,61 @@ pub enum MaidenError {
     WrongArgCount {
         expected: usize,
         got: usize,
-        line: u32,
+        line: usize,
     },
     #[fail(display = "Unbalanced expression {}", expression)]
-    UnbalancedExpression { expression: String, line: u32 },
+    UnbalancedExpression { expression: String, line: usize },
     #[fail(display = "Bad boolean resolve: {:?}", expression)]
-    BadBooleanResolve { expression: String, line: u32 },
+    BadBooleanResolve { expression: String, line: usize },
     #[fail(display = "Don't recognise command sequence {:?}", sequence)]
     BadCommandSequence {
         sequence: Vec<SymbolType>,
-        line: u32,
+        line: usize,
     },
     #[fail(display = "Unparsable number: '{}'", number)]
-    ParseNumberError { number: String, line: u32 },
+    ParseNumberError { number: String, line: usize },
     #[fail(display = "Bad 'is' section: {:?}", sequence)]
     BadIs {
         sequence: Vec<SymbolType>,
-        line: u32,
+        line: usize,
     },
     #[fail(display = "Bad 'put' section: {:?}", sequence)]
     BadPut {
         sequence: Vec<SymbolType>,
-        line: u32,
+        line: usize,
     },
     #[fail(display = "No end of if statement")]
-    NoEndOfIf { line: u32 },
+    NoEndOfIf { line: usize },
     #[fail(display = "Else with no if statement")]
-    ElseWithNoIf { line: u32 },
+    ElseWithNoIf { line: usize },
     #[fail(display = "More than one else statement")]
-    MultipleElse { line: u32 },
+    MultipleElse { line: usize },
     #[fail(display = "No end of function")]
-    NoEndFunction { line: u32 },
+    NoEndFunction { line: usize },
     #[fail(display = "No end of loop")]
-    NoEndLoop { line: u32 },
+    NoEndLoop { line: usize },
     #[fail(display = "Continue outside of a loop")]
-    ContinueOutsideLoop { line: u32 },
+    ContinueOutsideLoop { line: usize },
     #[fail(display = "Break outside of a loop")]
-    BreakOutsideLoop { line: u32 },
+    BreakOutsideLoop { line: usize },
     #[fail(display = "Next outside of a loop")]
-    NextOutsideLoop { line: u32 },
+    NextOutsideLoop { line: usize },
     #[fail(display = "Unimplemented: {}", description)]
-    Unimplemented { description: String, line: u32 },
+    Unimplemented { description: String, line: usize },
     #[fail(display = "Exceeded maximum allowed stack depth of {}", depth)]
-    StackOverflow { depth: u32, line: u32 },
+    StackOverflow { depth: u32, line: usize },
     #[fail(display = "Hit instruction limit of 10,000,000. Infinite loop?")]
-    InstructionLimit { line: u32 },
+    InstructionLimit { line: usize },
     #[fail(display = "Got to a pronoun, but no variable defined")]
-    UndefinedPronoun { line: u32 },
+    UndefinedPronoun { line: usize },
     #[fail(display = "Got infinity on divide between {} and {}", x, y)]
-    Infinity { x: String, y: String, line: u32 },
+    Infinity { x: String, y: String, line: usize },
+
+    #[fail(display = "Expected another item, but didn't get one")]
+    Incomplete { line: usize },
+
+    #[fail(display = "Bad string. Expected length at least 2 and got {}", length)]
+    BadString { length: usize, line: usize },
 }
 
 pub type Result<T> = ::core::result::Result<T, MaidenError>;
@@ -260,32 +225,5 @@ pub type Result<T> = ::core::result::Result<T, MaidenError>;
 impl From<std::io::Error> for MaidenError {
     fn from(err: std::io::Error) -> MaidenError {
         return MaidenError::Io { io_error: err };
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-pub fn get_error_line(e: &MaidenError) -> u32 {
-    match e {
-        MaidenError::MissingVariable { line, .. } => line.clone(),
-        MaidenError::UnparsedText { line, .. } => line.clone(),
-        MaidenError::MissingFunction { line, .. } => line.clone(),
-        MaidenError::WrongArgCount { line, .. } => line.clone(),
-        MaidenError::UnbalancedExpression { line, .. } => line.clone(),
-        MaidenError::BadCommandSequence { line, .. } => line.clone(),
-        MaidenError::ParseNumberError { line, .. } => line.clone(),
-        MaidenError::BadIs { line, .. } => line.clone(),
-        MaidenError::BadPut { line, .. } => line.clone(),
-        MaidenError::NoEndOfIf { line } => line.clone(),
-        MaidenError::ElseWithNoIf { line } => line.clone(),
-        MaidenError::MultipleElse { line } => line.clone(),
-        MaidenError::NoEndFunction { line } => line.clone(),
-        MaidenError::NoEndLoop { line } => line.clone(),
-        MaidenError::BadBooleanResolve { line, .. } => line.clone(),
-        MaidenError::Unimplemented { line, .. } => line.clone(),
-        MaidenError::StackOverflow { line, .. } => line.clone(),
-        MaidenError::InstructionLimit { line } => line.clone(),
-        MaidenError::UndefinedPronoun { line } => line.clone(),
-        MaidenError::Infinity { line, .. } => line.clone(),
-        _ => 0,
     }
 }

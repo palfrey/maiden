@@ -1,7 +1,10 @@
-use crate::common;
+use crate::common::MaidenError;
+use crate::display;
 use crate::parser;
 use crate::runner;
 use std;
+use stdweb::js;
+use yew::html;
 use yew::prelude::*;
 use yew::services::ConsoleService;
 
@@ -28,8 +31,8 @@ impl Model {
         }
     }
 
-    fn nicer_error(&self, err: &common::MaidenError) -> String {
-        let line = common::get_error_line(err);
+    fn nicer_error(&self, err: &MaidenError) -> String {
+        let line = get_error_line(err);
         format!(
             "{} at line {}: \"{}\"",
             err,
@@ -58,11 +61,11 @@ impl Model {
                 self.parse_error = true;
                 self.res = "".to_string()
             }
-            Ok(val) => {
-                self.program = parser::print_program(&val);
+            Ok(mut val) => {
+                self.program = display::print_program(&val);
                 self.parse_error = false;
                 let mut writer = std::io::Cursor::new(Vec::new());
-                let res = runner::run(&val, &mut writer);
+                let res = runner::run(&mut val, &mut writer);
                 self.res = "".into();
                 if let Err(err) = res {
                     self.res += &self.nicer_error(&err);
@@ -86,7 +89,7 @@ impl Component for Model {
 
     fn create(_: Self::Properties, mut link: ComponentLink<Self>) -> Self {
         let mut res = Self {
-            value: include_str!("../tests/modulo.rock").into(),
+            value: include_str!("../tests/local/modulo.rock").into(),
             program: "".into(),
             parse_error: false,
             res: "".into(),
@@ -176,5 +179,31 @@ impl Renderable<Model> for Model {
                 </div>
             </div>
         }
+    }
+}
+
+fn get_error_line(e: &MaidenError) -> usize {
+    match e {
+        MaidenError::MissingVariable { line, .. } => line.clone(),
+        MaidenError::UnparsedText { line, .. } => line.clone(),
+        MaidenError::MissingFunction { line, .. } => line.clone(),
+        MaidenError::WrongArgCount { line, .. } => line.clone(),
+        MaidenError::UnbalancedExpression { line, .. } => line.clone(),
+        MaidenError::BadCommandSequence { line, .. } => line.clone(),
+        MaidenError::ParseNumberError { line, .. } => line.clone(),
+        MaidenError::BadIs { line, .. } => line.clone(),
+        MaidenError::BadPut { line, .. } => line.clone(),
+        MaidenError::NoEndOfIf { line } => line.clone(),
+        MaidenError::ElseWithNoIf { line } => line.clone(),
+        MaidenError::MultipleElse { line } => line.clone(),
+        MaidenError::NoEndFunction { line } => line.clone(),
+        MaidenError::NoEndLoop { line } => line.clone(),
+        MaidenError::BadBooleanResolve { line, .. } => line.clone(),
+        MaidenError::Unimplemented { line, .. } => line.clone(),
+        MaidenError::StackOverflow { line, .. } => line.clone(),
+        MaidenError::InstructionLimit { line } => line.clone(),
+        MaidenError::UndefinedPronoun { line } => line.clone(),
+        MaidenError::Infinity { line, .. } => line.clone(),
+        _ => 0,
     }
 }

@@ -13,15 +13,17 @@ cache:
 before_cache:
   - rm -rf /home/travis/.cargo/registry
 
-matrix:
-  allow_failures:
-  - rust: nightly
+env:
+  global:
+    - RUST_MIN_STACK=8388608
 
 stages:
 - test
 - name: deploy
   if: branch = master
 jobs:
+  allow_failures:
+    - rust: nightly
   include:
   - stage: test
     rust: stable
@@ -44,6 +46,10 @@ jobs:
   - stage: test
     rust: nightly
     script: cargo build --all && cargo test --all
+  - name: minimal versions check
+    stage: test
+    rust: nightly
+    script: rm Cargo.lock && cargo build -Z minimal-versions --tests
   - stage: deploy
     if: branch = master AND type != pull_request
     rust: stable

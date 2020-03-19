@@ -1,32 +1,15 @@
-#![recursion_limit = "5000"]
 #![deny(warnings)]
 #![allow(clippy::needless_return)]
 
-#[macro_use]
-extern crate nom;
-#[macro_use]
-extern crate log;
-#[cfg(not(target_arch = "wasm32"))]
-extern crate clap;
-#[cfg(not(target_arch = "wasm32"))]
-extern crate pretty_env_logger;
-extern crate regex;
-#[macro_use]
-extern crate nom_locate;
-
-#[cfg(target_arch = "wasm32")]
-#[macro_use]
-extern crate yew;
-#[cfg(target_arch = "wasm32")]
-use yew::prelude::*;
-#[cfg(target_arch = "wasm32")]
-#[macro_use]
-extern crate stdweb;
 #[cfg(target_arch = "wasm32")]
 use stdweb::web::IParentNode;
+#[cfg(target_arch = "wasm32")]
+use yew::prelude::*;
 
 mod common;
+mod display;
 mod parser;
+mod peg;
 mod runner;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -54,8 +37,8 @@ fn main() -> common::Result<()> {
     let mut buffer = String::new();
     f.read_to_string(&mut buffer)?;
 
-    let program = parser::parse(&buffer)?;
-    runner::run(&program, &mut io::stdout())?;
+    let mut program = parser::parse(&buffer)?;
+    runner::run(&mut program, &mut io::stdout())?;
     Ok(())
 }
 
@@ -78,16 +61,17 @@ fn main() {
 mod tests {
     use super::*;
     use crate::common::Expression;
+    use log::{debug, info};
     use pretty_assertions::assert_eq;
     use std::collections::HashMap;
     use std::io::Cursor;
 
     fn test_program(code: &str, end_variables: HashMap<String, Expression>, expected_output: &str) {
         pretty_env_logger::try_init().unwrap_or(());
-        let program = parser::parse(code).unwrap();
+        let mut program = parser::parse(code).unwrap();
         info!("Commands: {:?}", program.commands);
         let mut writer = Cursor::new(Vec::new());
-        let variables = runner::run(&program, &mut writer).unwrap();
+        let variables = runner::run(&mut program, &mut writer).unwrap();
         writer.set_position(0);
         let res = std::str::from_utf8(writer.get_ref()).unwrap();
         if res != "" {
@@ -118,7 +102,7 @@ mod tests {
     Buzz is 5
     Until Counter is Limit
         Build Counter up
-    End";
+    ";
         let end_variables = hashmap! {
             "buzz" => Expression::Floating(5f64),
             "limit" => Expression::Floating(100f64),
@@ -266,9 +250,9 @@ mod tests {
 
     fn test_error(input: &str) -> common::MaidenError {
         pretty_env_logger::try_init().unwrap_or(());
-        let program = parser::parse(input).unwrap();
+        let mut program = parser::parse(input).unwrap();
         let mut writer = Cursor::new(Vec::new());
-        runner::run(&program, &mut writer).err().unwrap()
+        runner::run(&mut program, &mut writer).err().unwrap()
     }
 
     #[test]
@@ -279,36 +263,6 @@ mod tests {
             assert_eq!(line, 1);
         } else {
             assert!(false, err);
-        }
-    }
-
-    #[test]
-    fn end_of_if() {
-        let err = test_error("if 1 is 2");
-        if let common::MaidenError::NoEndOfIf { line } = err {
-            assert_eq!(line, 1);
-        } else {
-            assert!(false, format!("{:?}", err));
-        }
-    }
-
-    #[test]
-    fn no_end_func() {
-        let err = test_error("What Remains takes the fighters, and a war");
-        if let common::MaidenError::NoEndFunction { line } = err {
-            assert_eq!(line, 1);
-        } else {
-            assert!(false, format!("{:?}", err));
-        }
-    }
-
-    #[test]
-    fn no_end_loop() {
-        let err = test_error("until 1");
-        if let common::MaidenError::NoEndLoop { line } = err {
-            assert_eq!(line, 1);
-        } else {
-            assert!(false, format!("{:?}", err));
         }
     }
 }
