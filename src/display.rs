@@ -8,14 +8,50 @@ fn print_command(
     indent: usize,
     max_number_length: usize,
 ) -> String {
+    let new_indent = format!(
+        "{}{}",
+        "  ".repeat(indent),
+        " ".repeat(max_number_length + 2 + indent * 2) // <number> + ": " + <indent>
+    );
     match command {
         Command::FunctionDeclaration { name, args, block } => format!(
-            "FunctionDeclaration {{ name: \"{}\", args: {:?}, block: Block {{\n{}{}{}}}}}",
+            "FunctionDeclaration {{ name: \"{}\", args: {:?}, block: Block {{\n{}{}}}}}",
             name,
             args,
             print_commands(&block.commands, last_line, indent + 1, max_number_length),
-            "  ".repeat(indent),
-            " ".repeat(max_number_length + 2 + indent * 2) // <number> + ": " + <indent>
+            new_indent
+        ),
+        Command::If {
+            expression,
+            then,
+            otherwise,
+        } => format!(
+            "If {{ expression: {:?}, then: Block {{{}}}}}, otherwise: Block {{{}}}}}",
+            expression,
+            if then.is_some() {
+                String::from("\n")
+                    + &print_commands(
+                        &then.as_ref().unwrap().commands,
+                        last_line,
+                        indent + 1,
+                        max_number_length,
+                    )
+                    + &new_indent
+            } else {
+                String::new()
+            },
+            if otherwise.is_some() {
+                String::from("\n")
+                    + &print_commands(
+                        &otherwise.as_ref().unwrap().commands,
+                        last_line,
+                        indent + 1,
+                        max_number_length,
+                    )
+                    + &new_indent
+            } else {
+                String::new()
+            },
         ),
         _ => format!("{:?}", command),
     }
@@ -75,6 +111,19 @@ mod tests {
         let expected = "1: FunctionDeclaration { name: \"Midnight\", args: [\"your heart\", \"your soul\"], block: Block {
 2:   Return { return_value: Variable(\"your heart\") }
    }}
+";
+        test_print(code, expected);
+    }
+
+    #[test]
+    fn test_print_if() {
+        let code = "If a thought is greater than nothing
+        Give back a thought
+        ";
+        let expected =
+            "1: If { expression: GreaterThan(Variable(\"a thought\"), Null), then: Block {
+2:   Return { return_value: Variable(\"a thought\") }
+   }}, otherwise: Block {}}
 ";
         test_print(code, expected);
     }

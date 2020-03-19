@@ -204,12 +204,25 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
                     alternate = if pairs.is_empty() {
                         None
                     } else {
-                        Some(depair_core(remove(&mut pairs, 0, line)?, level + 1)?.block()?)
+                        let block =
+                            depair_core(remove(&mut pairs, 0, line)?, level + 1)?.block()?;
+                        if !block.commands.is_empty() {
+                            Some(block)
+                        } else {
+                            None
+                        }
                     };
                 }
                 Rule::alternate => {
                     consequent = None;
-                    alternate = Some(depair_core(first, level + 1)?.block()?);
+                    alternate = {
+                        let block = depair_core(first, level + 1)?.block()?;
+                        if !block.commands.is_empty() {
+                            Some(block)
+                        } else {
+                            None
+                        }
+                    }
                 }
                 rule => {
                     panic!("Bad rule (conditional): {:?}", rule);
