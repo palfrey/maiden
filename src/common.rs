@@ -120,6 +120,15 @@ pub enum Command {
         name: String,
         args: Vec<Expression>,
     },
+    Floor {
+        target: Expression,
+    },
+    Ceil {
+        target: Expression,
+    },
+    Round {
+        target: Expression,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]

@@ -711,6 +711,36 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             }
             .into()
         }
+        Rule::math_round => {
+            let pair = depair(&mut pair.into_inner(), level + 1)?;
+            CommandLine {
+                cmd: Command::Round {
+                    target: pair.expr()?,
+                },
+                line,
+            }
+            .into()
+        }
+        Rule::floor => {
+            let pair = depair(&mut pair.into_inner(), level + 1)?;
+            CommandLine {
+                cmd: Command::Floor {
+                    target: pair.expr()?,
+                },
+                line,
+            }
+            .into()
+        }
+        Rule::ceil => {
+            let pair = depair(&mut pair.into_inner(), level + 1)?;
+            CommandLine {
+                cmd: Command::Ceil {
+                    target: pair.expr()?,
+                },
+                line,
+            }
+            .into()
+        }
         rule => {
             let original = pair.clone();
             let inner = pair.into_inner();
