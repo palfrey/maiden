@@ -575,7 +575,7 @@ fn alter_variable(
 fn round_variable(state: &mut State, target: &Expression, f: &dyn Fn(f64) -> f64) -> Result<()> {
     let name = match target {
         Expression::Variable(n) => n.to_lowercase(),
-        Expression::Pronoun => state.pronoun.as_ref().unwrap().to_lowercase().to_string(),
+        Expression::Pronoun => state.pronoun.as_ref().unwrap().to_lowercase(),
         _ => {
             return Err(MaidenError::Unimplemented {
                 line: state.current_line,
