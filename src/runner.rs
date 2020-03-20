@@ -572,6 +572,46 @@ fn alter_variable(
     return Ok(());
 }
 
+fn round_variable(state: &mut State, target: &Expression, f: &dyn Fn(f64) -> f64) -> Result<()> {
+    let name = match target {
+        Expression::Variable(n) => n.to_lowercase(),
+        Expression::Pronoun => state.pronoun.as_ref().unwrap().to_lowercase(),
+        _ => {
+            return Err(MaidenError::Unimplemented {
+                line: state.current_line,
+                description: String::from("Attempt to round a non-variable expression"),
+            });
+        }
+    };
+    let val = {
+        let current_line = state.current_line;
+        let v = state.variables.get(&name);
+        if v.is_none() {
+            return Err(MaidenError::MissingVariable {
+                name,
+                line: current_line,
+            });
+        }
+        v.unwrap().clone()
+    };
+    debug!("Value of {} is {:?}", name, val);
+    match val {
+        Expression::Floating(x) => {
+            state.variables.insert(name, Expression::Floating(f(x)));
+        }
+        Expression::Null => {
+            state.variables.insert(name, Expression::Floating(f(0f64)));
+        }
+        _ => {
+            return Err(MaidenError::Unimplemented {
+                description: format!("Attempt to alter non-integer '{}'", name),
+                line: state.current_line,
+            });
+        }
+    };
+    return Ok(());
+}
+
 fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<Expression> {
     let mut total_instr = 0;
     loop {
@@ -736,6 +776,15 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                         Expression::String(input.trim_end_matches('\n').to_string()),
                     );
                 }
+            }
+            Command::Round { ref target } => {
+                round_variable(state, &target, &|x| x.round())?;
+            }
+            Command::Ceil { ref target } => {
+                round_variable(state, &target, &|x| x.ceil())?;
+            }
+            Command::Floor { ref target } => {
+                round_variable(state, &target, &|x| x.floor())?;
             }
         }
         pc += 1;

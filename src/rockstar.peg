@@ -38,7 +38,7 @@ return_kw = { ^"return" | ^"give back" }
 
 function_return = { return_kw ~ expression }
 
-operation = { readline | output | crement | mutation | assignment | put_assignment }
+operation = { readline | output | crement | mutation | assignment | put_assignment | rounding }
 
 readline = { (^"listen to" ~ variable) | ^"listen" }
 
@@ -221,12 +221,12 @@ mutation
 
 rounding = { floor | ceil | math_round }
 
-floor = { ^"turn" ~ variable ~ ^"down" | ^"turn" ~ ^"down" ~ variable }
+floor = { (^"turn" ~ variable ~ ^"down") | (^"turn" ~ ^"down" ~ variable) }
 
 ceil
   = {^"turn" ~ variable ~ ^"up"
   | ^"turn" ~ ^"up" ~ variable }
 
 math_round
-  = {^"turn" ~ variable ~ (^"round" | ^"around")
-  | ^"turn" ~ (^"round" ~ ^"around") ~  variable }
+  = {(^"turn" ~ variable ~ (^"round" | ^"around"))
+  | (^"turn" ~ (^"round" | ^"around") ~  variable) }
