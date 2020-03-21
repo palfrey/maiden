@@ -93,11 +93,11 @@ pub enum Command {
         otherwise: Option<Block>,
     },
     Increment {
-        target: String,
+        target: Expression,
         count: f64,
     },
     Decrement {
-        target: String,
+        target: Expression,
         count: f64,
     },
     Continue,
@@ -189,12 +189,12 @@ pub enum MaidenError {
     UndefinedPronoun { line: usize },
     #[fail(display = "Got infinity on divide between {} and {}", x, y)]
     Infinity { x: String, y: String, line: usize },
-
     #[fail(display = "Expected another item, but didn't get one")]
     Incomplete { line: usize },
-
     #[fail(display = "Bad string. Expected length at least 2 and got {}", length)]
     BadString { length: usize, line: usize },
+    #[fail(display = "Expected an expression, got: {}", other)]
+    NotAnExpression { other: String, line: usize },
 }
 
 pub type Result<T> = ::core::result::Result<T, MaidenError>;

@@ -532,39 +532,45 @@ fn flip_boolean(state: &mut State, target: &str, val: &Expression, count: usize)
 
 fn alter_variable(
     state: &mut State,
-    target: &str,
+    target: &Expression,
     f: &dyn Fn(f64) -> f64,
     count: usize,
 ) -> Result<()> {
+    let name = match target {
+        Expression::Variable(n) => n.to_lowercase(),
+        Expression::Pronoun => state.pronoun.as_ref().unwrap().to_lowercase(),
+        _ => {
+            return Err(MaidenError::Unimplemented {
+                line: state.current_line,
+                description: String::from("Attempt to alter a non-variable expression"),
+            });
+        }
+    };
     let val = {
         let current_line = state.current_line;
-        let v = state.variables.get(&target.to_lowercase());
+        let v = state.variables.get(&name);
         if v.is_none() {
             return Err(MaidenError::MissingVariable {
-                name: target.to_string(),
+                name: name.to_string(),
                 line: current_line,
             });
         }
         v.unwrap().clone()
     };
-    debug!("Value of {} is {:?}", target, val);
+    debug!("Value of {} is {:?}", name, val);
     match val {
         Expression::Floating(x) => {
-            state
-                .variables
-                .insert(target.to_lowercase(), Expression::Floating(f(x)));
+            state.variables.insert(name, Expression::Floating(f(x)));
         }
         Expression::Null => {
-            state
-                .variables
-                .insert(target.to_lowercase(), Expression::Floating(f(0f64)));
+            state.variables.insert(name, Expression::Floating(f(0f64)));
         }
         Expression::False | Expression::True => {
-            return flip_boolean(state, target, &val, count);
+            return flip_boolean(state, &name, &val, count);
         }
         _ => {
             return Err(MaidenError::Unimplemented {
-                description: format!("Attempt to alter non-integer '{}'", target),
+                description: format!("Attempt to alter non-integer '{}'", name),
                 line: state.current_line,
             });
         }

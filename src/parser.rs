@@ -20,7 +20,10 @@ impl Item {
         if let Item::Expression(e) = self {
             Ok(e)
         } else {
-            panic!("Not an expression: {:?}", self)
+            Err(MaidenError::NotAnExpression {
+                other: format!("{:?}", self),
+                line: 0,
+            })
         }
     }
     fn symbol(self) -> Result<SymbolType> {
@@ -315,11 +318,20 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
                 .into(),
                 2 => {
                     let operator = remove(&mut items, 0, line)?.symbol()?;
-                    let first = Box::new(target.clone());
-                    let second = remove(&mut items, 0, line)?.expr()?;
+                    let first = target.clone();
+                    let mut second = match remove(&mut items, 0, line)? {
+                        Item::Expression(expr) => vec![expr],
+                        Item::Symbol(SymbolType::ExpressionList(items)) => items,
+                        item => {
+                            panic!("Something else for assignment: {:?}", item);
+                        }
+                    };
                     match operator {
                         SymbolType::Add => {
-                            let expr = Expression::Add(first, Box::new(second));
+                            let mut expr = first;
+                            for s in second.drain(0..) {
+                                expr = Expression::Add(Box::new(expr), Box::new(s));
+                            }
                             CommandLine {
                                 cmd: Command::Assignment {
                                     target,
@@ -330,7 +342,24 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
                             .into()
                         }
                         SymbolType::Subtract => {
-                            let expr = Expression::Subtract(first, Box::new(second));
+                            let mut expr = first;
+                            for s in second.drain(0..) {
+                                expr = Expression::Subtract(Box::new(expr), Box::new(s));
+                            }
+                            CommandLine {
+                                cmd: Command::Assignment {
+                                    target,
+                                    value: expr,
+                                },
+                                line,
+                            }
+                            .into()
+                        }
+                        SymbolType::Times => {
+                            let mut expr = first;
+                            for s in second.drain(0..) {
+                                expr = Expression::Times(Box::new(expr), Box::new(s));
+                            }
                             CommandLine {
                                 cmd: Command::Assignment {
                                     target,
@@ -341,7 +370,10 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
                             .into()
                         }
                         SymbolType::Divide => {
-                            let expr = Expression::Divide(first, Box::new(second));
+                            let mut expr = first;
+                            for s in second.drain(0..) {
+                                expr = Expression::Divide(Box::new(expr), Box::new(s));
+                            }
                             CommandLine {
                                 cmd: Command::Assignment {
                                     target,
@@ -351,14 +383,14 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
                             }
                             .into()
                         }
-                        SymbolType::Is => CommandLine {
-                            cmd: Command::Assignment {
-                                target,
-                                value: second,
-                            },
-                            line,
+                        SymbolType::Is => {
+                            let s = remove(&mut second, 0, line)?;
+                            CommandLine {
+                                cmd: Command::Assignment { target, value: s },
+                                line,
+                            }
+                            .into()
                         }
-                        .into(),
                         _ => {
                             panic!("Bad assignment operator: {:?}", operator);
                         }
@@ -372,6 +404,9 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
         Rule::arithmetic | Rule::product => {
             debug!("{}Depairing arithmetic", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            if items.len() == 1 {
+                return remove(&mut items, 0, line);
+            }
             if items.len() % 2 != 1 {
                 panic!("Weird arithmetic: {:?}", items);
             };
@@ -624,14 +659,10 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
         Rule::increment => {
             debug!("{}Depairing increment", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
-            let name = if let Expression::Variable(n) = remove(&mut items, 0, line)?.expr()? {
-                n
-            } else {
-                panic!("Non-variable name for increment");
-            };
+            let target = remove(&mut items, 0, line)?.expr()?;
             CommandLine {
                 cmd: Command::Increment {
-                    target: name,
+                    target,
                     count: items.len() as f64,
                 },
                 line,
@@ -641,14 +672,10 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
         Rule::decrement => {
             debug!("{}Depairing decrement", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
-            let name = if let Expression::Variable(n) = remove(&mut items, 0, line)?.expr()? {
-                n
-            } else {
-                panic!("Non-variable name for decrement");
-            };
+            let target = remove(&mut items, 0, line)?.expr()?;
             CommandLine {
                 cmd: Command::Decrement {
-                    target: name,
+                    target,
                     count: items.len() as f64,
                 },
                 line,
