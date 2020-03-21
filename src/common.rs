@@ -93,11 +93,11 @@ pub enum Command {
         otherwise: Option<Block>,
     },
     Increment {
-        target: String,
+        target: Expression,
         count: f64,
     },
     Decrement {
-        target: String,
+        target: Expression,
         count: f64,
     },
     Continue,
@@ -150,7 +150,6 @@ pub struct Program {
 }
 
 #[derive(Debug, Fail)]
-#[allow(dead_code)]
 pub enum MaidenError {
     #[fail(display = "parsing error: {:?}", kind)]
     Pest { kind: pest::error::Error<peg::Rule> },
@@ -174,43 +173,12 @@ pub enum MaidenError {
         got: usize,
         line: usize,
     },
-    #[fail(display = "Unbalanced expression {}", expression)]
-    UnbalancedExpression { expression: String, line: usize },
     #[fail(display = "Bad boolean resolve: {:?}", expression)]
     BadBooleanResolve { expression: String, line: usize },
-    #[fail(display = "Don't recognise command sequence {:?}", sequence)]
-    BadCommandSequence {
-        sequence: Vec<SymbolType>,
-        line: usize,
-    },
     #[fail(display = "Unparsable number: '{}'", number)]
     ParseNumberError { number: String, line: usize },
-    #[fail(display = "Bad 'is' section: {:?}", sequence)]
-    BadIs {
-        sequence: Vec<SymbolType>,
-        line: usize,
-    },
-    #[fail(display = "Bad 'put' section: {:?}", sequence)]
-    BadPut {
-        sequence: Vec<SymbolType>,
-        line: usize,
-    },
     #[fail(display = "No end of if statement")]
     NoEndOfIf { line: usize },
-    #[fail(display = "Else with no if statement")]
-    ElseWithNoIf { line: usize },
-    #[fail(display = "More than one else statement")]
-    MultipleElse { line: usize },
-    #[fail(display = "No end of function")]
-    NoEndFunction { line: usize },
-    #[fail(display = "No end of loop")]
-    NoEndLoop { line: usize },
-    #[fail(display = "Continue outside of a loop")]
-    ContinueOutsideLoop { line: usize },
-    #[fail(display = "Break outside of a loop")]
-    BreakOutsideLoop { line: usize },
-    #[fail(display = "Next outside of a loop")]
-    NextOutsideLoop { line: usize },
     #[fail(display = "Unimplemented: {}", description)]
     Unimplemented { description: String, line: usize },
     #[fail(display = "Exceeded maximum allowed stack depth of {}", depth)]
@@ -221,12 +189,12 @@ pub enum MaidenError {
     UndefinedPronoun { line: usize },
     #[fail(display = "Got infinity on divide between {} and {}", x, y)]
     Infinity { x: String, y: String, line: usize },
-
     #[fail(display = "Expected another item, but didn't get one")]
     Incomplete { line: usize },
-
     #[fail(display = "Bad string. Expected length at least 2 and got {}", length)]
     BadString { length: usize, line: usize },
+    #[fail(display = "Expected an expression, got: {}", other)]
+    NotAnExpression { other: String, line: usize },
 }
 
 pub type Result<T> = ::core::result::Result<T, MaidenError>;

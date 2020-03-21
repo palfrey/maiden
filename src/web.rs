@@ -184,26 +184,21 @@ impl Renderable<Model> for Model {
 
 fn get_error_line(e: &MaidenError) -> usize {
     match e {
-        MaidenError::MissingVariable { line, .. } => line.clone(),
-        MaidenError::UnparsedText { line, .. } => line.clone(),
-        MaidenError::MissingFunction { line, .. } => line.clone(),
-        MaidenError::WrongArgCount { line, .. } => line.clone(),
-        MaidenError::UnbalancedExpression { line, .. } => line.clone(),
-        MaidenError::BadCommandSequence { line, .. } => line.clone(),
-        MaidenError::ParseNumberError { line, .. } => line.clone(),
-        MaidenError::BadIs { line, .. } => line.clone(),
-        MaidenError::BadPut { line, .. } => line.clone(),
-        MaidenError::NoEndOfIf { line } => line.clone(),
-        MaidenError::ElseWithNoIf { line } => line.clone(),
-        MaidenError::MultipleElse { line } => line.clone(),
-        MaidenError::NoEndFunction { line } => line.clone(),
-        MaidenError::NoEndLoop { line } => line.clone(),
-        MaidenError::BadBooleanResolve { line, .. } => line.clone(),
-        MaidenError::Unimplemented { line, .. } => line.clone(),
-        MaidenError::StackOverflow { line, .. } => line.clone(),
-        MaidenError::InstructionLimit { line } => line.clone(),
-        MaidenError::UndefinedPronoun { line } => line.clone(),
-        MaidenError::Infinity { line, .. } => line.clone(),
-        _ => 0,
+        MaidenError::MissingVariable { ref line, .. }
+        | MaidenError::UnparsedText { ref line, .. }
+        | MaidenError::MissingFunction { ref line, .. }
+        | MaidenError::WrongArgCount { ref line, .. }
+        | MaidenError::ParseNumberError { ref line, .. }
+        | MaidenError::NoEndOfIf { ref line }
+        | MaidenError::BadBooleanResolve { ref line, .. }
+        | MaidenError::Unimplemented { ref line, .. }
+        | MaidenError::StackOverflow { ref line, .. }
+        | MaidenError::InstructionLimit { ref line }
+        | MaidenError::UndefinedPronoun { ref line }
+        | MaidenError::Infinity { ref line, .. }
+        | MaidenError::Incomplete { ref line, .. }
+        | MaidenError::NotAnExpression { ref line, .. }
+        | MaidenError::BadString { ref line, .. } => *line,
+        MaidenError::Pest { .. } | MaidenError::Io { .. } => 0,
     }
 }
