@@ -37,7 +37,14 @@ fn main() -> common::Result<()> {
     let mut buffer = String::new();
     f.read_to_string(&mut buffer)?;
 
-    let mut program = parser::parse(&buffer)?;
+    let mut program = match parser::parse(&buffer) {
+        Err(err) => {
+            // This hack is in here as the standard Err printing uses Debug, not Display
+            eprintln!("Error: {}", err);
+            std::process::exit(1);
+        }
+        other => other?,
+    };
     runner::run(&mut program, &mut io::stdout())?;
     Ok(())
 }

@@ -2,9 +2,9 @@
 PEG grammar for Rockstar (https://codewithrockstar.com)
 */
 
-program     = { line+ | EOI }
+program     = { SOI ~ line* ~ EOI }
 
-line = { (statement ~ (EOL | EOI)) | EOL }
+line = { (statement ~ EOL?) | EOL }
 
 WHITESPACE  =  _{" " | "\t" }
 COMMENT     =  _{"(" ~ (!")" ~ ANY)* ~ ")"}

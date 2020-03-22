@@ -33,12 +33,16 @@ impl Model {
 
     fn nicer_error(&self, err: &MaidenError) -> String {
         let line = get_error_line(err);
-        format!(
-            "{} at line {}: \"{}\"",
-            err,
-            line,
-            self.get_line(line as usize)
-        )
+        if line == 0 {
+            format!("{}", err)
+        } else {
+            format!(
+                "{} at line {}: \"{}\"",
+                err,
+                line,
+                self.get_line(line as usize)
+            )
+        }
     }
 
     fn ast_tab(&self) -> Html<Self> {
@@ -185,7 +189,6 @@ impl Renderable<Model> for Model {
 fn get_error_line(e: &MaidenError) -> usize {
     match e {
         MaidenError::MissingVariable { ref line, .. }
-        | MaidenError::UnparsedText { ref line, .. }
         | MaidenError::MissingFunction { ref line, .. }
         | MaidenError::WrongArgCount { ref line, .. }
         | MaidenError::ParseNumberError { ref line, .. }

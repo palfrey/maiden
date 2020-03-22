@@ -151,15 +151,13 @@ pub struct Program {
 
 #[derive(Debug, Fail)]
 pub enum MaidenError {
-    #[fail(display = "parsing error: {:?}", kind)]
+    #[fail(display = "parsing error: {}", kind)]
     Pest { kind: pest::error::Error<peg::Rule> },
     #[fail(display = "IO Error")]
     Io {
         #[fail(cause)]
         io_error: std::io::Error,
     },
-    #[fail(display = "Unparsed text '{}'", text)]
-    UnparsedText { text: String, line: usize },
     #[fail(display = "Missing variable '{}'", name)]
     MissingVariable { name: String, line: usize },
     #[fail(display = "Missing function '{}'", name)]

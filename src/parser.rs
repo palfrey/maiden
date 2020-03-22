@@ -77,10 +77,7 @@ where
     if span.end() != content.len() {
         let text = content[span.end()..].trim();
         if !text.is_empty() {
-            return Err(MaidenError::UnparsedText {
-                text: text.to_string(),
-                line: span.end_pos().line_col().0,
-            });
+            panic!("Unparsed text: {}", text);
         }
     }
     let mut commands = vec![];
