@@ -1,15 +1,15 @@
 use std::io::Write;
 extern crate walkdir;
+use failure::Error;
 use walkdir::WalkDir;
 
-fn main() {
-    let out_dir = std::env::var("OUT_DIR").unwrap();
+fn main() -> Result<(), Error> {
+    let out_dir = std::env::var("OUT_DIR")?;
     let destination = std::path::Path::new(&out_dir).join("test.rs");
-    let mut f = std::fs::File::create(&destination).unwrap();
+    let mut f = std::fs::File::create(&destination)?;
 
     for entry in WalkDir::new("tests").follow_links(true) {
-        let name = entry
-            .unwrap()
+        let name = entry?
             .path()
             .to_str()
             .unwrap()
@@ -50,8 +50,8 @@ fn main() {
                 name = name,
                 test_name = test_name,
                 function = function
-            )
-            .unwrap();
+            )?;
         }
     }
+    Ok(())
 }
