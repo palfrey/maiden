@@ -7,7 +7,7 @@ program     = { SOI ~ line* ~ EOI }
 line = { (statement ~ EOL?) | EOL }
 
 WHITESPACE  =  _{" " | "\t" }
-COMMENT     =  _{"(" ~ (!("("|")") ~ ANY)* ~ ")"}
+COMMENT     =  _{"(" ~ (!")" ~ ANY)* ~ ")"}
 
 noise 	= _{ WHITESPACE|";"|","|"?"|"!"|"&"|"." }
 EOL = _{ noise* ~ NEWLINE }
