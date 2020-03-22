@@ -27,13 +27,6 @@ fn main() -> Result<(), Error> {
                 continue; // FIXME: Blocked by https://github.com/RockstarLang/rockstar/issues/162
             }
 
-            if test_name.contains("_arrays_") {
-                continue; // we don't implement arrays yet
-            }
-            if test_name.contains("types_parsing") {
-                continue; // don't support casts yet
-            }
-
             let function = if name.contains("failures") {
                 "parse_fail_file_test"
             } else {

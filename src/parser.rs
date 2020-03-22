@@ -297,6 +297,23 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             }
             .into()
         }
+        Rule::assignable => {
+            debug!("{}Depairing assignable", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            let variable = remove(&mut items, 0, line)?;
+            let indexer = remove(&mut items, 0, line);
+            match indexer {
+                Ok(index) => Expression::ArrayRef {
+                    name: Box::new(variable.expr()?),
+                    index: Box::new(index.expr()?),
+                }
+                .into(),
+                Err(_) => variable,
+            }
+        }
+        Rule::join => SymbolType::Join.into(),
+        Rule::split => SymbolType::Split.into(),
+        Rule::cast => SymbolType::Cast.into(),
         Rule::assignment => {
             debug!("{}Depairing assignment", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
@@ -765,6 +782,28 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             }
             .into()
         }
+        Rule::modifier => {
+            debug!("{}Depairing modifier", level_string);
+            Expression::Modifier(Box::new(depair(&mut pair.into_inner(), level + 1)?.expr()?))
+                .into()
+        }
+        Rule::mutation => {
+            debug!("{}Depairing mutation", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            let mutator = remove(&mut items, 0, line)?.symbol()?;
+            let mut count = items.len();
+            let modifier =
+                if let Some(Item::Expression(Expression::Modifier(changer))) = items.last() {
+                    count -= 1;
+                    Some(changer)
+                } else {
+                    None
+                };
+            panic!(
+                "Mutation ({:?}): {:?} {:?} {}",
+                mutator, modifier, items, count
+            );
+        }
         rule => {
             let original = pair.clone();
             let inner = pair.into_inner();
@@ -783,7 +822,11 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
                 depair(&mut original.into_inner(), level + 1)?
             } else {
                 debug!("{}List rule: {:?}", level_string, rule);
-                depair(&mut original.into_inner(), level + 1)?
+                panic!(
+                    "Unbuilt list rule '{:?}': {:?}",
+                    rule,
+                    depair_seq(&mut original.into_inner(), level + 1)?
+                );
             }
         }
     };

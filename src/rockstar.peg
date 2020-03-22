@@ -59,7 +59,7 @@ until_kw = {^"until"}
 loop_kw 	= { (while_kw ~ expression ~ loopable) | (until_kw ~ expression ~ loopable) }
 output  = {(^"say" |^"shout"|^"whisper"|^"scream") ~ expression}
 
-simple_expression = { function_call | constant | lookup | literal | pronoun }
+simple_expression = { function_call | lookup | literal | pronoun }
 
 literal = { constant | number | string}
 
@@ -129,7 +129,10 @@ pronoun = {
     | ^"ze" | ^"ve" | ^"xe" | ^"it" | ^"he"
 }
 
-lookup = { variable }
+indexer = { "at " ~ expression }
+assignable = { variable ~ indexer? }
+
+lookup = { assignable }
 
 common_prefix = { ^"an" | ^"a" | ^"the" | ^"my" | ^"your" }
 
@@ -142,16 +145,13 @@ common_variable = @{common_prefix ~ WHITESPACE ~ letter+}
 
 is = { "=''" | ^"'s " | ^"is " | ^"was " | ^"are " | ^"were "}
 
-target = { ^"into" ~ assignable }
+target = { ^"into " ~ assignable }
 
-indexer = { ^"at" ~ expression }
-assignable = { variable ~ indexer? }
-
-put_assignment = { ^"put" ~ expression ~ ^"into " ~ variable }
+put_assignment = { ^"put " ~ expression ~ target }
 assignment = { (assignable ~ is ~ (literal | poetic_number))
   | (assignable ~ ^"says " ~ poetic_string)
-  | (^"let" ~ assignable ~ ^"be " ~ compoundable_operator ~ expression)
-  | (^"let" ~ assignable ~ ^"be " ~ expression)
+  | (^"let " ~ assignable ~ ^"be " ~ compoundable_operator ~ expression)
+  | (^"let " ~ assignable ~ ^"be " ~ expression)
 }
 
 poetic_string = @{ (!"\n" ~ ANY)+ }
@@ -188,7 +188,7 @@ kw4 = { ^"aint" | ^"back" | ^"cast" | ^"burn" | ^"join" | ^"down" | ^"else" | ^"
     | ^"plus" | ^"says" | ^"than" | ^"them" | ^"they" | ^"true" | ^"weak" | ^"were" | ^"your" | ^"over" | ^"with"}
 kw3 = { ^"and" | ^"big" | ^"her" | ^"him" | ^"hir" | ^"it " | ^"low" | ^"nor" | ^"not" | ^"put" | ^"say" | ^"she"
     | ^"the" | ^"top" | ^"ver" | ^"was" | ^"xem" | ^"yes" | ^"zie" | ^"zir"}
-kw2 = { ^"an" | ^"as" | ^"he" | ^"if" | ^"is" | ^"it" | ^"my" | ^"no" | ^"of" | ^"ok" | ^"or" | ^"to" | ^"up" | ^"ve"
+kw2 = { ^"an" | ^"as" | ^"at" | ^"he" | ^"if" | ^"is" | ^"it" | ^"my" | ^"no" | ^"of" | ^"ok" | ^"or" | ^"to" | ^"up" | ^"ve"
     | ^"xe" | ^"ze" }
 kw1 = { ^"a" }
 
@@ -217,7 +217,7 @@ mutator = { split | cast | join }
 modifier =  { (^"with" | ^"using") ~ expression }
 
 mutation
-    = { mutator ~ expression ~ target ~ modifier | mutator ~ assignable ~ modifier? }
+    = { mutator ~ ((expression ~ target) | assignable) ~ modifier? }
 
 rounding = { floor | ceil | math_round }
 

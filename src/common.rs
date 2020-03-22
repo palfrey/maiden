@@ -10,6 +10,11 @@ pub enum Expression {
     Floating(f64),
     Variable(String),
     Object(String), // currently just functions
+    ArrayRef {
+        name: Box<Expression>,
+        index: Box<Expression>,
+    },
+    Modifier(Box<Expression>),
     True,
     False,
     Call(String, Vec<Expression>),
@@ -57,6 +62,9 @@ pub enum SymbolType {
     Aint,
     Divide,
     Empty,
+    Join,
+    Cast,
+    Split,
     VariableList(Vec<String>),
     ArgsList(Vec<Expression>),
     ExpressionList(Vec<Expression>),
