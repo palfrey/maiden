@@ -39,7 +39,9 @@ fn main() -> common::Result<()> {
 
     let mut program = match parser::parse(&buffer) {
         Err(err) => {
-            panic!("{}", err);
+            // This hack is in here as the standard Err printing uses Debug, not Display
+            eprintln!("Error: {}", err);
+            std::process::exit(1);
         }
         other => other?,
     };
