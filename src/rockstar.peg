@@ -56,14 +56,14 @@ loopable 	= { statement | (EOL ~ block ~ EOL) }
 
 while_kw = {^"while"}
 until_kw = {^"until"}
-loop_kw 	= { (while_kw ~ expression ~ loopable) | (until_kw ~ expression ~ loopable) }
+loop_kw 	= { (while_kw | until_kw) ~ expression ~ loopable }
 output  = {(^"say" |^"shout"|^"whisper"|^"scream") ~ expression}
 
 simple_expression = { function_call | lookup | literal | pronoun }
 
-literal = { constant | number | string}
+literal = { constant | number | string }
 
-constant = {null | true_kw | false_kw | mysterious}
+constant = { null | true_kw | false_kw | mysterious }
 
 true_kw 	= @{(^"true" | ^"ok" | ^"right" | ^"yes") ~ !letter }
 
@@ -77,7 +77,7 @@ number      = @{(("-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)?) ~ "."?) | ("." ~ 
 
 string      = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 
-expression = { boolean }
+expression = !{ boolean }
 
 boolean = { nor }
 
@@ -129,8 +129,7 @@ pronoun = {
     | ^"ze" | ^"ve" | ^"xe" | ^"it" | ^"he"
 }
 
-indexer = { "at " ~ expression }
-assignable = { variable ~ indexer? }
+assignable = ${ variable ~ (WHITESPACE ~ "at" ~ WHITESPACE ~ expression)? }
 
 lookup = { assignable }
 
@@ -188,7 +187,7 @@ kw4 = { ^"aint" | ^"back" | ^"cast" | ^"burn" | ^"join" | ^"down" | ^"else" | ^"
     | ^"plus" | ^"says" | ^"than" | ^"them" | ^"they" | ^"true" | ^"weak" | ^"were" | ^"your" | ^"over" | ^"with"}
 kw3 = { ^"and" | ^"big" | ^"her" | ^"him" | ^"hir" | ^"it " | ^"low" | ^"nor" | ^"not" | ^"put" | ^"say" | ^"she"
     | ^"the" | ^"top" | ^"ver" | ^"was" | ^"xem" | ^"yes" | ^"zie" | ^"zir"}
-kw2 = { ^"an" | ^"as" | ^"at" | ^"he" | ^"if" | ^"is" | ^"it" | ^"my" | ^"no" | ^"of" | ^"ok" | ^"or" | ^"to" | ^"up" | ^"ve"
+kw2 = { ^"an" | ^"as" | ^"at" | ^"be" | ^"he" | ^"if" | ^"is" | ^"it" | ^"my" | ^"no" | ^"of" | ^"ok" | ^"or" | ^"to" | ^"up" | ^"ve"
     | ^"xe" | ^"ze" }
 kw1 = { ^"a" }
 
