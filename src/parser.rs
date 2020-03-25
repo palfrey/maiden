@@ -278,6 +278,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             item
         }
         Rule::not => {
+            debug!("{}Depairing not", level_string);
             let mut pairs = pair.into_inner();
             let compare = pairs.peek().unwrap().as_rule() == Rule::comparison;
             let item = depair(&mut pairs, level + 1)?;
@@ -288,6 +289,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             }
         }
         Rule::put_assignment => {
+            debug!("{}Depairing put_assignment", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let value = remove(&mut items, 0, line)?.expr()?;
             let target = remove(&mut items, 0, line)?.expr()?;
