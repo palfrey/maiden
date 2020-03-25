@@ -59,6 +59,13 @@ impl PartialOrd for Expression {
                     None
                 }
             }
+            Expression::String(s) => {
+                if let Expression::String(o) = other {
+                    s.partial_cmp(o)
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }
