@@ -1,9 +1,10 @@
 use failure::Fail;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 
 use crate::peg;
 
-#[derive(Debug, PartialEq, Clone, PartialOrd)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     // Single items
     String(String),
@@ -13,6 +14,10 @@ pub enum Expression {
     ArrayRef {
         name: Box<Expression>,
         index: Box<Expression>,
+    },
+    Array {
+        numeric: HashMap<usize, Box<Expression>>,
+        strings: HashMap<String, Box<Expression>>,
     },
     Modifier(Box<Expression>),
     True,
@@ -44,7 +49,22 @@ pub enum Expression {
     LessThan(Box<Expression>, Box<Expression>),
 }
 
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
+impl PartialOrd for Expression {
+    fn partial_cmp(&self, other: &Expression) -> Option<Ordering> {
+        match self {
+            Expression::Floating(s) => {
+                if let Expression::Floating(o) = other {
+                    s.partial_cmp(o)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum SymbolType {
     Is,
     Up,

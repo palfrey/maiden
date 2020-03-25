@@ -648,6 +648,36 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                         let pronoun = state.pronoun.as_ref().unwrap();
                         state.variables.insert(pronoun.to_lowercase(), val);
                     }
+                    // FIXME: improve with box patterns once stabilised https://github.com/rust-lang/rust/issues/29641
+                    Expression::ArrayRef { name, index } => {
+                        if let Expression::Variable(var_name) = name.deref() {
+                            if let Expression::Floating(index) = **index {
+                                if let Some(array) = state.variables.get_mut(var_name) {
+                                    if let Expression::Array {
+                                        ref mut numeric, ..
+                                    } = array
+                                    {
+                                        numeric.insert(index as usize, Box::new(val));
+                                    } else {
+                                        panic!(
+                                            "Array ref assignment to non-array {} {}",
+                                            var_name, index
+                                        );
+                                    }
+                                } else {
+                                    let mut numeric = HashMap::new();
+                                    numeric.insert(index as usize, Box::new(val));
+                                    state.variables.insert(
+                                        var_name.to_string(),
+                                        Expression::Array {
+                                            numeric,
+                                            strings: HashMap::new(),
+                                        },
+                                    );
+                                }
+                            }
+                        }
+                    }
                     _ => {
                         panic!("Don't know how to assign to {:?}", target);
                     }
