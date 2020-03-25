@@ -477,7 +477,7 @@ pub fn run(program: &mut Program, writer: &mut dyn Write) -> Result<HashMap<Stri
     return Ok(variables);
 }
 
-fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
+fn get_printable(value: &Expression, state: &State) -> Result<String> {
     match *value {
         Expression::Floating(ref x) => Ok(format!("{}", x)),
         Expression::String(ref s) => Ok(s.to_string()),
@@ -492,6 +492,51 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
                     });
                 }
                 v.unwrap().clone()
+            };
+            get_printable(&v, state)
+        }
+        Expression::Array { ref numeric, .. } => Ok(format!("{}", numeric.len())),
+        Expression::ArrayRef {
+            ref name,
+            ref index,
+        } => {
+            let v = {
+                let current_line = state.current_line;
+                let n = match **name {
+                    Expression::Variable(ref s) => s,
+                    _ => {
+                        panic!("Other expression for array name: {:?}", name);
+                    }
+                };
+                let v = state.variables.get(&n.to_lowercase());
+                if v.is_none() {
+                    return Err(MaidenError::MissingVariable {
+                        name: n.to_string(),
+                        line: current_line,
+                    });
+                }
+                let entry = match v.unwrap() {
+                    Expression::Array {
+                        ref numeric,
+                        ref strings,
+                    } => match **index {
+                        Expression::String(ref s) => strings.get(s),
+                        Expression::Floating(f) => numeric.get(&(f as usize)),
+                        _ => {
+                            panic!("Don't know how to array lookup with: {:?}", index);
+                        }
+                    },
+                    _ => {
+                        panic!("Array ref to non-array: {:?}", v);
+                    }
+                };
+                if entry.is_none() {
+                    return Err(MaidenError::MissingVariable {
+                        name: n.to_string(),
+                        line: current_line,
+                    });
+                }
+                entry.unwrap()
             };
             get_printable(&v, state)
         }
@@ -651,29 +696,59 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                     // FIXME: improve with box patterns once stabilised https://github.com/rust-lang/rust/issues/29641
                     Expression::ArrayRef { name, index } => {
                         if let Expression::Variable(var_name) = name.deref() {
-                            if let Expression::Floating(index) = **index {
-                                if let Some(array) = state.variables.get_mut(var_name) {
-                                    if let Expression::Array {
-                                        ref mut numeric, ..
-                                    } = array
-                                    {
-                                        numeric.insert(index as usize, Box::new(val));
+                            match **index {
+                                Expression::Floating(idx) => {
+                                    if let Some(array) = state.variables.get_mut(var_name) {
+                                        if let Expression::Array {
+                                            ref mut numeric, ..
+                                        } = array
+                                        {
+                                            numeric.insert(idx as usize, Box::new(val));
+                                        } else {
+                                            panic!(
+                                                "Array ref assignment to non-array {} {}",
+                                                var_name, idx
+                                            );
+                                        }
                                     } else {
-                                        panic!(
-                                            "Array ref assignment to non-array {} {}",
-                                            var_name, index
+                                        let mut numeric = HashMap::new();
+                                        numeric.insert(idx as usize, Box::new(val));
+                                        state.variables.insert(
+                                            var_name.to_string(),
+                                            Expression::Array {
+                                                numeric,
+                                                strings: HashMap::new(),
+                                            },
                                         );
                                     }
-                                } else {
-                                    let mut numeric = HashMap::new();
-                                    numeric.insert(index as usize, Box::new(val));
-                                    state.variables.insert(
-                                        var_name.to_string(),
-                                        Expression::Array {
-                                            numeric,
-                                            strings: HashMap::new(),
-                                        },
-                                    );
+                                }
+                                Expression::String(ref idx) => {
+                                    if let Some(array) = state.variables.get_mut(var_name) {
+                                        if let Expression::Array {
+                                            ref mut strings, ..
+                                        } = array
+                                        {
+                                            strings.insert(idx.to_string(), Box::new(val));
+                                        } else {
+                                            panic!(
+                                                "Array ref assignment to non-array {} {}",
+                                                var_name, idx
+                                            );
+                                        }
+                                    } else {
+                                        let mut strings = HashMap::new();
+                                        strings.insert(idx.to_string(), Box::new(val));
+                                        state.variables.insert(
+                                            var_name.to_string(),
+                                            Expression::Array {
+                                                numeric: HashMap::new(),
+                                                strings,
+                                            },
+                                        );
+                                    }
+                                }
+                                _ => {
+                                    panic!("Index assignment with {:?}", index);
                                 }
                             }
                         }
