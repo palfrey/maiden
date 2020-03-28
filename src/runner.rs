@@ -519,15 +519,21 @@ fn get_printable(value: &Expression, state: &State) -> Result<String> {
                         line: current_line,
                     });
                 }
+                let mut local_index = &**index;
+                let variable;
+                if let Expression::Variable(ref var) = local_index {
+                    variable = state.variables.get(var).unwrap().clone();
+                    local_index = &variable;
+                }
                 let entry = match v.unwrap() {
                     Expression::Array {
                         ref numeric,
                         ref strings,
-                    } => match **index {
+                    } => match local_index {
                         Expression::String(ref s) => strings.get(s),
-                        Expression::Floating(f) => numeric.get(&(f as usize)),
+                        Expression::Floating(f) => numeric.get(&(*f as usize)),
                         _ => {
-                            panic!("Don't know how to array lookup with: {:?}", index);
+                            panic!("Don't know how to array lookup with: {:?}", local_index);
                         }
                     },
                     _ => {
@@ -694,14 +700,20 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                     // FIXME: improve with box patterns once stabilised https://github.com/rust-lang/rust/issues/29641
                     Expression::ArrayRef { name, index } => {
                         if let Expression::Variable(var_name) = name.deref() {
-                            match **index {
-                                Expression::Floating(idx) => {
+                            let mut local_index = &**index;
+                            let variable;
+                            if let Expression::Variable(ref var) = local_index {
+                                variable = state.variables.get(var).unwrap().clone();
+                                local_index = &variable;
+                            }
+                            match local_index {
+                                Expression::Floating(ref idx) => {
                                     if let Some(array) = state.variables.get_mut(var_name) {
                                         if let Expression::Array {
                                             ref mut numeric, ..
                                         } = array
                                         {
-                                            numeric.insert(idx as usize, Box::new(val));
+                                            numeric.insert(*idx as usize, Box::new(val));
                                         } else {
                                             panic!(
                                                 "Array ref assignment to non-array {} {}",
@@ -710,7 +722,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                                         }
                                     } else {
                                         let mut numeric = HashMap::new();
-                                        numeric.insert(idx as usize, Box::new(val));
+                                        numeric.insert(*idx as usize, Box::new(val));
                                         state.variables.insert(
                                             var_name.to_string(),
                                             Expression::Array {
