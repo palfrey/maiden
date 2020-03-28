@@ -500,6 +500,7 @@ fn get_printable(value: &Expression, state: &State) -> Result<String> {
             ref name,
             ref index,
         } => {
+            let mysterious_box = Box::new(Expression::Mysterious);
             let v = {
                 let current_line = state.current_line;
                 let n = match **name {
@@ -530,13 +531,7 @@ fn get_printable(value: &Expression, state: &State) -> Result<String> {
                         panic!("Array ref to non-array: {:?}", v);
                     }
                 };
-                if entry.is_none() {
-                    return Err(MaidenError::MissingVariable {
-                        name: n.to_string(),
-                        line: current_line,
-                    });
-                }
-                entry.unwrap()
+                entry.unwrap_or(&mysterious_box)
             };
             get_printable(&v, state)
         }
