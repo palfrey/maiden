@@ -504,6 +504,7 @@ fn get_printable(value: &Expression, state: &State) -> Result<String> {
             ref index,
         } => {
             let mysterious_box = Box::new(Expression::Mysterious);
+            let string_box;
             let v = {
                 let current_line = state.current_line;
                 let n = match **name {
@@ -534,6 +535,21 @@ fn get_printable(value: &Expression, state: &State) -> Result<String> {
                         Expression::Floating(f) => numeric.get(&(*f as usize)),
                         _ => {
                             panic!("Don't know how to array lookup with: {:?}", local_index);
+                        }
+                    },
+                    Expression::String(ref s) => match local_index {
+                        Expression::Floating(f) => {
+                            let g = *f as usize;
+                            match s.get(g..(g + 1)) {
+                                Some(slice) => {
+                                    string_box = Box::new(Expression::String(slice.to_string()));
+                                    Some(&string_box)
+                                }
+                                None => None,
+                            }
+                        }
+                        _ => {
+                            panic!("Don't know how to do string lookup with: {:?}", local_index);
                         }
                     },
                     _ => {
