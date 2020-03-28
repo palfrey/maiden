@@ -108,6 +108,7 @@ pub struct Block {
     pub commands: Vec<CommandLine>,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum Command {
     Assignment {

@@ -7,6 +7,7 @@ use pest::iterators::Pair;
 use pest::Parser;
 use std::collections::HashMap;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 enum Item {
     Expression(Expression),

@@ -495,10 +495,9 @@ fn get_printable(value: &Expression, state: &State) -> Result<String> {
             };
             get_printable(&v, state)
         }
-        Expression::Array { ref numeric, .. } => Ok(format!(
-            "{}",
-            numeric.keys().into_iter().max().map_or(0, |x| x + 1)
-        )),
+        Expression::Array { ref numeric, .. } => {
+            Ok(format!("{}", numeric.keys().max().map_or(0, |x| x + 1)))
+        }
         Expression::ArrayRef {
             ref name,
             ref index,
@@ -507,16 +506,16 @@ fn get_printable(value: &Expression, state: &State) -> Result<String> {
             let string_box;
             let v = {
                 let current_line = state.current_line;
-                let n = match **name {
+                let var_name = match **name {
                     Expression::Variable(ref s) => s,
                     _ => {
                         panic!("Other expression for array name: {:?}", name);
                     }
                 };
-                let v = state.variables.get(&n.to_lowercase());
+                let v = state.variables.get(&var_name.to_lowercase());
                 if v.is_none() {
                     return Err(MaidenError::MissingVariable {
-                        name: n.to_string(),
+                        name: var_name.to_string(),
                         line: current_line,
                     });
                 }
@@ -683,6 +682,7 @@ fn round_variable(state: &mut State, target: &Expression, f: &dyn Fn(f64) -> f64
     return Ok(());
 }
 
+#[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
 fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<Expression> {
     let mut total_instr = 0;
     loop {
