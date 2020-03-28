@@ -349,6 +349,7 @@ name = "maiden"
 version = "0.1.0"
 dependencies = [
  "assert_cmd",
+ "backtrace-sys",
  "clap",
  "failure",
  "log",

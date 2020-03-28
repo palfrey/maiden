@@ -477,7 +477,7 @@ pub fn run(program: &mut Program, writer: &mut dyn Write) -> Result<HashMap<Stri
     return Ok(variables);
 }
 
-fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
+fn get_printable(value: &Expression, state: &State) -> Result<String> {
     match *value {
         Expression::Floating(ref x) => Ok(format!("{}", x)),
         Expression::String(ref s) => Ok(s.to_string()),
@@ -492,6 +492,70 @@ fn get_printable(value: &Expression, state: &mut State) -> Result<String> {
                     });
                 }
                 v.unwrap().clone()
+            };
+            get_printable(&v, state)
+        }
+        Expression::Array { ref numeric, .. } => {
+            Ok(format!("{}", numeric.keys().max().map_or(0, |x| x + 1)))
+        }
+        Expression::ArrayRef {
+            ref name,
+            ref index,
+        } => {
+            let mysterious_box = Box::new(Expression::Mysterious);
+            let string_box;
+            let v = {
+                let current_line = state.current_line;
+                let var_name = match **name {
+                    Expression::Variable(ref s) => s,
+                    _ => {
+                        panic!("Other expression for array name: {:?}", name);
+                    }
+                };
+                let v = state.variables.get(&var_name.to_lowercase());
+                if v.is_none() {
+                    return Err(MaidenError::MissingVariable {
+                        name: var_name.to_string(),
+                        line: current_line,
+                    });
+                }
+                let mut local_index = &**index;
+                let variable;
+                if let Expression::Variable(ref var) = local_index {
+                    variable = state.variables.get(var).unwrap().clone();
+                    local_index = &variable;
+                }
+                let entry = match v.unwrap() {
+                    Expression::Array {
+                        ref numeric,
+                        ref strings,
+                    } => match local_index {
+                        Expression::String(ref s) => strings.get(s),
+                        Expression::Floating(f) => numeric.get(&(*f as usize)),
+                        _ => {
+                            panic!("Don't know how to array lookup with: {:?}", local_index);
+                        }
+                    },
+                    Expression::String(ref s) => match local_index {
+                        Expression::Floating(f) => {
+                            let g = *f as usize;
+                            match s.get(g..(g + 1)) {
+                                Some(slice) => {
+                                    string_box = Box::new(Expression::String(slice.to_string()));
+                                    Some(&string_box)
+                                }
+                                None => None,
+                            }
+                        }
+                        _ => {
+                            panic!("Don't know how to do string lookup with: {:?}", local_index);
+                        }
+                    },
+                    _ => {
+                        panic!("Array ref to non-array: {:?}", v);
+                    }
+                };
+                entry.unwrap_or(&mysterious_box)
             };
             get_printable(&v, state)
         }
@@ -618,6 +682,7 @@ fn round_variable(state: &mut State, target: &Expression, f: &dyn Fn(f64) -> f64
     return Ok(());
 }
 
+#[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
 fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<Expression> {
     let mut total_instr = 0;
     loop {
@@ -647,6 +712,72 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                     Expression::Pronoun => {
                         let pronoun = state.pronoun.as_ref().unwrap();
                         state.variables.insert(pronoun.to_lowercase(), val);
+                    }
+                    // FIXME: improve with box patterns once stabilised https://github.com/rust-lang/rust/issues/29641
+                    Expression::ArrayRef { name, index } => {
+                        if let Expression::Variable(var_name) = name.deref() {
+                            let mut local_index = &**index;
+                            let variable;
+                            if let Expression::Variable(ref var) = local_index {
+                                variable = state.variables.get(var).unwrap().clone();
+                                local_index = &variable;
+                            }
+                            match local_index {
+                                Expression::Floating(ref idx) => {
+                                    if let Some(array) = state.variables.get_mut(var_name) {
+                                        if let Expression::Array {
+                                            ref mut numeric, ..
+                                        } = array
+                                        {
+                                            numeric.insert(*idx as usize, Box::new(val));
+                                        } else {
+                                            panic!(
+                                                "Array ref assignment to non-array {} {}",
+                                                var_name, idx
+                                            );
+                                        }
+                                    } else {
+                                        let mut numeric = HashMap::new();
+                                        numeric.insert(*idx as usize, Box::new(val));
+                                        state.variables.insert(
+                                            var_name.to_string(),
+                                            Expression::Array {
+                                                numeric,
+                                                strings: HashMap::new(),
+                                            },
+                                        );
+                                    }
+                                }
+                                Expression::String(ref idx) => {
+                                    if let Some(array) = state.variables.get_mut(var_name) {
+                                        if let Expression::Array {
+                                            ref mut strings, ..
+                                        } = array
+                                        {
+                                            strings.insert(idx.to_string(), Box::new(val));
+                                        } else {
+                                            panic!(
+                                                "Array ref assignment to non-array {} {}",
+                                                var_name, idx
+                                            );
+                                        }
+                                    } else {
+                                        let mut strings = HashMap::new();
+                                        strings.insert(idx.to_string(), Box::new(val));
+                                        state.variables.insert(
+                                            var_name.to_string(),
+                                            Expression::Array {
+                                                numeric: HashMap::new(),
+                                                strings,
+                                            },
+                                        );
+                                    }
+                                }
+                                _ => {
+                                    panic!("Index assignment with {:?}", index);
+                                }
+                            }
+                        }
                     }
                     _ => {
                         panic!("Don't know how to assign to {:?}", target);

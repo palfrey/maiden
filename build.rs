@@ -1,15 +1,15 @@
 use std::io::Write;
 extern crate walkdir;
+use failure::Error;
 use walkdir::WalkDir;
 
-fn main() {
-    let out_dir = std::env::var("OUT_DIR").unwrap();
+fn main() -> Result<(), Error> {
+    let out_dir = std::env::var("OUT_DIR")?;
     let destination = std::path::Path::new(&out_dir).join("test.rs");
-    let mut f = std::fs::File::create(&destination).unwrap();
+    let mut f = std::fs::File::create(&destination)?;
 
     for entry in WalkDir::new("tests").follow_links(true) {
-        let name = entry
-            .unwrap()
+        let name = entry?
             .path()
             .to_str()
             .unwrap()
@@ -27,11 +27,11 @@ fn main() {
                 continue; // FIXME: Blocked by https://github.com/RockstarLang/rockstar/issues/162
             }
 
-            if test_name.contains("_arrays_") {
-                continue; // we don't implement arrays yet
-            }
-            if test_name.contains("types_parsing") {
-                continue; // don't support casts yet
+            if test_name.contains("arrays_join")
+                || test_name.contains("arrays_split")
+                || test_name.contains("types_parsing")
+            {
+                continue; // we don't implement mutators yet https://github.com/palfrey/maiden/issues/25
             }
 
             let function = if name.contains("failures") {
@@ -50,8 +50,8 @@ fn main() {
                 name = name,
                 test_name = test_name,
                 function = function
-            )
-            .unwrap();
+            )?;
         }
     }
+    Ok(())
 }

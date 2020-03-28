@@ -1,15 +1,25 @@
 use failure::Fail;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 
 use crate::peg;
 
-#[derive(Debug, PartialEq, Clone, PartialOrd)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     // Single items
     String(String),
     Floating(f64),
     Variable(String),
     Object(String), // currently just functions
+    ArrayRef {
+        name: Box<Expression>,
+        index: Box<Expression>,
+    },
+    Array {
+        numeric: HashMap<usize, Box<Expression>>,
+        strings: HashMap<String, Box<Expression>>,
+    },
+    Modifier(Box<Expression>),
     True,
     False,
     Call(String, Vec<Expression>),
@@ -39,7 +49,29 @@ pub enum Expression {
     LessThan(Box<Expression>, Box<Expression>),
 }
 
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
+impl PartialOrd for Expression {
+    fn partial_cmp(&self, other: &Expression) -> Option<Ordering> {
+        match self {
+            Expression::Floating(s) => {
+                if let Expression::Floating(o) = other {
+                    s.partial_cmp(o)
+                } else {
+                    None
+                }
+            }
+            Expression::String(s) => {
+                if let Expression::String(o) = other {
+                    s.partial_cmp(o)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum SymbolType {
     Is,
     Up,
@@ -57,6 +89,9 @@ pub enum SymbolType {
     Aint,
     Divide,
     Empty,
+    Join,
+    Cast,
+    Split,
     VariableList(Vec<String>),
     ArgsList(Vec<Expression>),
     ExpressionList(Vec<Expression>),
@@ -73,6 +108,7 @@ pub struct Block {
     pub commands: Vec<CommandLine>,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum Command {
     Assignment {
