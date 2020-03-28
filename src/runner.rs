@@ -495,9 +495,10 @@ fn get_printable(value: &Expression, state: &State) -> Result<String> {
             };
             get_printable(&v, state)
         }
-        Expression::Array { ref numeric, .. } => {
-            Ok(format!("{}", numeric.keys().into_iter().max().unwrap() + 1))
-        }
+        Expression::Array { ref numeric, .. } => Ok(format!(
+            "{}",
+            numeric.keys().into_iter().max().map_or(0, |x| x + 1)
+        )),
         Expression::ArrayRef {
             ref name,
             ref index,
