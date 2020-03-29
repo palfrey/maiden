@@ -798,14 +798,39 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             let modifier =
                 if let Some(Item::Expression(Expression::Modifier(changer))) = items.last() {
                     count -= 1;
-                    Some(changer)
+                    Some((**changer).clone())
                 } else {
                     None
                 };
-            panic!(
-                "Mutation ({:?}): {:?} {:?} {}",
-                mutator, modifier, items, count
-            );
+            let source;
+            let target;
+            let lookup;
+            match count {
+                1 => {
+                    source = None;
+                    target = None;
+                    lookup = Some(remove(&mut items, 0, line)?.expr()?);
+                }
+                2 => {
+                    source = Some(remove(&mut items, 0, line)?.expr()?);
+                    target = Some(remove(&mut items, 0, line)?.expr()?);
+                    lookup = None;
+                }
+                _ => {
+                    panic!("Mutation count of {} not 1 or 2: {:?}", count, items);
+                }
+            };
+            CommandLine {
+                cmd: Command::Mutation {
+                    mutator,
+                    source,
+                    target,
+                    lookup,
+                    modifier,
+                },
+                line,
+            }
+            .into()
         }
         rule => {
             let original = pair.clone();

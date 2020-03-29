@@ -165,6 +165,13 @@ pub enum Command {
     Round {
         target: Expression,
     },
+    Mutation {
+        mutator: SymbolType,
+        source: Option<Expression>,
+        target: Option<Expression>,
+        lookup: Option<Expression>,
+        modifier: Option<Expression>,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]
