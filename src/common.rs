@@ -1,6 +1,6 @@
 use failure::Fail;
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::peg;
 
@@ -16,8 +16,8 @@ pub enum Expression {
         index: Box<Expression>,
     },
     Array {
-        numeric: HashMap<usize, Box<Expression>>,
-        strings: HashMap<String, Box<Expression>>,
+        numeric: BTreeMap<usize, Box<Expression>>,
+        strings: BTreeMap<String, Box<Expression>>,
     },
     Modifier(Box<Expression>),
     True,

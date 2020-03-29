@@ -1,7 +1,7 @@
 use crate::common::*;
 use log::debug;
 use std;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::{self, Write};
 use std::ops::Deref;
 use std::str::FromStr;
@@ -738,13 +738,13 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                                             );
                                         }
                                     } else {
-                                        let mut numeric = HashMap::new();
+                                        let mut numeric = BTreeMap::new();
                                         numeric.insert(*idx as usize, Box::new(val));
                                         state.variables.insert(
                                             var_name.to_string(),
                                             Expression::Array {
                                                 numeric,
-                                                strings: HashMap::new(),
+                                                strings: BTreeMap::new(),
                                             },
                                         );
                                     }
@@ -763,12 +763,12 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                                             );
                                         }
                                     } else {
-                                        let mut strings = HashMap::new();
+                                        let mut strings = BTreeMap::new();
                                         strings.insert(idx.to_string(), Box::new(val));
                                         state.variables.insert(
                                             var_name.to_string(),
                                             Expression::Array {
-                                                numeric: HashMap::new(),
+                                                numeric: BTreeMap::new(),
                                                 strings,
                                             },
                                         );
@@ -982,7 +982,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                             .enumerate()
                             .map(|(k, v)| (k, Box::new(Expression::String(v.to_string()))))
                             .collect(),
-                        strings: HashMap::new(),
+                        strings: BTreeMap::new(),
                     };
                     if lookup.is_some() {
                         if let Expression::Variable(var_name) = lookup.as_ref().unwrap().deref() {
@@ -1030,6 +1030,84 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                     } else {
                         unimplemented!(
                             "Split for {:?} {:?} {:?} {:?}",
+                            source,
+                            target,
+                            lookup,
+                            modifier
+                        );
+                    }
+                }
+                SymbolType::Join => {
+                    let join_with = modifier
+                        .as_ref()
+                        .map(|b| match b.deref() {
+                            Expression::String(s) => s.as_str(),
+                            other => panic!("Modifier with non-string: {:?}", other),
+                        })
+                        .unwrap_or("");
+                    let join_array = |to_join: &BTreeMap<usize, Box<Expression>>| {
+                        Expression::String(
+                            to_join
+                                .values()
+                                .map(|b| match b.deref() {
+                                    Expression::String(s) => s.as_str(),
+                                    other => panic!("Modifier with non-string: {:?}", other),
+                                })
+                                .fold(String::new(), |acc, x| {
+                                    if acc.is_empty() {
+                                        x.to_string()
+                                    } else {
+                                        acc + join_with + x
+                                    }
+                                }),
+                        )
+                    };
+                    if lookup.is_some() {
+                        if let Expression::Variable(var_name) = lookup.as_ref().unwrap().deref() {
+                            match state.variables.get(&var_name.to_lowercase()).unwrap() {
+                                Expression::Array { ref numeric, .. } => {
+                                    let val = join_array(numeric);
+                                    state.variables.insert(var_name.to_lowercase(), val);
+                                }
+                                var => {
+                                    unimplemented!("Join for {:?}", var);
+                                }
+                            }
+                        } else {
+                            unimplemented!("Join for non-variable: {:?}", lookup);
+                        }
+                    } else if target.is_some() && source.is_some() {
+                        match source.as_ref().unwrap().deref() {
+                            Expression::Array { ref numeric, .. } => {
+                                if let Expression::Variable(tar) = target.as_ref().unwrap().deref()
+                                {
+                                    let val = join_array(numeric);
+                                    state.variables.insert(tar.to_lowercase(), val);
+                                } else {
+                                    unimplemented!("Join to {:?}", target);
+                                }
+                            }
+                            Expression::Variable(src) => {
+                                if let Expression::Variable(tar) = target.as_ref().unwrap().deref()
+                                {
+                                    let var = state.variables.get(src).unwrap();
+                                    if let Expression::Array { ref numeric, .. } = var {
+                                        let val = join_array(numeric);
+                                        state.variables.insert(tar.to_lowercase(), val);
+                                    } else {
+                                        unimplemented!("Join of {:?}", var);
+                                    }
+                                } else {
+                                    unimplemented!("Join to {:?}", target);
+                                }
+                            }
+                            _ => {
+                                unimplemented!("Join for {:?}", source);
+                            }
+                        }
+                    } else {
+                        unimplemented!(
+                            "Join for {:?} {:?} {:?} {:?}",
                             source,
                             target,
                             lookup,
