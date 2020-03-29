@@ -968,9 +968,16 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                     }
                 }
                 SymbolType::Split => {
+                    let split_by = modifier
+                        .as_ref()
+                        .map(|b| match b.deref() {
+                            Expression::String(s) => s.as_str(),
+                            other => panic!("Modifier with non-string: {:?}", other),
+                        })
+                        .unwrap_or("");
                     let split_array = |to_split: &String| Expression::Array {
                         numeric: to_split
-                            .chars()
+                            .split(split_by)
                             .enumerate()
                             .map(|(k, v)| (k, Box::new(Expression::String(v.to_string()))))
                             .collect(),
