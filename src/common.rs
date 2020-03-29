@@ -1,6 +1,6 @@
 use failure::Fail;
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::peg;
 
@@ -16,8 +16,8 @@ pub enum Expression {
         index: Box<Expression>,
     },
     Array {
-        numeric: HashMap<usize, Box<Expression>>,
-        strings: HashMap<String, Box<Expression>>,
+        numeric: BTreeMap<usize, Box<Expression>>,
+        strings: BTreeMap<String, Box<Expression>>,
     },
     Modifier(Box<Expression>),
     True,
@@ -108,12 +108,11 @@ pub struct Block {
     pub commands: Vec<CommandLine>,
 }
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum Command {
     Assignment {
-        target: Expression,
-        value: Expression,
+        target: Box<Expression>,
+        value: Box<Expression>,
     },
     Until {
         expression: Expression,
@@ -164,6 +163,13 @@ pub enum Command {
     },
     Round {
         target: Expression,
+    },
+    Mutation {
+        mutator: SymbolType,
+        source: Option<Box<Expression>>,
+        target: Option<Box<Expression>>,
+        lookup: Option<Box<Expression>>,
+        modifier: Option<Box<Expression>>,
     },
 }
 

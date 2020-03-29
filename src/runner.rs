@@ -1,9 +1,10 @@
 use crate::common::*;
 use log::debug;
 use std;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::{self, Write};
 use std::ops::Deref;
+use std::str::FromStr;
 
 struct State<'a> {
     writer: &'a mut dyn Write,
@@ -704,7 +705,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                 ref value,
             } => {
                 let val = run_expression(state, program, &value)?;
-                match target {
+                match &**target {
                     Expression::Variable(name) => {
                         state.pronoun = Some(name.clone());
                         state.variables.insert(name.to_lowercase(), val);
@@ -737,13 +738,13 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                                             );
                                         }
                                     } else {
-                                        let mut numeric = HashMap::new();
+                                        let mut numeric = BTreeMap::new();
                                         numeric.insert(*idx as usize, Box::new(val));
                                         state.variables.insert(
                                             var_name.to_string(),
                                             Expression::Array {
                                                 numeric,
-                                                strings: HashMap::new(),
+                                                strings: BTreeMap::new(),
                                             },
                                         );
                                     }
@@ -762,12 +763,12 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                                             );
                                         }
                                     } else {
-                                        let mut strings = HashMap::new();
+                                        let mut strings = BTreeMap::new();
                                         strings.insert(idx.to_string(), Box::new(val));
                                         state.variables.insert(
                                             var_name.to_string(),
                                             Expression::Array {
-                                                numeric: HashMap::new(),
+                                                numeric: BTreeMap::new(),
                                                 strings,
                                             },
                                         );
@@ -923,6 +924,208 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
             Command::Floor { ref target } => {
                 round_variable(state, &target, &|x| x.floor())?;
             }
+            Command::Mutation {
+                ref mutator,
+                ref source,
+                ref target,
+                ref lookup,
+                ref modifier,
+            } => match mutator {
+                SymbolType::Cast => {
+                    if source.is_some()
+                        || target.is_some()
+                        || lookup.is_none()
+                        || modifier.is_some()
+                    {
+                        unimplemented!(
+                            "Cast for {:?} {:?} {:?} {:?}",
+                            source,
+                            target,
+                            lookup,
+                            modifier
+                        );
+                    }
+                    if let Expression::Variable(var_name) = lookup.as_ref().unwrap().deref() {
+                        match state.variables.get(&var_name.to_lowercase()).unwrap() {
+                            Expression::String(s) => {
+                                let val = f64::from_str(s).unwrap();
+                                state
+                                    .variables
+                                    .insert(var_name.to_lowercase(), Expression::Floating(val));
+                            }
+                            Expression::Floating(f) => {
+                                let val = std::char::from_u32(*f as u32).unwrap().to_string();
+                                state
+                                    .variables
+                                    .insert(var_name.to_lowercase(), Expression::String(val));
+                            }
+                            var => {
+                                unimplemented!("Cast for {:?}", var);
+                            }
+                        }
+                    } else {
+                        unimplemented!("Cast for non-variable: {:?}", lookup);
+                    }
+                }
+                SymbolType::Split => {
+                    let split_by = modifier
+                        .as_ref()
+                        .map(|b| match b.deref() {
+                            Expression::String(s) => s.as_str(),
+                            other => panic!("Modifier with non-string: {:?}", other),
+                        })
+                        .unwrap_or("");
+                    let split_array = |to_split: &String| Expression::Array {
+                        numeric: to_split
+                            .split(split_by)
+                            .filter(|x| !x.is_empty())
+                            .enumerate()
+                            .map(|(k, v)| (k, Box::new(Expression::String(v.to_string()))))
+                            .collect(),
+                        strings: BTreeMap::new(),
+                    };
+                    if lookup.is_some() {
+                        if let Expression::Variable(var_name) = lookup.as_ref().unwrap().deref() {
+                            match state.variables.get(&var_name.to_lowercase()).unwrap() {
+                                Expression::String(s) => {
+                                    let val = split_array(s);
+                                    state.variables.insert(var_name.to_lowercase(), val);
+                                }
+                                var => {
+                                    unimplemented!("Split for {:?}", var);
+                                }
+                            }
+                        } else {
+                            unimplemented!("Split for non-variable: {:?}", lookup);
+                        }
+                    } else if target.is_some() && source.is_some() {
+                        match source.as_ref().unwrap().deref() {
+                            Expression::String(src) => {
+                                if let Expression::Variable(tar) = target.as_ref().unwrap().deref()
+                                {
+                                    let val = split_array(src);
+                                    state.variables.insert(tar.to_lowercase(), val);
+                                } else {
+                                    unimplemented!("Split to {:?}", target);
+                                }
+                            }
+                            Expression::Variable(src) => {
+                                if let Expression::Variable(tar) = target.as_ref().unwrap().deref()
+                                {
+                                    let var = state.variables.get(src).unwrap();
+                                    if let Expression::String(var_str) = var {
+                                        let val = split_array(var_str);
+                                        state.variables.insert(tar.to_lowercase(), val);
+                                    } else {
+                                        unimplemented!("Split of {:?}", var);
+                                    }
+                                } else {
+                                    unimplemented!("Split to {:?}", target);
+                                }
+                            }
+                            _ => {
+                                unimplemented!("Split for {:?}", source);
+                            }
+                        }
+                    } else {
+                        unimplemented!(
+                            "Split for {:?} {:?} {:?} {:?}",
+                            source,
+                            target,
+                            lookup,
+                            modifier
+                        );
+                    }
+                }
+                SymbolType::Join => {
+                    let join_with = modifier
+                        .as_ref()
+                        .map(|b| match b.deref() {
+                            Expression::String(s) => s.as_str(),
+                            other => panic!("Modifier with non-string: {:?}", other),
+                        })
+                        .unwrap_or("");
+                    let join_array = |to_join: &BTreeMap<usize, Box<Expression>>| {
+                        Expression::String(
+                            to_join
+                                .values()
+                                .map(|b| match b.deref() {
+                                    Expression::String(s) => s.as_str(),
+                                    other => panic!("Modifier with non-string: {:?}", other),
+                                })
+                                .fold(String::new(), |acc, x| {
+                                    if acc.is_empty() {
+                                        x.to_string()
+                                    } else {
+                                        acc + join_with + x
+                                    }
+                                }),
+                        )
+                    };
+                    if lookup.is_some() {
+                        if let Expression::Variable(var_name) = lookup.as_ref().unwrap().deref() {
+                            match state.variables.get(&var_name.to_lowercase()).unwrap() {
+                                Expression::Array { ref numeric, .. } => {
+                                    let val = join_array(numeric);
+                                    state.variables.insert(var_name.to_lowercase(), val);
+                                }
+                                var => {
+                                    unimplemented!("Join for {:?}", var);
+                                }
+                            }
+                        } else {
+                            unimplemented!("Join for non-variable: {:?}", lookup);
+                        }
+                    } else if target.is_some() && source.is_some() {
+                        match source.as_ref().unwrap().deref() {
+                            Expression::Array { ref numeric, .. } => {
+                                if let Expression::Variable(tar) = target.as_ref().unwrap().deref()
+                                {
+                                    let val = join_array(numeric);
+                                    state.variables.insert(tar.to_lowercase(), val);
+                                } else {
+                                    unimplemented!("Join to {:?}", target);
+                                }
+                            }
+                            Expression::Variable(src) => {
+                                if let Expression::Variable(tar) = target.as_ref().unwrap().deref()
+                                {
+                                    let var = state.variables.get(src).unwrap();
+                                    if let Expression::Array { ref numeric, .. } = var {
+                                        let val = join_array(numeric);
+                                        state.variables.insert(tar.to_lowercase(), val);
+                                    } else {
+                                        unimplemented!("Join of {:?}", var);
+                                    }
+                                } else {
+                                    unimplemented!("Join to {:?}", target);
+                                }
+                            }
+                            _ => {
+                                unimplemented!("Join for {:?}", source);
+                            }
+                        }
+                    } else {
+                        unimplemented!(
+                            "Join for {:?} {:?} {:?} {:?}",
+                            source,
+                            target,
+                            lookup,
+                            modifier
+                        );
+                    }
+                }
+                _ => {
+                    unimplemented!(
+                        "Mutation: {:?} {:?} {:?} {:?} {:?}",
+                        mutator,
+                        source,
+                        target,
+                        lookup,
+                        modifier
+                    );
+                }
+            },
         }
         pc += 1;
     }
