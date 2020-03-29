@@ -4,6 +4,7 @@ use std;
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::ops::Deref;
+use std::str::FromStr;
 
 struct State<'a> {
     writer: &'a mut dyn Write,
@@ -923,6 +924,60 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
             Command::Floor { ref target } => {
                 round_variable(state, &target, &|x| x.floor())?;
             }
+            Command::Mutation {
+                ref mutator,
+                ref source,
+                ref target,
+                ref lookup,
+                ref modifier,
+            } => match mutator {
+                SymbolType::Cast => {
+                    if source.is_some()
+                        || target.is_some()
+                        || lookup.is_none()
+                        || modifier.is_some()
+                    {
+                        unimplemented!(
+                            "Cast for {:?} {:?} {:?} {:?}",
+                            source,
+                            target,
+                            lookup,
+                            modifier
+                        );
+                    }
+                    if let Some(Expression::Variable(var_name)) = lookup {
+                        match state.variables.get(&var_name.to_lowercase()).unwrap() {
+                            Expression::String(s) => {
+                                let val = f64::from_str(s).unwrap();
+                                state
+                                    .variables
+                                    .insert(var_name.to_lowercase(), Expression::Floating(val));
+                            }
+                            Expression::Floating(f) => {
+                                let val = std::char::from_u32(*f as u32).unwrap().to_string();
+                                state
+                                    .variables
+                                    .insert(var_name.to_lowercase(), Expression::String(val));
+                            }
+                            var => {
+                                unimplemented!("Cast for {:?}", var);
+                            }
+                        }
+                    } else {
+                        unimplemented!("Cast for non-variable: {:?}", lookup);
+                    }
+                }
+                _ => {
+                    unimplemented!(
+                        "Mutation: {:?} {:?} {:?} {:?} {:?}",
+                        mutator,
+                        source,
+                        target,
+                        lookup,
+                        modifier
+                    );
+                }
+            },
         }
         pc += 1;
     }
