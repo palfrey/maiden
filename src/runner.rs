@@ -998,15 +998,33 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                             unimplemented!("Split for non-variable: {:?}", lookup);
                         }
                     } else if target.is_some() && source.is_some() {
-                        if let Expression::String(src) = source.as_ref().unwrap().deref() {
-                            if let Expression::Variable(tar) = target.as_ref().unwrap().deref() {
-                                let val = split_array(src);
-                                state.variables.insert(tar.to_lowercase(), val);
-                            } else {
-                                unimplemented!("Split to {:?}", target);
+                        match source.as_ref().unwrap().deref() {
+                            Expression::String(src) => {
+                                if let Expression::Variable(tar) = target.as_ref().unwrap().deref()
+                                {
+                                    let val = split_array(src);
+                                    state.variables.insert(tar.to_lowercase(), val);
+                                } else {
+                                    unimplemented!("Split to {:?}", target);
+                                }
                             }
-                        } else {
-                            unimplemented!("Split for {:?}", source);
+                            Expression::Variable(src) => {
+                                if let Expression::Variable(tar) = target.as_ref().unwrap().deref()
+                                {
+                                    let var = state.variables.get(src).unwrap();
+                                    if let Expression::String(var_str) = var {
+                                        let val = split_array(var_str);
+                                        state.variables.insert(tar.to_lowercase(), val);
+                                    } else {
+                                        unimplemented!("Split of {:?}", var);
+                                    }
+                                } else {
+                                    unimplemented!("Split to {:?}", target);
+                                }
+                            }
+                            _ => {
+                                unimplemented!("Split for {:?}", source);
+                            }
                         }
                     } else {
                         unimplemented!(
