@@ -27,13 +27,6 @@ fn main() -> Result<(), Error> {
                 continue; // FIXME: Blocked by https://github.com/RockstarLang/rockstar/issues/162
             }
 
-            if test_name.contains("arrays_join")
-                || test_name.contains("arrays_split")
-                || test_name.contains("types_parsing")
-            {
-                continue; // we don't implement mutators yet https://github.com/palfrey/maiden/issues/25
-            }
-
             let function = if name.contains("failures") {
                 "parse_fail_file_test"
             } else {
