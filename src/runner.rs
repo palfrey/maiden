@@ -967,6 +967,50 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                         unimplemented!("Cast for non-variable: {:?}", lookup);
                     }
                 }
+                SymbolType::Split => {
+                    let split_array = |to_split: &String| Expression::Array {
+                        numeric: to_split
+                            .chars()
+                            .enumerate()
+                            .map(|(k, v)| (k, Box::new(Expression::String(v.to_string()))))
+                            .collect(),
+                        strings: HashMap::new(),
+                    };
+                    if lookup.is_some() {
+                        if let Expression::Variable(var_name) = lookup.as_ref().unwrap().deref() {
+                            match state.variables.get(&var_name.to_lowercase()).unwrap() {
+                                Expression::String(s) => {
+                                    let val = split_array(s);
+                                    state.variables.insert(var_name.to_lowercase(), val);
+                                }
+                                var => {
+                                    unimplemented!("Split for {:?}", var);
+                                }
+                            }
+                        } else {
+                            unimplemented!("Split for non-variable: {:?}", lookup);
+                        }
+                    } else if target.is_some() && source.is_some() {
+                        if let Expression::String(src) = source.as_ref().unwrap().deref() {
+                            if let Expression::Variable(tar) = target.as_ref().unwrap().deref() {
+                                let val = split_array(src);
+                                state.variables.insert(tar.to_lowercase(), val);
+                            } else {
+                                unimplemented!("Split to {:?}", target);
+                            }
+                        } else {
+                            unimplemented!("Split for {:?}", source);
+                        }
+                    } else {
+                        unimplemented!(
+                            "Split for {:?} {:?} {:?} {:?}",
+                            source,
+                            target,
+                            lookup,
+                            modifier
+                        );
+                    }
+                }
                 _ => {
                     unimplemented!(
                         "Mutation: {:?} {:?} {:?} {:?} {:?}",
