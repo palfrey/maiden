@@ -978,6 +978,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                     let split_array = |to_split: &String| Expression::Array {
                         numeric: to_split
                             .split(split_by)
+                            .filter(|x| !x.is_empty())
                             .enumerate()
                             .map(|(k, v)| (k, Box::new(Expression::String(v.to_string()))))
                             .collect(),
