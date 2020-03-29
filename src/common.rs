@@ -108,12 +108,11 @@ pub struct Block {
     pub commands: Vec<CommandLine>,
 }
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum Command {
     Assignment {
-        target: Expression,
-        value: Expression,
+        target: Box<Expression>,
+        value: Box<Expression>,
     },
     Until {
         expression: Expression,
@@ -167,10 +166,10 @@ pub enum Command {
     },
     Mutation {
         mutator: SymbolType,
-        source: Option<Expression>,
-        target: Option<Expression>,
-        lookup: Option<Expression>,
-        modifier: Option<Expression>,
+        source: Option<Box<Expression>>,
+        target: Option<Box<Expression>>,
+        lookup: Option<Box<Expression>>,
+        modifier: Option<Box<Expression>>,
     },
 }
 

@@ -269,8 +269,8 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             if let Item::Expression(Expression::Is(target, value)) = item {
                 return Ok(CommandLine {
                     cmd: Command::Assignment {
-                        target: *target,
-                        value: *value,
+                        target: Box::new(*target),
+                        value: Box::new(*value),
                     },
                     line,
                 }
@@ -292,8 +292,8 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
         Rule::put_assignment => {
             debug!("{}Depairing put_assignment", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
-            let value = remove(&mut items, 0, line)?.expr()?;
-            let target = remove(&mut items, 0, line)?.expr()?;
+            let value = Box::new(remove(&mut items, 0, line)?.expr()?);
+            let target = Box::new(remove(&mut items, 0, line)?.expr()?);
             CommandLine {
                 cmd: Command::Assignment { target, value },
                 line,
@@ -327,8 +327,8 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             match items.len() {
                 1 => CommandLine {
                     cmd: Command::Assignment {
-                        target,
-                        value: remove(&mut items, 0, line)?.expr()?,
+                        target: Box::new(target),
+                        value: Box::new(remove(&mut items, 0, line)?.expr()?),
                     },
                     line,
                 }
@@ -351,8 +351,8 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
                             }
                             CommandLine {
                                 cmd: Command::Assignment {
-                                    target,
-                                    value: expr,
+                                    target: Box::new(target),
+                                    value: Box::new(expr),
                                 },
                                 line,
                             }
@@ -365,8 +365,8 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
                             }
                             CommandLine {
                                 cmd: Command::Assignment {
-                                    target,
-                                    value: expr,
+                                    target: Box::new(target),
+                                    value: Box::new(expr),
                                 },
                                 line,
                             }
@@ -379,8 +379,8 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
                             }
                             CommandLine {
                                 cmd: Command::Assignment {
-                                    target,
-                                    value: expr,
+                                    target: Box::new(target),
+                                    value: Box::new(expr),
                                 },
                                 line,
                             }
@@ -393,8 +393,8 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
                             }
                             CommandLine {
                                 cmd: Command::Assignment {
-                                    target,
-                                    value: expr,
+                                    target: Box::new(target),
+                                    value: Box::new(expr),
                                 },
                                 line,
                             }
@@ -403,7 +403,10 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
                         SymbolType::Is => {
                             let s = remove(&mut second, 0, line)?;
                             CommandLine {
-                                cmd: Command::Assignment { target, value: s },
+                                cmd: Command::Assignment {
+                                    target: Box::new(target),
+                                    value: Box::new(s),
+                                },
                                 line,
                             }
                             .into()
@@ -798,7 +801,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             let modifier =
                 if let Some(Item::Expression(Expression::Modifier(changer))) = items.last() {
                     count -= 1;
-                    Some((**changer).clone())
+                    Some(Box::new((**changer).clone()))
                 } else {
                     None
                 };
@@ -809,11 +812,11 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
                 1 => {
                     source = None;
                     target = None;
-                    lookup = Some(remove(&mut items, 0, line)?.expr()?);
+                    lookup = Some(Box::new(remove(&mut items, 0, line)?.expr()?));
                 }
                 2 => {
-                    source = Some(remove(&mut items, 0, line)?.expr()?);
-                    target = Some(remove(&mut items, 0, line)?.expr()?);
+                    source = Some(Box::new(remove(&mut items, 0, line)?.expr()?));
+                    target = Some(Box::new(remove(&mut items, 0, line)?.expr()?));
                     lookup = None;
                 }
                 _ => {

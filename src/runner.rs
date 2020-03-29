@@ -705,7 +705,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                 ref value,
             } => {
                 let val = run_expression(state, program, &value)?;
-                match target {
+                match &**target {
                     Expression::Variable(name) => {
                         state.pronoun = Some(name.clone());
                         state.variables.insert(name.to_lowercase(), val);
@@ -945,7 +945,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                             modifier
                         );
                     }
-                    if let Some(Expression::Variable(var_name)) = lookup {
+                    if let Expression::Variable(var_name) = lookup.as_ref().unwrap().deref() {
                         match state.variables.get(&var_name.to_lowercase()).unwrap() {
                             Expression::String(s) => {
                                 let val = f64::from_str(s).unwrap();
