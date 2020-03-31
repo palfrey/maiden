@@ -235,6 +235,12 @@ pub enum MaidenError {
     BadString { length: usize, line: usize },
     #[fail(display = "Expected an expression, got: {}", other)]
     NotAnExpression { other: String, line: usize },
+    #[fail(display = "Expected an symbol, got: {}", other)]
+    NotASymbol { other: String, line: usize },
+    #[fail(display = "Expected an command, got: {}", other)]
+    NotACommand { other: String, line: usize },
+    #[fail(display = "Expected an block, got: {}", other)]
+    NotABlock { other: String, line: usize },
 }
 
 pub type Result<T> = ::core::result::Result<T, MaidenError>;

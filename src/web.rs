@@ -201,6 +201,9 @@ fn get_error_line(e: &MaidenError) -> usize {
         | MaidenError::Infinity { ref line, .. }
         | MaidenError::Incomplete { ref line, .. }
         | MaidenError::NotAnExpression { ref line, .. }
+        | MaidenError::NotASymbol { ref line, .. }
+        | MaidenError::NotACommand { ref line, .. }
+        | MaidenError::NotABlock { ref line, .. }
         | MaidenError::BadString { ref line, .. } => *line,
         MaidenError::Pest { .. } | MaidenError::Io { .. } => 0,
     }

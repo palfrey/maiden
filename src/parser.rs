@@ -31,21 +31,30 @@ impl Item {
         if let Item::Symbol(e) = self {
             Ok(e)
         } else {
-            panic!("Not a symboltype: {:?}", self)
+            Err(MaidenError::NotASymbol {
+                other: format!("{:?}", self),
+                line: 0,
+            })
         }
     }
     fn command(self) -> Result<CommandLine> {
         if let Item::Command(e) = self {
             Ok(e)
         } else {
-            panic!("Not a command: {:?}", self)
+            Err(MaidenError::NotACommand {
+                other: format!("{:?}", self),
+                line: 0,
+            })
         }
     }
     fn block(self) -> Result<Block> {
         if let Item::Block(e) = self {
             Ok(e)
         } else {
-            panic!("Not a block: {:?}", self)
+            Err(MaidenError::NotABlock {
+                other: format!("{:?}", self),
+                line: 0,
+            })
         }
     }
 }
