@@ -21,6 +21,18 @@ fn print_command(
             print_commands(&block.commands, last_line, indent + 1, max_number_length),
             new_indent
         ),
+        Command::Until { expression, block } => format!(
+            "Until {{ expression: {:?}, block: Block {{\n{}{}}}}}",
+            expression,
+            print_commands(&block.commands, last_line, indent + 1, max_number_length),
+            new_indent
+        ),
+        Command::While { expression, block } => format!(
+            "While {{ expression: {:?}, block: Block {{\n{}{}}}}}",
+            expression,
+            print_commands(&block.commands, last_line, indent + 1, max_number_length),
+            new_indent
+        ),
         Command::If {
             expression,
             then,
@@ -124,6 +136,32 @@ mod tests {
             "1: If { expression: GreaterThan(Variable(\"a thought\"), Null), then: Block {
 2:   Return { return_value: Variable(\"a thought\") }
    }, otherwise: Block {}}
+";
+        test_print(code, expected);
+    }
+
+    #[test]
+    fn test_print_while() {
+        let code = "while char is weaker than max
+        Give back a thought
+        ";
+        let expected =
+            "1: While { expression: LessThan(Variable(\"char\"), Variable(\"max\")), block: Block {
+2:   Return { return_value: Variable(\"a thought\") }
+   }}
+";
+        test_print(code, expected);
+    }
+
+    #[test]
+    fn test_print_until() {
+        let code = "until char is weaker than max
+        Give back a thought
+        ";
+        let expected =
+            "1: Until { expression: LessThan(Variable(\"char\"), Variable(\"max\")), block: Block {
+2:   Return { return_value: Variable(\"a thought\") }
+   }}
 ";
         test_print(code, expected);
     }
