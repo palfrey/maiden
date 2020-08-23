@@ -5,9 +5,15 @@ use std::io::{self, Write};
 use std::ops::Deref;
 use std::str::FromStr;
 
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum VariableType {
+    Global,
+    Local,
+}
+
 struct State<'a> {
     writer: &'a mut dyn Write,
-    variables: &'a mut HashMap<String, Expression>,
+    variables: &'a mut HashMap<String, (VariableType, Expression)>,
     current_line: usize,
     depth: u32,
     pronoun: Option<String>,
@@ -288,10 +294,10 @@ fn call_function(
         let value = run_expression(&mut new_state, program, &arg)?;
         new_state
             .variables
-            .insert(func.args[i].to_lowercase(), value);
+            .insert(func.args[i].to_lowercase(), (VariableType::Local, value));
     }
 
-    return run_core(
+    let result = run_core(
         &mut new_state,
         &mut Program {
             commands: func.block.commands.clone(),
@@ -299,6 +305,14 @@ fn call_function(
         },
         0,
     );
+    for (name, (kind, value)) in new_state.variables.iter() {
+        if kind == &VariableType::Global {
+            state
+                .variables
+                .insert(name.to_string(), (VariableType::Global, value.clone()));
+        }
+    }
+    return result;
 }
 
 #[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
@@ -412,7 +426,7 @@ fn run_expression(
             }
         }
         Expression::Variable(ref name) => match state.variables.get(&name.to_lowercase()) {
-            Some(exp) => {
+            Some((_, exp)) => {
                 debug!("Got variable {} with value {:?}", &name, exp);
                 Ok(exp.clone())
             }
@@ -429,7 +443,7 @@ fn run_expression(
         Expression::Call(ref target, ref args) => call_function(state, program, target, args),
         Expression::Pronoun => match state.pronoun {
             Some(ref pronoun) => match state.variables.get(&pronoun.to_lowercase()) {
-                Some(exp) => {
+                Some((_, exp)) => {
                     debug!("Got variable {} with value {:?}", &pronoun, exp);
                     Ok(exp.clone())
                 }
@@ -463,9 +477,12 @@ fn run_expression(
     };
 }
 
-pub fn run(program: &mut Program, writer: &mut dyn Write) -> Result<HashMap<String, Expression>> {
+pub fn run(
+    program: &mut Program,
+    writer: &mut dyn Write,
+) -> Result<HashMap<String, (VariableType, Expression)>> {
     let pc = 0;
-    let mut variables: HashMap<String, Expression> = HashMap::new();
+    let mut variables = HashMap::new();
     let mut state = State {
         variables: &mut variables,
         writer,
@@ -482,7 +499,7 @@ fn get_printable(value: &Expression, state: &State) -> Result<String> {
         Expression::Floating(ref x) => Ok(format!("{}", x)),
         Expression::String(ref s) => Ok(s.to_string()),
         Expression::Variable(ref x) => {
-            let v = {
+            let (_, v) = {
                 let current_line = state.current_line;
                 let v = state.variables.get(&x.to_lowercase());
                 if v.is_none() {
@@ -522,10 +539,10 @@ fn get_printable(value: &Expression, state: &State) -> Result<String> {
                 let mut local_index = &**index;
                 let variable;
                 if let Expression::Variable(ref var) = local_index {
-                    variable = state.variables.get(var).unwrap().clone();
+                    variable = state.variables.get(var).unwrap().1.clone();
                     local_index = &variable;
                 }
-                let entry = match v.unwrap() {
+                let entry = match v.unwrap().1 {
                     Expression::Array {
                         ref numeric,
                         ref strings,
@@ -572,7 +589,13 @@ fn get_printable(value: &Expression, state: &State) -> Result<String> {
     }
 }
 
-fn flip_boolean(state: &mut State, target: &str, val: &Expression, count: usize) -> Result<()> {
+fn flip_boolean(
+    state: &mut State,
+    target: &str,
+    val: &Expression,
+    count: usize,
+    kind: VariableType,
+) -> Result<()> {
     if (count & 0x1) == 0 {
         // double-flips do nothing, so just look at the low bit
         return Ok(());
@@ -580,10 +603,10 @@ fn flip_boolean(state: &mut State, target: &str, val: &Expression, count: usize)
     match val {
         Expression::True => state
             .variables
-            .insert(target.to_lowercase(), Expression::False),
+            .insert(target.to_lowercase(), (kind, Expression::False)),
         Expression::False => state
             .variables
-            .insert(target.to_lowercase(), Expression::True),
+            .insert(target.to_lowercase(), (kind, Expression::True)),
         _ => {
             return Err(MaidenError::Unimplemented {
                 description: format!("Attempt to flip non-boolean '{}'", target),
@@ -610,7 +633,7 @@ fn alter_variable(
             });
         }
     };
-    let val = {
+    let (kind, val) = {
         let current_line = state.current_line;
         let v = state.variables.get(&name);
         if v.is_none() {
@@ -624,13 +647,17 @@ fn alter_variable(
     debug!("Value of {} is {:?}", name, val);
     match val {
         Expression::Floating(x) => {
-            state.variables.insert(name, Expression::Floating(f(x)));
+            state
+                .variables
+                .insert(name, (kind, Expression::Floating(f(x))));
         }
         Expression::Null => {
-            state.variables.insert(name, Expression::Floating(f(0f64)));
+            state
+                .variables
+                .insert(name, (kind, Expression::Floating(f(0f64))));
         }
         Expression::False | Expression::True => {
-            return flip_boolean(state, &name, &val, count);
+            return flip_boolean(state, &name, &val, count, kind);
         }
         _ => {
             return Err(MaidenError::Unimplemented {
@@ -653,7 +680,7 @@ fn round_variable(state: &mut State, target: &Expression, f: &dyn Fn(f64) -> f64
             });
         }
     };
-    let val = {
+    let (kind, val) = {
         let current_line = state.current_line;
         let v = state.variables.get(&name);
         if v.is_none() {
@@ -667,10 +694,14 @@ fn round_variable(state: &mut State, target: &Expression, f: &dyn Fn(f64) -> f64
     debug!("Value of {} is {:?}", name, val);
     match val {
         Expression::Floating(x) => {
-            state.variables.insert(name, Expression::Floating(f(x)));
+            state
+                .variables
+                .insert(name, (kind, Expression::Floating(f(x))));
         }
         Expression::Null => {
-            state.variables.insert(name, Expression::Floating(f(0f64)));
+            state
+                .variables
+                .insert(name, (kind, Expression::Floating(f(0f64))));
         }
         _ => {
             return Err(MaidenError::Unimplemented {
@@ -680,6 +711,14 @@ fn round_variable(state: &mut State, target: &Expression, f: &dyn Fn(f64) -> f64
         }
     };
     return Ok(());
+}
+
+fn get_variable_type(state: &State) -> VariableType {
+    if state.depth == 0 {
+        VariableType::Global
+    } else {
+        VariableType::Local
+    }
 }
 
 #[allow(clippy::cognitive_complexity)] // FIXME: break this up a bit
@@ -707,11 +746,20 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                 match &**target {
                     Expression::Variable(name) => {
                         state.pronoun = Some(name.clone());
-                        state.variables.insert(name.to_lowercase(), val);
+                        let kind = if let Some((inner_kind, _var)) =
+                            state.variables.get(&name.to_lowercase())
+                        {
+                            *inner_kind
+                        } else {
+                            get_variable_type(&state)
+                        };
+                        state.variables.insert(name.to_lowercase(), (kind, val));
                     }
                     Expression::Pronoun => {
                         let pronoun = state.pronoun.as_ref().unwrap();
-                        state.variables.insert(pronoun.to_lowercase(), val);
+                        state
+                            .variables
+                            .insert(pronoun.to_lowercase(), (get_variable_type(&state), val));
                     }
                     // FIXME: improve with box patterns once stabilised https://github.com/rust-lang/rust/issues/29641
                     Expression::ArrayRef { name, index } => {
@@ -719,12 +767,13 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                             let mut local_index = &**index;
                             let variable;
                             if let Expression::Variable(ref var) = local_index {
-                                variable = state.variables.get(var).unwrap().clone();
+                                variable = state.variables.get(var).unwrap().clone().1;
                                 local_index = &variable;
                             }
                             match local_index {
                                 Expression::Floating(ref idx) => {
-                                    if let Some(array) = state.variables.get_mut(var_name) {
+                                    if let Some((_kind, array)) = state.variables.get_mut(var_name)
+                                    {
                                         if let Expression::Array {
                                             ref mut numeric, ..
                                         } = array
@@ -741,15 +790,19 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                                         numeric.insert(*idx as usize, Box::new(val));
                                         state.variables.insert(
                                             var_name.to_string(),
-                                            Expression::Array {
-                                                numeric,
-                                                strings: BTreeMap::new(),
-                                            },
+                                            (
+                                                get_variable_type(&state),
+                                                Expression::Array {
+                                                    numeric,
+                                                    strings: BTreeMap::new(),
+                                                },
+                                            ),
                                         );
                                     }
                                 }
                                 Expression::String(ref idx) => {
-                                    if let Some(array) = state.variables.get_mut(var_name) {
+                                    if let Some((_kind, array)) = state.variables.get_mut(var_name)
+                                    {
                                         if let Expression::Array {
                                             ref mut strings, ..
                                         } = array
@@ -766,10 +819,13 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                                         strings.insert(idx.to_string(), Box::new(val));
                                         state.variables.insert(
                                             var_name.to_string(),
-                                            Expression::Array {
-                                                numeric: BTreeMap::new(),
-                                                strings,
-                                            },
+                                            (
+                                                get_variable_type(&state),
+                                                Expression::Array {
+                                                    numeric: BTreeMap::new(),
+                                                    strings,
+                                                },
+                                            ),
                                         );
                                     }
                                 }
@@ -910,7 +966,10 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                 if let Some(target) = opt_target {
                     state.variables.insert(
                         target.to_lowercase(),
-                        Expression::String(input.trim_end_matches('\n').to_string()),
+                        (
+                            get_variable_type(&state),
+                            Expression::String(input.trim_end_matches('\n').to_string()),
+                        ),
                     );
                 }
             }
@@ -946,17 +1005,21 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                     }
                     if let Expression::Variable(var_name) = lookup.as_ref().unwrap().deref() {
                         match state.variables.get(&var_name.to_lowercase()).unwrap() {
-                            Expression::String(s) => {
+                            (kind, Expression::String(ref s)) => {
                                 let val = f64::from_str(s).unwrap();
-                                state
-                                    .variables
-                                    .insert(var_name.to_lowercase(), Expression::Floating(val));
+                                let new_kind = *kind;
+                                state.variables.insert(
+                                    var_name.to_lowercase(),
+                                    (new_kind, Expression::Floating(val)),
+                                );
                             }
-                            Expression::Floating(f) => {
+                            (kind, Expression::Floating(f)) => {
                                 let val = std::char::from_u32(*f as u32).unwrap().to_string();
-                                state
-                                    .variables
-                                    .insert(var_name.to_lowercase(), Expression::String(val));
+                                let new_kind = *kind;
+                                state.variables.insert(
+                                    var_name.to_lowercase(),
+                                    (new_kind, Expression::String(val)),
+                                );
                             }
                             var => {
                                 unimplemented!("Cast for {:?}", var);
@@ -986,9 +1049,12 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                     if lookup.is_some() {
                         if let Expression::Variable(var_name) = lookup.as_ref().unwrap().deref() {
                             match state.variables.get(&var_name.to_lowercase()).unwrap() {
-                                Expression::String(s) => {
+                                (kind, Expression::String(s)) => {
                                     let val = split_array(s);
-                                    state.variables.insert(var_name.to_lowercase(), val);
+                                    let new_kind = *kind;
+                                    state
+                                        .variables
+                                        .insert(var_name.to_lowercase(), (new_kind, val));
                                 }
                                 var => {
                                     unimplemented!("Split for {:?}", var);
@@ -1003,7 +1069,10 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                                 if let Expression::Variable(tar) = target.as_ref().unwrap().deref()
                                 {
                                     let val = split_array(src);
-                                    state.variables.insert(tar.to_lowercase(), val);
+                                    state.variables.insert(
+                                        tar.to_lowercase(),
+                                        (get_variable_type(&state), val),
+                                    );
                                 } else {
                                     unimplemented!("Split to {:?}", target);
                                 }
@@ -1012,9 +1081,10 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                                 if let Expression::Variable(tar) = target.as_ref().unwrap().deref()
                                 {
                                     let var = state.variables.get(src).unwrap();
-                                    if let Expression::String(var_str) = var {
+                                    let kind = var.0;
+                                    if let Expression::String(ref var_str) = var.1 {
                                         let val = split_array(var_str);
-                                        state.variables.insert(tar.to_lowercase(), val);
+                                        state.variables.insert(tar.to_lowercase(), (kind, val));
                                     } else {
                                         unimplemented!("Split of {:?}", var);
                                     }
@@ -1064,9 +1134,12 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                     if lookup.is_some() {
                         if let Expression::Variable(var_name) = lookup.as_ref().unwrap().deref() {
                             match state.variables.get(&var_name.to_lowercase()).unwrap() {
-                                Expression::Array { ref numeric, .. } => {
+                                (kind, Expression::Array { ref numeric, .. }) => {
                                     let val = join_array(numeric);
-                                    state.variables.insert(var_name.to_lowercase(), val);
+                                    let new_kind = *kind;
+                                    state
+                                        .variables
+                                        .insert(var_name.to_lowercase(), (new_kind, val));
                                 }
                                 var => {
                                     unimplemented!("Join for {:?}", var);
@@ -1081,7 +1154,10 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                                 if let Expression::Variable(tar) = target.as_ref().unwrap().deref()
                                 {
                                     let val = join_array(numeric);
-                                    state.variables.insert(tar.to_lowercase(), val);
+                                    state.variables.insert(
+                                        tar.to_lowercase(),
+                                        (get_variable_type(&state), val),
+                                    );
                                 } else {
                                     unimplemented!("Join to {:?}", target);
                                 }
@@ -1089,10 +1165,11 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                             Expression::Variable(src) => {
                                 if let Expression::Variable(tar) = target.as_ref().unwrap().deref()
                                 {
-                                    let var = state.variables.get(src).unwrap();
+                                    let (kind, var) = state.variables.get(src).unwrap();
                                     if let Expression::Array { ref numeric, .. } = var {
                                         let val = join_array(numeric);
-                                        state.variables.insert(tar.to_lowercase(), val);
+                                        let new_kind = *kind;
+                                        state.variables.insert(tar.to_lowercase(), (new_kind, val));
                                     } else {
                                         unimplemented!("Join of {:?}", var);
                                     }

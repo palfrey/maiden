@@ -78,7 +78,11 @@ mod tests {
         let mut program = parser::parse(code).unwrap();
         info!("Commands: {:?}", program.commands);
         let mut writer = Cursor::new(Vec::new());
-        let variables = runner::run(&mut program, &mut writer).unwrap();
+        let variables = runner::run(&mut program, &mut writer)
+            .unwrap()
+            .drain()
+            .map(|(k, v)| (k, v.1))
+            .collect();
         writer.set_position(0);
         let res = std::str::from_utf8(writer.get_ref()).unwrap();
         if res != "" {
