@@ -20,7 +20,7 @@ env:
 stages:
 - test
 - name: deploy
-  if: branch = master
+  if: branch = main
 jobs:
   allow_failures:
     - rust: nightly
@@ -51,7 +51,7 @@ jobs:
     rust: nightly
     script: rm Cargo.lock && cargo build -Z minimal-versions --tests
   - stage: deploy
-    if: branch = master AND type != pull_request
+    if: branch = main AND type != pull_request
     rust: stable
     before_script: which cargo-web || cargo install cargo-web
     script: cargo web deploy --release && GIT_DEPLOY_DIR=./target/deploy ./deploy.sh
