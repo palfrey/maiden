@@ -529,7 +529,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             let mut decimal_places = 0;
             for raw_word in value.split_whitespace() {
                 let mut word = raw_word.to_string();
-                word.retain(|c| c.is_alphabetic());
+                word.retain(|c| c.is_alphabetic() || c == '-');
                 if word.is_empty() {
                     continue;
                 }
@@ -919,6 +919,10 @@ pub fn parse(buffer: &str) -> Result<Program> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use crate::common::{Command, CommandLine, Expression, Program};
+
     use super::{parse, MaidenError};
 
     #[test]
@@ -929,5 +933,23 @@ mod tests {
         } else {
             assert!(false, format!("{:?}", err));
         }
+    }
+
+    #[test]
+    fn hyphens_in_numbers() {
+        let ok = parse("Belle was a be-our-guest intellectual");
+        assert_eq!(
+            ok.unwrap(),
+            Program {
+                commands: vec![CommandLine {
+                    cmd: Command::Assignment {
+                        target: Box::new(Expression::Variable("Belle".to_string(),)),
+                        value: Box::new(Expression::Floating(122.0,)),
+                    },
+                    line: 1,
+                },],
+                functions: HashMap::new(),
+            }
+        );
     }
 }
