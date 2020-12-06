@@ -14,7 +14,13 @@ Rockstar is still very much in active flux, but we target the [full "fixtures" t
 
 Usage
 -----
-`cargo run --quiet <your rockstar program>` works pretty well
+Clone this repo and **update the submodule**
+```
+git clone https://github.com/palfrey/maiden.git
+cd maiden
+git submodule update --init
+```
+After this, `cargo run --quiet <your rockstar program>` works pretty well
 
 Web version
 -----------
