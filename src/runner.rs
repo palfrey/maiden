@@ -79,22 +79,22 @@ fn run_binop_shortcut(
     match res_first {
         Expression::True | Expression::False => match res_second {
             Expression::True | Expression::False => {
-                return Ok(f(state, &res_first, &res_second)?);
+                return f(state, &res_first, &res_second);
             }
             _ => {
                 let val = to_boolean(state, &res_second);
                 if let Ok(b) = val {
                     if b {
-                        return Ok(f(state, &res_first, &Expression::True)?);
+                        return f(state, &res_first, &Expression::True);
                     } else {
-                        return Ok(f(state, &res_first, &Expression::False)?);
+                        return f(state, &res_first, &Expression::False);
                     }
                 }
             }
         },
         Expression::String(_) => {
             if let Expression::String(_) = res_second {
-                return Ok(f(state, &res_first, &res_second)?);
+                return f(state, &res_first, &res_second);
             }
             if Expression::Null == res_second {
                 return Ok(false);
@@ -114,9 +114,9 @@ fn run_binop_shortcut(
             let val = to_boolean(state, &res_first);
             if let Ok(b) = val {
                 if b {
-                    return Ok(f(state, &Expression::True, &res_second)?);
+                    return f(state, &Expression::True, &res_second);
                 } else {
-                    return Ok(f(state, &Expression::False, &res_second)?);
+                    return f(state, &Expression::False, &res_second);
                 }
             }
         }
@@ -128,11 +128,11 @@ fn run_binop_shortcut(
     }
 
     // Try numeric conversion instead
-    return Ok(f(
+    return f(
         state,
         &expression_to_number(res_first, state.current_line)?,
         &converted_second?,
-    )?);
+    );
 }
 
 fn run_mathbinop(

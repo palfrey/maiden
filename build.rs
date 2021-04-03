@@ -15,7 +15,7 @@ fn main() -> Result<(), Error> {
             .unwrap()
             .to_string()
             .replace("tests/", "");
-        if name.ends_with(".rock") {
+        if name.to_lowercase().ends_with(".rock") {
             let test_name = name.replace(".", "_").replace("-", "_").replace("/", "_");
             if test_name == "upstream_fixtures_equality_mysterious_rock"
                 || test_name == "upstream_fixtures_equality_equalityComparison_rock"
