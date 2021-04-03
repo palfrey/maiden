@@ -38,10 +38,6 @@ jobs:
         with:
           command: clippy
         if: matrix.rust == 'stable'
-      - name: Check formatting
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt        
       - name: Build and test
         uses: actions-rs/cargo@v1
         with:
