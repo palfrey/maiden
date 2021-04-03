@@ -32,11 +32,7 @@ jobs:
           args: -- --check
         if: matrix.rust == 'stable'
       - name: Clippy
-        uses: actions-rs/cargo@v1
-        env:
-          RUSTFLAGS: -Dwarnings
-        with:
-          command: clippy
+        run: cargo clippy -- -W clippy::all -A clippy::upper_case_acronyms
         if: matrix.rust == 'stable'
       - name: Build and test
         uses: actions-rs/cargo@v1
