@@ -931,7 +931,7 @@ mod tests {
         if let Err(MaidenError::NoEndOfIf { line }) = err {
             assert_eq!(line, 1);
         } else {
-            assert!(false, format!("{:?}", err));
+            assert!(false, "{:?}", err);
         }
     }
 

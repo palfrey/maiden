@@ -255,7 +255,7 @@ mod tests {
             assert_eq!(name, "Multiply");
             assert_eq!(line, 1);
         } else {
-            assert!(false, err);
+            assert!(false, "{}", err);
         }
     }
 
@@ -273,7 +273,7 @@ mod tests {
             assert_eq!(name, "Desire");
             assert_eq!(line, 1);
         } else {
-            assert!(false, err);
+            assert!(false, "{}", err);
         }
     }
 }
