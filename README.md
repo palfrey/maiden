@@ -25,6 +25,7 @@ After this, `cargo run --quiet <your rockstar program>` works pretty well
 Web version
 -----------
 There's a deployed edition at https://palfrey.github.io/maiden/. To work with it
-1. [Install cargo web](https://github.com/koute/cargo-web#installation) (0.6.24 or above, because of stdweb)
-2. Run `cargo web start --auto-reload --release` (weird bugs with debug config for some reasons)
-3. Goto http://localhost:8000/
+1. Install Rust < 1.48.0 (workaround for [#40](https://github.com/palfrey/maiden/issues/40) until stdweb fixes things, or we move off it)
+2. [Install cargo web](https://github.com/koute/cargo-web#installation) (0.6.24 or above, because of stdweb)
+3. Run `cargo web start --auto-reload --release` (weird bugs with debug config for some reasons)
+4. Goto http://localhost:8000/
