@@ -1,0 +1,80 @@
+on: 
+  push:
+  pull_request:
+
+name: Continuous integration
+
+jobs:
+  test:
+    name: Test suite
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust:
+          - stable
+          - beta
+          - nightly
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v1
+      - name: Check formatting
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: -- --check
+        if: matrix.rust == 'stable'
+      - name: Clippy
+        uses: actions-rs/cargo@v1
+        env:
+          RUSTFLAGS: -Dwarnings
+        with:
+          command: clippy
+        if: matrix.rust == 'stable'
+      - name: Check formatting
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt        
+      - name: Build and test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+
+  minimal-versions:
+    name: minimal versions check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      - name: Remove lock
+        run: rm Cargo.lock
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: -Z minimal-versions
+
+  web:
+    name: web build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      - name: Install Cargo web
+        run: which cargo-web || cargo install cargo-web
+      - name: Run Cargo web
+        run: cargo web build
