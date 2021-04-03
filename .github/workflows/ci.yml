@@ -16,6 +16,8 @@ jobs:
           - nightly
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: true
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -78,3 +80,19 @@ jobs:
         run: which cargo-web || cargo install cargo-web
       - name: Run Cargo web
         run: cargo web build
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [web, test, minimal-versions]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      - name: Install Cargo web
+        run: which cargo-web || cargo install cargo-web
+      - name: Run Cargo web
+        run: cargo web deploy --release && GIT_DEPLOY_DIR=./target/deploy ./deploy.sh
