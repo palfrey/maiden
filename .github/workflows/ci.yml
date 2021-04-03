@@ -36,6 +36,8 @@ jobs:
         if: matrix.rust == 'stable'
       - name: Build and test
         uses: actions-rs/cargo@v1
+        env:
+          RUST_MIN_STACK: 8388608
         with:
           command: test
 
