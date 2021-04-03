@@ -261,7 +261,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             debug!("{}Depairing equality_check", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             if items.len() == 1 {
-                return Ok(remove(&mut items, 0, line)?);
+                return remove(&mut items, 0, line);
             }
             let is = remove(&mut items, 1, line)?;
             let first = Box::new(remove(&mut items, 0, line)?.expr()?);
@@ -473,7 +473,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             debug!("{}Depairing and", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             if items.len() == 1 {
-                return Ok(remove(&mut items, 0, line)?);
+                return remove(&mut items, 0, line);
             }
             Expression::And(
                 Box::new(remove(&mut items, 0, line)?.expr()?),
@@ -485,7 +485,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             debug!("{}Depairing or", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             if items.len() == 1 {
-                return Ok(remove(&mut items, 0, line)?);
+                return remove(&mut items, 0, line);
             }
             Expression::Or(
                 Box::new(remove(&mut items, 0, line)?.expr()?),
@@ -497,7 +497,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             debug!("{}Depairing nor", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             if items.len() == 1 {
-                return Ok(remove(&mut items, 0, line)?);
+                return remove(&mut items, 0, line);
             }
             Expression::Nor(
                 Box::new(remove(&mut items, 0, line)?.expr()?),
@@ -626,7 +626,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             let mut expressions = vec![];
             if items.len() == 1 {
-                return Ok(remove(&mut items, 0, line)?);
+                return remove(&mut items, 0, line);
             }
             if !items.is_empty() {
                 for item in items.drain(0..) {
@@ -720,7 +720,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             debug!("{}Depairing comparison", level_string);
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
             if items.len() == 1 {
-                return Ok(remove(&mut items, 0, line)?);
+                return remove(&mut items, 0, line);
             }
             if items.len() != 3 {
                 panic!("Bad comparison: {:?}", items);
@@ -931,7 +931,7 @@ mod tests {
         if let Err(MaidenError::NoEndOfIf { line }) = err {
             assert_eq!(line, 1);
         } else {
-            assert!(false, format!("{:?}", err));
+            assert!(false, "{:?}", err);
         }
     }
 
