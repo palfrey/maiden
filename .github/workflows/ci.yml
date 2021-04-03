@@ -71,7 +71,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: 1.47.0 # FIXME: Because of https://github.com/palfrey/maiden/issues/40
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install Cargo web
@@ -89,7 +89,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: 1.47.0 # FIXME: Because of https://github.com/palfrey/maiden/issues/40
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install Cargo web
