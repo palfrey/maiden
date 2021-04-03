@@ -2,7 +2,7 @@ Maiden
 ======
 [![Continuous integration](https://github.com/palfrey/maiden/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/palfrey/maiden/actions/workflows/ci.yml)
 
-Maiden is a [Rockstar](https://github.com/dylanbeattie/rockstar) interpreter written in Rust. 
+Maiden is a [Rockstar](https://github.com/RockstarLang/rockstar) interpreter written in Rust. 
 
 Why the name?
 -------------
@@ -10,7 +10,7 @@ Well given that Rockstar is about hard rock from the 1980s, [Iron Maiden](https:
 
 Status
 ------
-Rockstar is still very much in active flux, but we target the [full "fixtures" test suite](https://github.com/RockstarLang/rockstar/tree/master/tests) from the reference implementation (excepting [some issues](https://github.com/dylanbeattie/rockstar/issues/168) in it)
+Rockstar is still very much in active flux, but we target the [full "fixtures" test suite](https://github.com/RockstarLang/rockstar/tree/master/tests) from the reference implementation (excepting [some issues](https://github.com/RockstarLang/rockstar/issues/168) in it)
 
 Usage
 -----
