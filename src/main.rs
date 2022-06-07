@@ -85,7 +85,7 @@ mod tests {
             .collect();
         writer.set_position(0);
         let res = std::str::from_utf8(writer.get_ref()).unwrap();
-        if res != "" {
+        if !res.is_empty() {
             debug!("{}", res);
         }
         assert_eq!(expected_output, res);
@@ -255,7 +255,7 @@ mod tests {
             assert_eq!(name, "Multiply");
             assert_eq!(line, 1);
         } else {
-            assert!(false, "{}", err);
+            panic!("{}", err);
         }
     }
 
@@ -273,7 +273,7 @@ mod tests {
             assert_eq!(name, "Desire");
             assert_eq!(line, 1);
         } else {
-            assert!(false, "{}", err);
+            panic!("{}", err);
         }
     }
 }

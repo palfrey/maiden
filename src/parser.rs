@@ -913,8 +913,8 @@ where
 
 pub fn parse(buffer: &str) -> Result<Program> {
     let mut parsed =
-        Rockstar::parse(Rule::program, &buffer).map_err(|e| MaidenError::Pest { kind: e })?;
-    return depair_program(&mut parsed, &buffer);
+        Rockstar::parse(Rule::program, buffer).map_err(|e| MaidenError::Pest { kind: e })?;
+    return depair_program(&mut parsed, buffer);
 }
 
 #[cfg(test)]
@@ -931,7 +931,7 @@ mod tests {
         if let Err(MaidenError::NoEndOfIf { line }) = err {
             assert_eq!(line, 1);
         } else {
-            assert!(false, "{:?}", err);
+            panic!("{:?}", err);
         }
     }
 
