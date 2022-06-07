@@ -288,7 +288,7 @@ fn call_function(
         pronoun: None,
     };
     for (i, arg) in args.iter().enumerate() {
-        let value = run_expression(&mut new_state, program, &arg)?;
+        let value = run_expression(&mut new_state, program, arg)?;
         new_state
             .variables
             .insert(func.args[i].to_lowercase(), (VariableType::Local, value));
@@ -571,7 +571,7 @@ fn get_printable(value: &Expression, state: &State) -> Result<String> {
                 };
                 entry.unwrap_or(&mysterious_box)
             };
-            get_printable(&v, state)
+            get_printable(v, state)
         }
         Expression::True => Ok("true".to_string()),
         Expression::False => Ok("false".to_string()),
@@ -739,7 +739,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                 ref target,
                 ref value,
             } => {
-                let val = run_expression(state, program, &value)?;
+                let val = run_expression(state, program, value)?;
                 match &**target {
                     Expression::Variable(name) => {
                         state.pronoun = Some(name.clone());
@@ -748,7 +748,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                         {
                             *inner_kind
                         } else {
-                            get_variable_type(&state)
+                            get_variable_type(state)
                         };
                         state.variables.insert(name.to_lowercase(), (kind, val));
                     }
@@ -756,7 +756,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                         let pronoun = state.pronoun.as_ref().unwrap();
                         state
                             .variables
-                            .insert(pronoun.to_lowercase(), (get_variable_type(&state), val));
+                            .insert(pronoun.to_lowercase(), (get_variable_type(state), val));
                     }
                     // FIXME: improve with box patterns once stabilised https://github.com/rust-lang/rust/issues/29641
                     Expression::ArrayRef { name, index } => {
@@ -788,7 +788,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                                         state.variables.insert(
                                             var_name.to_string(),
                                             (
-                                                get_variable_type(&state),
+                                                get_variable_type(state),
                                                 Expression::Array {
                                                     numeric,
                                                     strings: BTreeMap::new(),
@@ -817,7 +817,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                                         state.variables.insert(
                                             var_name.to_string(),
                                             (
-                                                get_variable_type(&state),
+                                                get_variable_type(state),
                                                 Expression::Array {
                                                     numeric: BTreeMap::new(),
                                                     strings,
@@ -841,19 +841,19 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                 ref target,
                 ref count,
             } => {
-                alter_variable(state, &target, &|x| x + count, *count as usize)?;
+                alter_variable(state, target, &|x| x + count, *count as usize)?;
             }
             Command::Decrement {
                 ref target,
                 ref count,
             } => {
-                alter_variable(state, &target, &|x| x - count, *count as usize)?;
+                alter_variable(state, target, &|x| x - count, *count as usize)?;
             }
             Command::Until {
                 ref expression,
                 ref block,
             } => loop {
-                let resolve = run_expression(state, program, &expression)?;
+                let resolve = run_expression(state, program, expression)?;
                 if to_boolean(state, &resolve)? {
                     break;
                 }
@@ -871,7 +871,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                 ref expression,
                 ref block,
             } => loop {
-                let resolve = run_expression(state, program, &expression)?;
+                let resolve = run_expression(state, program, expression)?;
                 if !to_boolean(state, &resolve)? {
                     break;
                 }
@@ -895,7 +895,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                 return Ok(Expression::Break);
             }
             Command::Say { ref value } => {
-                let resolve = run_expression(state, program, &value)?;
+                let resolve = run_expression(state, program, value)?;
                 let x = get_printable(&resolve, state)?;
                 writeln!(state.writer, "{}", x)?;
             }
@@ -913,14 +913,14 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                 );
             }
             Command::Return { ref return_value } => {
-                return run_expression(state, program, &return_value);
+                return run_expression(state, program, return_value);
             }
             Command::If {
                 ref expression,
                 ref then,
                 ref otherwise,
             } => {
-                let resolve = run_expression(state, program, &expression)?;
+                let resolve = run_expression(state, program, expression)?;
                 debug!("if: {:?} {:?}", &resolve, expression);
                 if to_boolean(state, &resolve)? {
                     if let Some(block) = then {
@@ -953,7 +953,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                 }
             }
             Command::Call { ref name, ref args } => {
-                call_function(state, program, &name, &args)?;
+                call_function(state, program, name, args)?;
             }
             Command::Listen {
                 target: ref opt_target,
@@ -964,20 +964,20 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                     state.variables.insert(
                         target.to_lowercase(),
                         (
-                            get_variable_type(&state),
+                            get_variable_type(state),
                             Expression::String(input.trim_end_matches('\n').to_string()),
                         ),
                     );
                 }
             }
             Command::Round { ref target } => {
-                round_variable(state, &target, &|x| x.round())?;
+                round_variable(state, target, &|x| x.round())?;
             }
             Command::Ceil { ref target } => {
-                round_variable(state, &target, &|x| x.ceil())?;
+                round_variable(state, target, &|x| x.ceil())?;
             }
             Command::Floor { ref target } => {
-                round_variable(state, &target, &|x| x.floor())?;
+                round_variable(state, target, &|x| x.floor())?;
             }
             Command::Mutation {
                 ref mutator,
@@ -1068,7 +1068,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                                     let val = split_array(src);
                                     state.variables.insert(
                                         tar.to_lowercase(),
-                                        (get_variable_type(&state), val),
+                                        (get_variable_type(state), val),
                                     );
                                 } else {
                                     unimplemented!("Split to {:?}", target);
@@ -1153,7 +1153,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                                     let val = join_array(numeric);
                                     state.variables.insert(
                                         tar.to_lowercase(),
-                                        (get_variable_type(&state), val),
+                                        (get_variable_type(state), val),
                                     );
                                 } else {
                                     unimplemented!("Join to {:?}", target);
