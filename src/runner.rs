@@ -5,7 +5,7 @@ use std::io::{self, Write};
 use std::ops::Deref;
 use std::str::FromStr;
 
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum VariableType {
     Global,
     Local,
