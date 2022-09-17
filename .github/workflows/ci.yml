@@ -96,6 +96,6 @@ jobs:
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install Cargo web
-        run: which cargo-web || cargo install cargo-web
+        run: which cargo-web || cargo install cargo-web --version 0.6.24
       - name: Run Cargo web
         run: cargo web deploy --release && GIT_DEPLOY_DIR=./target/deploy ./deploy.sh
