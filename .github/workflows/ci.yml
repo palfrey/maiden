@@ -73,13 +73,16 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.47.0 # FIXME: Because of https://github.com/palfrey/maiden/issues/40
+          toolchain: stable
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install Cargo web
-        run: which cargo-web || cargo install cargo-web
+        run: which cargo-web || cargo install cargo-web --version 0.6.24
+      # FIXME: Because of https://github.com/palfrey/maiden/issues/40
+      - name: Install rust 1.47.0
+        run: rustup install 1.47.0
       - name: Run Cargo web
-        run: cargo web build
+        run: cargo +1.47.0 web build --no-default-features
 
   deploy:
     runs-on: ubuntu-latest
@@ -92,10 +95,13 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.47.0 # FIXME: Because of https://github.com/palfrey/maiden/issues/40
+          toolchain: stable
           override: true
       - uses: Swatinem/rust-cache@v1
       - name: Install Cargo web
-        run: which cargo-web || cargo install cargo-web
+        run: which cargo-web || cargo install cargo-web --version 0.6.24
+      # FIXME: Because of https://github.com/palfrey/maiden/issues/40
+      - name: Install rust 1.47.0
+        run: rustup install 1.47.0
       - name: Run Cargo web
-        run: cargo web deploy --release && GIT_DEPLOY_DIR=./target/deploy ./deploy.sh
+        run: cargo +1.47.0 web deploy --release --no-default-features && GIT_DEPLOY_DIR=./target/deploy ./deploy.sh
