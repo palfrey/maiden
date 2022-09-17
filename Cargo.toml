@@ -9,7 +9,7 @@ pest = "2.1"
 pest_meta = "2.1"
 pest_derive = "2.1"
 failure = "0.1.8"
-clap = { version = "3", optional = true }
+clap = { version = "3.2.22", optional = true }
 regex = "1"
 log = "0.4.4"
 pretty_env_logger = "0.3"
