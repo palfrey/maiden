@@ -1,5 +1,7 @@
 #![deny(warnings)]
 #![allow(clippy::needless_return)]
+#![allow(clippy::result_large_err)]
+#![allow(clippy::upper_case_acronyms)]
 
 #[cfg(target_arch = "wasm32")]
 use stdweb::web::IParentNode;
