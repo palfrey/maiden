@@ -34,7 +34,7 @@ jobs:
           args: -- --check
         if: matrix.rust == 'stable'
       - name: Clippy
-        run: cargo clippy -- -W clippy::all -A clippy::upper_case_acronyms
+        run: cargo clippy -- -W clippy::all
         if: matrix.rust == 'stable'
       - name: Build and test
         uses: actions-rs/cargo@v1
