@@ -1,6 +1,8 @@
 #![deny(warnings)]
 #![allow(clippy::needless_return)]
 #![recursion_limit = "256"]
+#![allow(clippy::result_large_err)]
+#![allow(clippy::upper_case_acronyms)]
 
 mod common;
 mod display;
