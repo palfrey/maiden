@@ -87,7 +87,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: [web, test, minimal-versions]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    #if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v2
         with:
@@ -98,10 +98,11 @@ jobs:
           toolchain: stable
           override: true
       - uses: Swatinem/rust-cache@v1
-      - name: Install Cargo web
-        run: which cargo-web || cargo install cargo-web --version 0.6.24
-      # FIXME: Because of https://github.com/palfrey/maiden/issues/40
-      - name: Install rust 1.47.0
-        run: rustup install 1.47.0
-      - name: Run Cargo web
-        run: cargo +1.47.0 web deploy --release --no-default-features && GIT_DEPLOY_DIR=./target/deploy ./deploy.sh
+      - name: Install trunk
+        run: wget -qO- https://github.com/thedodd/trunk/releases/download/${VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
+        env:
+          VERSION: "v0.16.0"
+      - name: Run trunk
+        run: ./trunk build
+      - name: Run deploy
+        run: GIT_DEPLOY_DIR=./static/dist ./deploy.sh
