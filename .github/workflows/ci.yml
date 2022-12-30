@@ -17,66 +17,55 @@ jobs:
           - beta
           - nightly
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           profile: minimal
           toolchain: ${{ matrix.rust }}
-          override: true
           components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Check formatting
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: -- --check
+        run: cargo fmt -- --check
         if: matrix.rust == 'stable'
       - name: Clippy
         run: cargo clippy -- -W clippy::all
         if: matrix.rust == 'stable'
       - name: Build and test
-        uses: actions-rs/cargo@v1
+        run: cargo test
         env:
           RUST_MIN_STACK: 8388608
-        with:
-          command: test
 
   minimal-versions:
     name: minimal versions check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           profile: minimal
           toolchain: nightly
-          override: true
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Remove lock
         run: rm Cargo.lock
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: -Z minimal-versions
+      - run: cargo build -Z minimal-versions
 
   web:
     name: web build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           profile: minimal
           toolchain: stable
-          override: true
           target: wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Install trunk
         run: wget -qO- https://github.com/thedodd/trunk/releases/download/${VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
         env:
@@ -89,16 +78,16 @@ jobs:
     needs: [web, test, minimal-versions]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           profile: minimal
           toolchain: stable
           override: true
           target: wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Install trunk
         run: wget -qO- https://github.com/thedodd/trunk/releases/download/${VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
         env:
