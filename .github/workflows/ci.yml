@@ -22,7 +22,6 @@ jobs:
           submodules: true
       - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: ${{ matrix.rust }}
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
@@ -46,7 +45,6 @@ jobs:
           submodules: true
       - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: nightly
       - uses: Swatinem/rust-cache@v2
       - name: Remove lock
@@ -62,7 +60,6 @@ jobs:
           submodules: true
       - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
           target: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
@@ -83,7 +80,6 @@ jobs:
           submodules: true
       - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
           override: true
           target: wasm32-unknown-unknown
