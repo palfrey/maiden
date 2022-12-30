@@ -32,8 +32,11 @@ default = ["cmd"]
 cmd = ["clap"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-yew = "0.6"
-stdweb = "0.4.16"
+yew = "0.19"
+web-sys = "0.3"
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1"
 
 [profile.release]
 lto = true

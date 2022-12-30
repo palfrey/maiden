@@ -34,7 +34,7 @@ jobs:
           args: -- --check
         if: matrix.rust == 'stable'
       - name: Clippy
-        run: cargo clippy -- -W clippy::all -A clippy::upper_case_acronyms
+        run: cargo clippy -- -W clippy::all
         if: matrix.rust == 'stable'
       - name: Build and test
         uses: actions-rs/cargo@v1
@@ -75,14 +75,14 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+          target: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v1
-      - name: Install Cargo web
-        run: which cargo-web || cargo install cargo-web --version 0.6.24
-      # FIXME: Because of https://github.com/palfrey/maiden/issues/40
-      - name: Install rust 1.47.0
-        run: rustup install 1.47.0
-      - name: Run Cargo web
-        run: cargo +1.47.0 web build --no-default-features
+      - name: Install trunk
+        run: wget -qO- https://github.com/thedodd/trunk/releases/download/${VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
+        env:
+          VERSION: "v0.16.0"
+      - name: Run trunk
+        run: ./trunk build --release
 
   deploy:
     runs-on: ubuntu-latest
@@ -97,11 +97,13 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+          target: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v1
-      - name: Install Cargo web
-        run: which cargo-web || cargo install cargo-web --version 0.6.24
-      # FIXME: Because of https://github.com/palfrey/maiden/issues/40
-      - name: Install rust 1.47.0
-        run: rustup install 1.47.0
-      - name: Run Cargo web
-        run: cargo +1.47.0 web deploy --release --no-default-features && GIT_DEPLOY_DIR=./target/deploy ./deploy.sh
+      - name: Install trunk
+        run: wget -qO- https://github.com/thedodd/trunk/releases/download/${VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
+        env:
+          VERSION: "v0.16.0"
+      - name: Run trunk
+        run: ./trunk build --release --public-url /maiden
+      - name: Run deploy
+        run: GIT_DEPLOY_DIR=./static/dist ./deploy.sh

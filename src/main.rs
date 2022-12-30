@@ -1,16 +1,17 @@
 #![deny(warnings)]
 #![allow(clippy::needless_return)]
-
-#[cfg(target_arch = "wasm32")]
-use stdweb::web::IParentNode;
-#[cfg(target_arch = "wasm32")]
-use yew::prelude::*;
+#![recursion_limit = "256"]
+#![allow(clippy::result_large_err)]
+#![allow(clippy::upper_case_acronyms)]
 
 mod common;
 mod display;
 mod parser;
 mod peg;
 mod runner;
+
+#[cfg(target_arch = "wasm32")]
+use std::panic;
 
 #[cfg(not(target_arch = "wasm32"))]
 use clap::{App, Arg};
@@ -54,14 +55,15 @@ mod web;
 
 #[cfg(target_arch = "wasm32")]
 fn main() {
-    yew::initialize();
-    let app: App<web::Model> = App::new();
-    let app_element = stdweb::web::document()
+    panic::set_hook(Box::new(console_error_panic_hook::hook));
+    let app_element = web_sys::window()
+        .unwrap()
+        .document()
+        .unwrap()
         .query_selector("#app")
         .unwrap()
         .unwrap();
-    app.mount(app_element);
-    yew::run_loop();
+    yew::start_app_in_element::<web::Model>(app_element);
 }
 
 #[cfg(test)]
