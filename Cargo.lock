@@ -463,7 +463,6 @@ dependencies = [
  "clap",
  "console_error_panic_hook",
  "failure",
- "gloo-timers",
  "js-sys",
  "log",
  "pest",
