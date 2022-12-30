@@ -17,7 +17,7 @@ pub struct Model {
     res: String,
     run_error: bool,
     interval: Option<i32>,
-    setup_fn: Closure<dyn FnMut()>,
+    _setup_fn: Closure<dyn FnMut()>,
     change_fn: Option<Closure<dyn FnMut(JsValue, JsValue)>>,
 }
 
@@ -115,7 +115,7 @@ impl Component for Model {
             res: "".into(),
             run_error: false,
             interval: Some(handle),
-            setup_fn,
+            _setup_fn: setup_fn,
             change_fn: None,
         };
         res.run_program();
