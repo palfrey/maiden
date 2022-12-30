@@ -6,7 +6,7 @@ use walkdir::WalkDir;
 fn main() -> Result<(), Error> {
     let out_dir = std::env::var("OUT_DIR")?;
     let destination = std::path::Path::new(&out_dir).join("test.rs");
-    let mut f = std::fs::File::create(&destination)?;
+    let mut f = std::fs::File::create(destination)?;
 
     for entry in WalkDir::new("tests").follow_links(true) {
         let name = entry?
@@ -16,7 +16,7 @@ fn main() -> Result<(), Error> {
             .to_string()
             .replace("tests/", "");
         if name.to_lowercase().ends_with(".rock") {
-            let test_name = name.replace('.', "_").replace('-', "_").replace('/', "_");
+            let test_name = name.replace(['.', '-', '/'], "_");
             if test_name == "upstream_fixtures_equality_mysterious_rock"
                 || test_name == "upstream_fixtures_equality_equalityComparison_rock"
                 || test_name == "upstream_fixtures_equality_nothing_rock"
