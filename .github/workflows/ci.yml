@@ -82,7 +82,7 @@ jobs:
         env:
           VERSION: "v0.16.0"
       - name: Run trunk
-        run: ./trunk build
+        run: ./trunk build --release
 
   deploy:
     runs-on: ubuntu-latest
@@ -104,6 +104,6 @@ jobs:
         env:
           VERSION: "v0.16.0"
       - name: Run trunk
-        run: ./trunk build
+        run: ./trunk build --release --public-url /maiden
       - name: Run deploy
         run: GIT_DEPLOY_DIR=./static/dist ./deploy.sh
