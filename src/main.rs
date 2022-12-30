@@ -1,4 +1,4 @@
-// #![deny(warnings)]
+#![deny(warnings)]
 #![allow(clippy::needless_return)]
 #![recursion_limit = "256"]
 
