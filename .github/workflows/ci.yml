@@ -76,13 +76,12 @@ jobs:
           toolchain: stable
           override: true
       - uses: Swatinem/rust-cache@v1
-      - name: Install Cargo web
-        run: which cargo-web || cargo install cargo-web --version 0.6.24
-      # FIXME: Because of https://github.com/palfrey/maiden/issues/40
-      - name: Install rust 1.47.0
-        run: rustup install 1.47.0
-      - name: Run Cargo web
-        run: cargo +1.47.0 web build --no-default-features
+      - name: Install trunk
+        run: wget -qO- https://github.com/thedodd/trunk/releases/download/${VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
+        env:
+          VERSION: "v0.16.0"
+      - name: Run trunk
+        run: ./trunk build
 
   deploy:
     runs-on: ubuntu-latest

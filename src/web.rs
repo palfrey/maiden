@@ -2,11 +2,13 @@ use crate::common::MaidenError;
 use crate::display;
 use crate::parser;
 use crate::runner;
+use js_sys::Function;
 use std;
-use stdweb::js;
+use wasm_bindgen::closure::Closure;
+use wasm_bindgen::JsCast;
+use wasm_bindgen::JsValue;
 use yew::html;
 use yew::prelude::*;
-use yew::services::ConsoleService;
 
 pub struct Model {
     value: String,
@@ -14,12 +16,14 @@ pub struct Model {
     parse_error: bool,
     res: String,
     run_error: bool,
-    input_callback: Callback<String>,
-    console: ConsoleService,
+    interval: Option<i32>,
+    setup_fn: Closure<dyn FnMut()>,
+    change_fn: Option<Closure<dyn FnMut(JsValue, JsValue)>>,
 }
 
 pub enum Msg {
     GotInput(String),
+    CodeMirrorSetup,
 }
 
 impl Model {
@@ -45,7 +49,7 @@ impl Model {
         }
     }
 
-    fn ast_tab(&self) -> Html<Self> {
+    fn ast_tab(&self) -> Html {
         if self.parse_error {
             html! {
                 { &self.program }
@@ -91,92 +95,134 @@ impl Component for Model {
     type Message = Msg;
     type Properties = ();
 
-    fn create(_: Self::Properties, mut link: ComponentLink<Self>) -> Self {
+    fn create(ctx: &Context<Self>) -> Self {
+        web_sys::console::log_1(&"Create".into());
+        let window = web_sys::window().unwrap();
+        let link = ctx.link().clone();
+        let setup_fn = Closure::wrap(
+            Box::new(move || link.send_message(Msg::CodeMirrorSetup)) as Box<dyn FnMut()>
+        );
+        let handle = window
+            .set_interval_with_callback_and_timeout_and_arguments_0(
+                setup_fn.as_ref().unchecked_ref(),
+                500,
+            )
+            .unwrap();
         let mut res = Self {
             value: include_str!("../tests/local/modulo.rock").into(),
             program: "".into(),
             parse_error: false,
             res: "".into(),
             run_error: false,
-            input_callback: link.send_back(|data| Msg::GotInput(data)),
-            console: ConsoleService::new(),
+            interval: Some(handle),
+            setup_fn,
+            change_fn: None,
         };
         res.run_program();
+        web_sys::console::log_1(&"end Create".into());
         res
     }
 
-    fn update(&mut self, msg: Self::Message) -> ShouldRender {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::GotInput(input_data) => {
-                self.console.log("Change");
+                web_sys::console::log_1(&"Change".into());
                 self.value = input_data;
                 self.run_program();
                 true
             }
-        }
-    }
-}
+            Msg::CodeMirrorSetup => {
+                web_sys::console::log_1(&"CodeMirrorSetup".into());
+                let window = web_sys::window().unwrap();
+                if let Ok(code_mirror) = js_sys::Reflect::get(&window, &"codeMirror".into()) {
+                    if !js_sys::Reflect::has(&code_mirror, &"configured".into()).unwrap() {
+                        web_sys::console::log_1(&"start setup callback".into());
 
-impl Renderable<Model> for Model {
-    fn view(&self) -> Html<Self> {
-        let callback = self.input_callback.clone();
-        let do_input = move |payload: String| callback.emit(payload);
-        js! {
-            function codeMirrorCallback() {
-                if (window.codeMirror) {
-                    if (!window.codeMirror.configured) {
-                        window.codeMirror.on("change", function(cm, change) {
-                            var callback = @{do_input};
-                            callback(cm.getValue());
+                        let local_link = ctx.link().clone();
+                        let change_fn =
+                            Closure::wrap(Box::new(move |cm: JsValue, _change: JsValue| {
+                                let get_value = Function::from(
+                                    js_sys::Reflect::get(&cm, &"getValue".into()).unwrap(),
+                                );
+                                local_link.send_message(Msg::GotInput(
+                                    get_value.call0(&cm).unwrap().as_string().unwrap(),
+                                ));
+                            })
+                                as Box<dyn FnMut(JsValue, JsValue)>);
+
+                        self.change_fn.replace(change_fn);
+
+                        self.change_fn.as_ref().and_then(|cf| {
+                            Function::from(
+                                js_sys::Reflect::get(&code_mirror, &"on".into()).unwrap(),
+                            )
+                            .call2(&code_mirror, &"change".into(), &cf.as_ref().unchecked_ref())
+                            .unwrap();
+                            None::<u32>
                         });
-                        window.codeMirror.setValue(@{&self.value});
-                        console.log("setup callback");
-                        window.codeMirror.configured = true;
+                        web_sys::console::log_1(&"setup callback".into());
+                        let set_value = Function::from(
+                            js_sys::Reflect::get(&code_mirror, &"setValue".into()).unwrap(),
+                        );
+                        web_sys::console::log_1(&"got setValue".into());
+                        set_value
+                            .call1(&code_mirror, &self.value.clone().into())
+                            .unwrap();
+                        web_sys::console::log_1(&"ran setValue".into());
+                        js_sys::Reflect::set(&code_mirror, &"configured".into(), &JsValue::TRUE)
+                            .unwrap();
+                        web_sys::console::log_1(&"end setup callback".into());
+                        let taken_interval = self.interval.take();
+                        if let Some(interval) = taken_interval {
+                            let window = web_sys::window().unwrap();
+                            web_sys::console::log_1(&format!("interval {}", interval).into());
+                            window.clear_interval_with_handle(interval);
+                        }
                     }
                 }
-                else {
-                    window.setTimeout(codeMirrorCallback, 500);
-                }
+                true
             }
-            codeMirrorCallback();
         }
+    }
+
+    fn view(&self, _ctx: &Context<Self>) -> Html {
         html! {
-            <div class="row",>
-                <div class="col-xl-6",>
-                    <textarea id="editor",
-                        class="form-control",
-                        value=&self.value,
-                        placeholder="placeholder",>
+            <div class="row">
+                <div class="col-xl-6">
+                    <textarea id="editor"
+                        class="form-control"
+                        value={self.value.clone()}
+                        placeholder="placeholder">
                     </textarea>
                 </div>
-                <div class="col-xl-6",>
-                    <ul class=("nav", "nav-tabs"), id="outputTabs", role="tablist",>
-                        <li class="nav-item",>
-                            <a class=("nav-link", "active"),
-                                id="ast-tab", data-toggle="tab",
-                                href="#ast", role="tab",
-                                style=if self.parse_error {"color: red"} else {"color: green"},
-                                aria-controls="ast", aria-selected="true",>{ "AST" }</a>
+                <div class="col-xl-6">
+                    <ul class="nav nav-tabs" id="outputTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active"
+                                id="ast-tab" data-toggle="tab"
+                                href="#ast" role="tab"
+                                style={if self.parse_error {"color: red"} else {"color: green"}}
+                                aria-controls="ast" aria-selected="true">{ "AST" }</a>
                         </li>
-                        <li class="nav-item",
-                            id="output-tab-li",
-                            style=if self.parse_error {"display: none"} else {""},>
-                            <a class="nav-link", id="output-tab",
-                                data-toggle="tab", href="#output",
-                                role="tab", aria-controls="output",
-                                style=if self.run_error {"color: red"} else {"color: green"},
-                                aria-selected="false",>{ "Output" }</a>
+                        <li class="nav-item"
+                            id="output-tab-li"
+                            style={if self.parse_error {"display: none"} else {""}}>
+                            <a class="nav-link" id="output-tab"
+                                data-toggle="tab" href="#output"
+                                role="tab" aria-controls="output"
+                                style={if self.run_error {"color: red"} else {"color: green"}}
+                                aria-selected="false">{ "Output" }</a>
                         </li>
                     </ul>
-                    <div class="tab-content", id="outputTabsContent",>
-                        <div class=("tab-pane", "fade", "show", "active"),
-                            id="ast", role="tabpanel", aria-labelledby="ast-tab",>
+                    <div class="tab-content" id="outputTabsContent">
+                        <div class="tab-pane fade show active"
+                            id="ast" role="tabpanel" aria-labelledby="ast-tab">
                             {self.ast_tab()}
                         </div>
-                        <div class=("tab-pane", "fade"),
-                            id="output",
-                            style=if self.parse_error {"display: none"} else {""},
-                            role="tabpanel", aria-labelledby="output-tab",>
+                        <div class="tab-pane fade"
+                            id="output"
+                            style={if self.parse_error {"display: none"} else {""}}
+                            role="tabpanel" aria-labelledby="output-tab">
                             <pre>{&self.res}</pre>
                         </div>
                     </div>
