@@ -85,7 +85,15 @@ nor = { or ~ ("nor" ~ nor)? }
 or = { and ~ ("or" ~ or)? }
 and = { equality_check ~ ("and" ~ and)? }
 
-ne = {^"aint" | "ain\'t" }
+isnt = {
+  ^"isnt"   | "isn't"  |
+  ^"aint"   | "ain't"   |
+  ^"arent"  | "aren't"  |
+  ^"wasnt"  | "wasn't"  |
+  ^"werent" | "weren't"
+}
+
+ne = { isnt }
 is_kw = {^"is"}
 eq = { ne | is_kw }
 
