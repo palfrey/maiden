@@ -21,7 +21,7 @@ break_kw = {^"break" ~ ignore_rest_of_line}
 
 continue_kw = {(^"continue" ~ ignore_rest_of_line) | ^"take it to the top"}
 
-function = { variable ~ ^"takes" ~ variable_list ~ EOL ~ block ~ EOL }
+function = { variable ~ (^"takes" | ^"wants") ~ variable_list ~ EOL ~ block ~ EOL }
 
 expression_list_separator = { ", and" | "&" | "," | "'n'" }
 
@@ -34,9 +34,9 @@ function_call = { variable ~ ^"taking" ~ args_list }
 
 expression_list = { (simple_expression ~ expression_list_separator ~ expression_list) | simple_expression }
 
-return_kw = { ^"return" | ^"give back" }
+return_kw = { ^"return" | ^"give back" | ^"send" | ^"give" }
 
-function_return = { return_kw ~ expression }
+function_return = { return_kw ~ expression ~ (^"back")? }
 
 operation = { readline | output | crement | mutation | assignment | put_assignment | rounding }
 
@@ -137,9 +137,20 @@ pronoun = {
     | ^"ze" | ^"ve" | ^"xe" | ^"it" | ^"he"
 }
 
-assignable = ${ variable ~ (WHITESPACE ~ "at" ~ WHITESPACE ~ expression)? }
+push  = _{"rock" | "push" }
+pop   = _{"roll" | "pop"}
+into  = _{^"into" | ^"in "}
 
-lookup = { assignable }
+delist = { pop ~ variable }
+
+lookup = { 
+  delist
+  | variable ~ "at" ~ expression
+  | variable }    
+
+indexer = { "at" ~ expression } 
+
+assignable = ${ variable ~ indexer? }
 
 common_prefix = { ^"an" | ^"a" | ^"the" | ^"my" | ^"your" }
 
@@ -152,13 +163,18 @@ common_variable = @{common_prefix ~ WHITESPACE ~ letter+}
 
 is = { "=''" | ^"'s " | ^"is " | ^"was " | ^"are " | ^"were "}
 
-target = { ^"into " ~ assignable }
+target = { into ~ assignable }
 
 put_assignment = { ^"put " ~ expression ~ target }
-assignment = { (assignable ~ is ~ (literal | poetic_number))
-  | (assignable ~ ^"says " ~ poetic_string)
+assignment = { 
+    (assignable ~ is ~ (literal | poetic_number))
+  | (assignable ~ (^"says " | ^"say "| ^"said ") ~ poetic_string)
   | (^"let " ~ assignable ~ ^"be " ~ compoundable_operator ~ expression)
   | (^"let " ~ assignable ~ ^"be " ~ expression)
+  | (push ~ expression ~ into ~ variable)
+  | (push ~ variable ~ "like " ~ (literal | poetic_number))
+  | (push ~ variable ~ "with " ~ expression)
+  | (delist ~ into ~ assignable)
 }
 
 poetic_string = @{ (!"\n" ~ ANY)+ }
