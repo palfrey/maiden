@@ -27,12 +27,12 @@ expression_list_separator = { ", and" | "&" | "," | "'n'" }
 
 variable_list_separator   = { expression_list_separator | "and" }
 
-variable_list = { (variable ~ variable_list_separator ~ variable_list) | variable }
+variable_list = { variable ~ (variable_list_separator ~ variable_list)? }
 
 args_list = { expression_list }
 function_call = { variable ~ ^"taking" ~ args_list }
 
-expression_list = { (simple_expression ~ expression_list_separator ~ expression_list) | simple_expression }
+expression_list = { simple_expression ~ (expression_list_separator ~ expression_list)? }
 
 return_kw = { ^"return" | ^"give back" | ^"send" | ^"give" }
 
@@ -57,7 +57,7 @@ loopable 	= { statement | (EOL ~ block ~ EOL) }
 while_kw = {^"while"}
 until_kw = {^"until"}
 loop_kw 	= { (while_kw | until_kw) ~ expression ~ loopable }
-output  = {(^"say" |^"shout"|^"whisper"|^"scream") ~ expression}
+output  = {(^"say " |^"shout "|^"whisper "|^"scream ") ~ expression}
 
 simple_expression = { function_call | lookup | literal | pronoun }
 
@@ -73,7 +73,7 @@ null 	= {^"null" | ^"nothing" | ^"nowhere" | ^"nobody" | ^"empty" | ^"gone" }
 
 mysterious = {"mysterious"}
 
-number      = @{(("-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)?) ~ "."?) | ("." ~ ASCII_DIGIT+) }
+number      = @{("-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ "."?) | ("." ~ ASCII_DIGIT+) }
 
 string      = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 
@@ -86,14 +86,15 @@ or = { and ~ ("or" ~ or)? }
 and = { equality_check ~ ("and" ~ and)? }
 
 isnt = {
-  ^"isnt"   | "isn't"  |
-  ^"aint"   | "ain't"   |
-  ^"arent"  | "aren't"  |
-  ^"wasnt"  | "wasn't"  |
-  ^"werent" | "weren't"
+  ^"isnt"   | ^"isn't"  |
+  ^"aint"   | ^"ain't"   |
+  ^"arent"  | ^"aren't"  |
+  ^"wasnt"  | ^"wasn't"  |
+  ^"werent" | ^"weren't"
 }
 
 ne = { isnt }
+is = _{ "=''" | ^"'s" | ^"'re" | ^"is " | ^"was " | ^"are" | ^"were"}
 is_kw = {^"is"}
 eq = { ne | is_kw }
 
@@ -108,10 +109,10 @@ smaller	 	= {^"lower" |^"less" | ^"smaller" | ^"weaker"}
 great	= {^"high" | ^"great" | ^"big" | ^"strong"}
 small	= {^"low" | ^"small" | ^"weak"}
 
-comparator 	= { (^"is" ~ greater ~ ^"than")
-            | (^"is" ~ smaller ~ ^"than")
-            |	(^"is" ~ ^"as" ~ great ~ ^"as")
-            |	(^"is" ~ ^"as" ~ small ~ ^"as")}
+comparator 	= { (is ~ greater ~ ^"than")
+            | (is ~ smaller ~ ^"than")
+            |	(is ~ ^"as" ~ great ~ ^"as")
+            |	(is ~ ^"as" ~ small ~ ^"as")}
 
 
 arithmetic    = { product ~ ((add | subtract) ~ product)* }
@@ -160,8 +161,6 @@ lowercase_letter = { LOWERCASE_LETTER }
 letter = { uppercase_letter | lowercase_letter}
 
 common_variable = @{common_prefix ~ WHITESPACE ~ letter+}
-
-is = { "=''" | ^"'s " | ^"is " | ^"was " | ^"are " | ^"were "}
 
 target = { into ~ assignable }
 
