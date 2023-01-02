@@ -21,22 +21,22 @@ break_kw = {^"break" ~ ignore_rest_of_line}
 
 continue_kw = {(^"continue" ~ ignore_rest_of_line) | ^"take it to the top"}
 
-function = { variable ~ ^"takes" ~ variable_list ~ EOL ~ block ~ EOL }
+function = { variable ~ (^"takes" | ^"wants") ~ variable_list ~ EOL ~ block ~ EOL }
 
 expression_list_separator = { ", and" | "&" | "," | "'n'" }
 
 variable_list_separator   = { expression_list_separator | "and" }
 
-variable_list = { (variable ~ variable_list_separator ~ variable_list) | variable }
+variable_list = { variable ~ (variable_list_separator ~ variable_list)? }
 
 args_list = { expression_list }
 function_call = { variable ~ ^"taking" ~ args_list }
 
-expression_list = { (simple_expression ~ expression_list_separator ~ expression_list) | simple_expression }
+expression_list = { simple_expression ~ (expression_list_separator ~ expression_list)? }
 
-return_kw = { ^"return" | ^"give back" }
+return_kw = { ^"return" | ^"give back" | ^"send" | ^"give" }
 
-function_return = { return_kw ~ expression }
+function_return = { return_kw ~ expression ~ (^"back")? }
 
 operation = { readline | output | crement | mutation | assignment | put_assignment | rounding }
 
@@ -57,7 +57,7 @@ loopable 	= { statement | (EOL ~ block ~ EOL) }
 while_kw = {^"while"}
 until_kw = {^"until"}
 loop_kw 	= { (while_kw | until_kw) ~ expression ~ loopable }
-output  = {(^"say" |^"shout"|^"whisper"|^"scream") ~ expression}
+output  = {(^"say " |^"shout "|^"whisper "|^"scream ") ~ expression}
 
 simple_expression = { function_call | lookup | literal | pronoun }
 
@@ -73,7 +73,7 @@ null 	= {^"null" | ^"nothing" | ^"nowhere" | ^"nobody" | ^"empty" | ^"gone" }
 
 mysterious = {"mysterious"}
 
-number      = @{(("-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)?) ~ "."?) | ("." ~ ASCII_DIGIT+) }
+number      = @{("-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ "."?) | ("." ~ ASCII_DIGIT+) }
 
 string      = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 
@@ -85,7 +85,16 @@ nor = { or ~ ("nor" ~ nor)? }
 or = { and ~ ("or" ~ or)? }
 and = { equality_check ~ ("and" ~ and)? }
 
-ne = {^"aint" | "ain\'t" }
+isnt = {
+  ^"isnt"   | ^"isn't"  |
+  ^"aint"   | ^"ain't"   |
+  ^"arent"  | ^"aren't"  |
+  ^"wasnt"  | ^"wasn't"  |
+  ^"werent" | ^"weren't"
+}
+
+ne = { isnt }
+is = _{ "=''" | ^"'s" | ^"'re" | ^"is " | ^"was " | ^"are" | ^"were"}
 is_kw = {^"is"}
 eq = { ne | is_kw }
 
@@ -100,10 +109,10 @@ smaller	 	= {^"lower" |^"less" | ^"smaller" | ^"weaker"}
 great	= {^"high" | ^"great" | ^"big" | ^"strong"}
 small	= {^"low" | ^"small" | ^"weak"}
 
-comparator 	= { (^"is" ~ greater ~ ^"than")
-            | (^"is" ~ smaller ~ ^"than")
-            |	(^"is" ~ ^"as" ~ great ~ ^"as")
-            |	(^"is" ~ ^"as" ~ small ~ ^"as")}
+comparator 	= { (is ~ greater ~ ^"than")
+            | (is ~ smaller ~ ^"than")
+            |	(is ~ ^"as" ~ great ~ ^"as")
+            |	(is ~ ^"as" ~ small ~ ^"as")}
 
 
 arithmetic    = { product ~ ((add | subtract) ~ product)* }
@@ -129,9 +138,20 @@ pronoun = {
     | ^"ze" | ^"ve" | ^"xe" | ^"it" | ^"he"
 }
 
-assignable = ${ variable ~ (WHITESPACE ~ "at" ~ WHITESPACE ~ expression)? }
+push  = _{"rock" | "push" }
+pop   = _{"roll" | "pop"}
+into  = _{^"into" | ^"in "}
 
-lookup = { assignable }
+delist = { pop ~ variable }
+
+lookup = { 
+  delist
+  | variable ~ "at" ~ expression
+  | variable }    
+
+indexer = { "at" ~ expression } 
+
+assignable = ${ variable ~ indexer? }
 
 common_prefix = { ^"an" | ^"a" | ^"the" | ^"my" | ^"your" }
 
@@ -142,15 +162,18 @@ letter = { uppercase_letter | lowercase_letter}
 
 common_variable = @{common_prefix ~ WHITESPACE ~ letter+}
 
-is = { "=''" | ^"'s " | ^"is " | ^"was " | ^"are " | ^"were "}
-
-target = { ^"into " ~ assignable }
+target = { into ~ assignable }
 
 put_assignment = { ^"put " ~ expression ~ target }
-assignment = { (assignable ~ is ~ (literal | poetic_number))
-  | (assignable ~ ^"says " ~ poetic_string)
+assignment = { 
+    (assignable ~ is ~ (literal | poetic_number))
+  | (assignable ~ (^"says " | ^"say "| ^"said ") ~ poetic_string)
   | (^"let " ~ assignable ~ ^"be " ~ compoundable_operator ~ expression)
   | (^"let " ~ assignable ~ ^"be " ~ expression)
+  | (push ~ expression ~ into ~ variable)
+  | (push ~ variable ~ "like " ~ (literal | poetic_number))
+  | (push ~ variable ~ "with " ~ expression)
+  | (delist ~ into ~ assignable)
 }
 
 poetic_string = @{ (!"\n" ~ ANY)+ }
@@ -185,7 +208,7 @@ kw5 = { ^"break" | ^"build" | ^"empty" | ^"false" | ^"great" | ^"knock" | ^"lowe
 kw4 = { ^"aint" | ^"back" | ^"cast" | ^"burn" | ^"join" | ^"down" | ^"else" | ^"give" | ^"gone" | ^"high" | ^"into" | ^"less" | ^"lies" | ^"null"
     | ^"plus" | ^"says" | ^"than" | ^"them" | ^"they" | ^"true" | ^"weak" | ^"were" | ^"your" | ^"over" | ^"with"}
 kw3 = { ^"and" | ^"big" | ^"her" | ^"him" | ^"hir" | ^"it " | ^"let" | ^"low" | ^"nor" | ^"not" | ^"put" | ^"say" | ^"she"
-    | ^"the" | ^"top" | ^"ver" | ^"was" | ^"xem" | ^"yes" | ^"zie" | ^"zir"}
+    | ^"the" | ^"top" | ^"ver" | ^"was" | ^"xem" | ^"yes" | ^"zie" | ^"zir" | ^"are"}
 kw2 = { ^"an" | ^"as" | ^"at" | ^"be" | ^"he" | ^"if" | ^"is" | ^"it" | ^"my" | ^"no" | ^"of" | ^"ok" | ^"or" | ^"to" | ^"up" | ^"ve"
     | ^"xe" | ^"ze" }
 kw1 = { ^"a" }

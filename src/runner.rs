@@ -257,7 +257,7 @@ fn call_function(
     target: &str,
     args: &[Expression],
 ) -> Result<Expression> {
-    let func_wrap = program.functions.get(target);
+    let func_wrap = program.functions.get(&target.to_lowercase());
     if func_wrap.is_none() {
         return Err(MaidenError::MissingFunction {
             name: target.to_string(),
@@ -905,7 +905,7 @@ fn run_core(state: &mut State, program: &mut Program, mut pc: usize) -> Result<E
                 ref block,
             } => {
                 program.functions.insert(
-                    name.to_string(),
+                    name.to_lowercase().to_string(),
                     Function {
                         args: args.to_vec(),
                         block: block.clone(),

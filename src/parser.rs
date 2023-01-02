@@ -510,7 +510,7 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
         Rule::multiply => SymbolType::Times.into(),
         Rule::divide => SymbolType::Divide.into(),
         Rule::pronoun => Expression::Pronoun.into(),
-        Rule::ne => SymbolType::Aint.into(),
+        Rule::isnt => SymbolType::Aint.into(),
         Rule::return_kw => SymbolType::Return.into(),
         Rule::function_return => {
             let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
