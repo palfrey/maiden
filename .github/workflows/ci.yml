@@ -17,7 +17,7 @@ jobs:
           - beta
           - nightly
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - uses: dtolnay/rust-toolchain@master
@@ -40,7 +40,7 @@ jobs:
     name: minimal versions check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - uses: dtolnay/rust-toolchain@master
@@ -55,7 +55,7 @@ jobs:
     name: web build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - uses: dtolnay/rust-toolchain@master
@@ -75,13 +75,12 @@ jobs:
     needs: [web, test, minimal-versions]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-          override: true
           target: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: Install trunk
