@@ -68,11 +68,11 @@ fn run_binop_shortcut(
     shortcut_return: bool,
     f: fn(&State, &Expression, &Expression) -> Result<bool>,
 ) -> Result<bool> {
-    let res_first = run_expression(state, program, first.deref())?;
+    let res_first = run_expression(state, program, first)?;
     if shortcut.is_some() && shortcut.unwrap() == res_first {
         return Ok(shortcut_return);
     }
-    let res_second = run_expression(state, program, second.deref())?;
+    let res_second = run_expression(state, program, second)?;
     debug!("first: {:?} second: {:?}", res_first, res_second);
 
     // Check for same types comparison first
@@ -143,8 +143,8 @@ fn run_mathbinop(
     op: &Expression,
     f: fn(f64, f64) -> f64,
 ) -> Result<Expression> {
-    let res_first = run_expression(state, program, first.deref())?;
-    let res_second = run_expression(state, program, second.deref())?;
+    let res_first = run_expression(state, program, first)?;
+    let res_second = run_expression(state, program, second)?;
     match res_first {
         Expression::Floating(ref i) => {
             let first_value = *i;
