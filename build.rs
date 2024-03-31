@@ -1,4 +1,4 @@
-use failure::Error;
+use failure::{Error, ResultExt};
 use serde::Deserialize;
 use std::{
     collections::HashMap,
@@ -253,7 +253,10 @@ struct Ast {
 
 fn make_peg() -> Result<(), Error> {
     if !Path::new("node_modules/.bin/peggy").exists() {
-        Command::new("pnpm").args(["install"]).output()?;
+        Command::new("pnpm")
+            .args(["install"])
+            .output()
+            .context("pnpm install")?;
     }
     if !Path::new("target/rockstar.ast").exists() {
         Command::new("./node_modules/.bin/peggy")
@@ -263,10 +266,11 @@ fn make_peg() -> Result<(), Error> {
                 "-o",
                 "target/rockstar.ast",
             ])
-            .output()?;
+            .output()
+            .context("peggy")?;
     }
 
-    let mut output_peg = File::create("src/rockstar.peg")?;
+    let mut output_peg = File::create("src/rockstar.peg").context("Creating rockstar.peg")?;
     output_peg.write_all(
         b"/*
 PEG grammar for Rockstar (https://codewithrockstar.com)
@@ -275,7 +279,9 @@ Generated from spec/satriani/rockstar.peg, do not edit here!
 
 ",
     )?;
-    let ast: Ast = serde_json::from_str(&fs::read_to_string("target/rockstar.ast")?)?;
+    let ast: Ast = serde_json::from_str(
+        &fs::read_to_string("target/rockstar.ast").context("Reading the AST")?,
+    )?;
 
     fn write_rule(output_peg: &mut File, rule: &Rule) -> Result<(), Error> {
         let name = &rule.name;
