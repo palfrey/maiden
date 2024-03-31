@@ -240,11 +240,11 @@ mod tests {
         };
         test_program(
             "if nothing is nothing
-        Foo says foo
-        Else
-        Bar says bar
+Foo says foo
+Else
+Bar says bar
 
-        ",
+",
             end_variables,
             "",
         );

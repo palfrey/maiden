@@ -2,3 +2,7 @@ target/
 .DS_Store
 .vscode/
 trunk
+node_modules/
+.downloads/
+_tmp*
+*.peg
