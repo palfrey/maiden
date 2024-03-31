@@ -1,4 +1,4 @@
-use failure::{err_msg, Error};
+use failure::Error;
 use serde::Deserialize;
 use std::{
     collections::HashMap,
@@ -56,7 +56,7 @@ fn make_tests() -> Result<(), Error> {
 }
 
 fn display_name(name: &str) -> String {
-    if vec!["break", "continue", "return", "true", "false", "loop"].contains(&name) {
+    if ["break", "continue", "return", "true", "false", "loop"].contains(&name) {
         format!("{name}_kw")
     } else if name == "_" {
         return "SPACING".to_owned();
@@ -247,7 +247,7 @@ struct Rule {
 }
 
 #[derive(Deserialize)]
-struct AST {
+struct Ast {
     rules: Vec<Rule>,
 }
 
@@ -267,7 +267,7 @@ fn make_peg() -> Result<(), Error> {
     }
 
     let mut output_peg = File::create("src/rockstar.peg")?;
-    output_peg.write(
+    output_peg.write_all(
         b"/*
 PEG grammar for Rockstar (https://codewithrockstar.com)
 Generated from spec/satriani/rockstar.peg, do not edit here!
@@ -275,13 +275,13 @@ Generated from spec/satriani/rockstar.peg, do not edit here!
 
 ",
     )?;
-    let ast: AST = serde_json::from_str(&fs::read_to_string("target/rockstar.ast")?)?;
+    let ast: Ast = serde_json::from_str(&fs::read_to_string("target/rockstar.ast")?)?;
 
     fn write_rule(output_peg: &mut File, rule: &Rule) -> Result<(), Error> {
         let name = &rule.name;
         let printed = rule.expression.print(0);
         let ignore = {
-            if vec![
+            if [
                 "noise",
                 "whitespace",
                 "comment",
@@ -292,7 +292,7 @@ Generated from spec/satriani/rockstar.peg, do not edit here!
             .contains(&name.as_str())
             {
                 "_"
-            } else if vec![
+            } else if [
                 "true",
                 "false",
                 "number",
@@ -311,8 +311,8 @@ Generated from spec/satriani/rockstar.peg, do not edit here!
                 ""
             }
         };
-        let disp_name = display_name(&name);
-        output_peg.write(format!("{disp_name} = {}{{ {printed} }}\n\n", ignore).as_bytes())?;
+        let disp_name = display_name(name);
+        output_peg.write_all(format!("{disp_name} = {}{{ {printed} }}\n\n", ignore).as_bytes())?;
         Ok(())
     }
 
@@ -419,118 +419,116 @@ Generated from spec/satriani/rockstar.peg, do not edit here!
     );
 
     for mut rule in ast.rules {
-        match rule.kind.as_str() {
-            "rule" => {
-                if rule.name == "EOF" {
-                    continue;
+        if rule.kind != "rule" {
+            continue;
+        }
+        if rule.name == "EOF" {
+            continue;
+        }
+        if rule.name == "program" {
+            rule.expression = Expression::Sequence {
+                elements: vec![
+                    Expression::RuleRef {
+                        name: "SOI".to_owned(),
+                    },
+                    rule.expression,
+                    Expression::RuleRef {
+                        name: "EOI".to_owned(),
+                    },
+                ],
+            };
+        }
+        let not_keyword = Expression::SemanticNot {
+            expression: Some(Box::new(Expression::RuleRef {
+                name: "keyword".to_owned(),
+            })),
+        };
+        if rule.name == "simple_variable" {
+            if let Expression::Action {
+                expression: ref mut act_expression,
+            } = rule.expression
+            {
+                if let Expression::Sequence { ref mut elements } = **act_expression {
+                    elements.insert(0, not_keyword.clone());
+                    elements.remove(2);
                 }
-                if rule.name == "program" {
-                    rule.expression = Expression::Sequence {
-                        elements: vec![
-                            Expression::RuleRef {
-                                name: "SOI".to_owned(),
-                            },
-                            rule.expression,
-                            Expression::RuleRef {
-                                name: "EOI".to_owned(),
-                            },
-                        ],
-                    };
+            }
+        }
+        if rule.name == "proper_noun" {
+            if let Expression::Action {
+                expression: ref mut act_expression,
+            } = rule.expression
+            {
+                if let Expression::Sequence { ref mut elements } = **act_expression {
+                    elements.insert(0, not_keyword);
+                    elements.remove(2);
                 }
-                let not_keyword = Expression::SemanticNot {
-                    expression: Some(Box::new(Expression::RuleRef {
-                        name: "keyword".to_owned(),
-                    })),
-                };
-                if rule.name == "simple_variable" {
+            }
+        }
+        if let Some(extra_rules) = extras.get(&rule.name) {
+            for extra_rule in extra_rules {
+                write_rule(&mut output_peg, extra_rule)?;
+            }
+        }
+        if rule.name == "_" {
+            rule.name = "SPACING".to_owned();
+        }
+        if rule.name == "eq" {
+            rule.expression = Expression::Choice {
+                alternatives: vec![
+                    Expression::RuleRef {
+                        name: "ne".to_owned(),
+                    },
+                    Expression::RuleRef {
+                        name: "is_kw".to_owned(),
+                    },
+                ],
+            };
+        }
+        if rule.name == "function_call" {
+            if let Expression::Action {
+                expression: ref mut items,
+            } = rule.expression
+            {
+                if let Expression::Sequence { ref mut elements } = **items {
+                    if let Expression::Labeled {
+                        expression: ref mut labelled_expression,
+                    } = elements.last_mut().unwrap()
+                    {
+                        if let Expression::RuleRef { ref mut name } = **labelled_expression {
+                            *name = "args_list".to_owned();
+                        }
+                    }
+                }
+            }
+        }
+        if rule.name == "assignment" {
+            if let Expression::Choice {
+                ref mut alternatives,
+            } = rule.expression
+            {
+                for choice in alternatives {
                     if let Expression::Action {
                         expression: ref mut act_expression,
-                    } = rule.expression
+                    } = choice
                     {
                         if let Expression::Sequence { ref mut elements } = **act_expression {
-                            elements.insert(0, not_keyword.clone());
-                            elements.remove(2);
-                        }
-                    }
-                }
-                if rule.name == "proper_noun" {
-                    if let Expression::Action {
-                        expression: ref mut act_expression,
-                    } = rule.expression
-                    {
-                        if let Expression::Sequence { ref mut elements } = **act_expression {
-                            elements.insert(0, not_keyword);
-                            elements.remove(2);
-                        }
-                    }
-                }
-                if let Some(extra_rules) = extras.get(&rule.name) {
-                    for extra_rule in extra_rules {
-                        write_rule(&mut output_peg, extra_rule)?;
-                    }
-                }
-                if rule.name == "_" {
-                    rule.name = "SPACING".to_owned();
-                }
-                if rule.name == "eq" {
-                    rule.expression = Expression::Choice {
-                        alternatives: vec![
-                            Expression::RuleRef {
-                                name: "ne".to_owned(),
-                            },
-                            Expression::RuleRef {
-                                name: "is_kw".to_owned(),
-                            },
-                        ],
-                    };
-                }
-                if rule.name == "function_call" {
-                    if let Expression::Action {
-                        expression: ref mut items,
-                    } = rule.expression
-                    {
-                        if let Expression::Sequence { ref mut elements } = **items {
-                            if let Expression::Labeled {
-                                expression: ref mut labelled_expression,
-                            } = elements.last_mut().unwrap()
-                            {
-                                if let Expression::RuleRef { ref mut name } = **labelled_expression
-                                {
-                                    *name = "args_list".to_owned();
-                                }
-                            }
-                        }
-                    }
-                }
-                if rule.name == "assignment" {
-                    if let Expression::Choice {
-                        ref mut alternatives,
-                    } = rule.expression
-                    {
-                        for choice in alternatives {
-                            if let Expression::Action {
-                                expression: ref mut act_expression,
-                            } = choice
-                            {
-                                if let Expression::Sequence { ref mut elements } = **act_expression
-                                {
-                                    if let Expression::Literal { value } = elements.first().unwrap()
-                                    {
-                                        if value == "put" {
-                                            **act_expression = Expression::RuleRef {
-                                                name: "put_assignment".to_owned(),
-                                            }
-                                        }
+                            if let Expression::Literal { value } = elements.first().unwrap() {
+                                if value == "put" {
+                                    **act_expression = Expression::RuleRef {
+                                        name: "put_assignment".to_owned(),
                                     }
                                 }
                             }
                         }
-                    } else {
-                        println!("Fail rule 1 {:?}", rule)
                     }
                 }
-                if rule.name == "variable" {
-                    output_peg.write(r#"// To disallow identifiers like "My back is hurting" (which is illegal because "back" is a keyword)
+            } else {
+                println!("Fail rule 1 {:?}", rule)
+            }
+        }
+        if rule.name == "variable" {
+            output_peg.write_all(r#"// To disallow identifiers like "My back is hurting" (which is illegal because "back" is a keyword)
 // we need to explicitly define all language keywords, and they MUST be matched in descending order of length
 // because of Complicated Weird Parser Reasons.
 kw10 = { ^"mysterious" }
@@ -551,43 +549,39 @@ kw1 = { ^"a" }
 keyword = @{(kw10 | kw8 | kw7 | kw6 | kw5 | kw5 | kw4 | kw3 | kw2 | kw1) ~ !letter }
 
 "#.as_bytes())?;
-                }
-                if rule.name == "line" {
-                    if let Expression::Choice {
-                        ref mut alternatives,
-                    } = rule.expression
-                    {
-                        if let Expression::Action { ref mut expression } = alternatives[0] {
-                            if let Expression::Sequence { ref mut elements } = **expression {
-                                elements[2] = Expression::Choice {
-                                    alternatives: vec![
-                                        Expression::RuleRef {
-                                            name: "EOL".to_owned(),
+        }
+        if rule.name == "line" {
+            if let Expression::Choice {
+                ref mut alternatives,
+            } = rule.expression
+            {
+                if let Expression::Action { ref mut expression } = alternatives[0] {
+                    if let Expression::Sequence { ref mut elements } = **expression {
+                        elements[2] = Expression::Choice {
+                            alternatives: vec![
+                                Expression::RuleRef {
+                                    name: "EOL".to_owned(),
+                                },
+                                Expression::Sequence {
+                                    elements: vec![
+                                        Expression::ZeroOrMore {
+                                            expression: Box::new(Expression::RuleRef {
+                                                name: "SPACING".to_owned(),
+                                            }),
                                         },
-                                        Expression::Sequence {
-                                            elements: vec![
-                                                Expression::ZeroOrMore {
-                                                    expression: Box::new(Expression::RuleRef {
-                                                        name: "SPACING".to_owned(),
-                                                    }),
-                                                },
-                                                Expression::RuleRef {
-                                                    name: "EOI".to_owned(),
-                                                },
-                                            ],
+                                        Expression::RuleRef {
+                                            name: "EOI".to_owned(),
                                         },
                                     ],
-                                }
-                            }
+                                },
+                            ],
                         }
                     }
                 }
-                write_rule(&mut output_peg, &rule)?;
             }
-            _ => {}
         }
+        write_rule(&mut output_peg, &rule)?;
     }
-    //Err(err_msg("nothing"))
     Ok(())
 }
 

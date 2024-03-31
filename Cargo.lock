@@ -461,6 +461,7 @@ dependencies = [
  "pretty_env_logger",
  "regex",
  "serde",
+ "serde_derive",
  "serde_json",
  "walkdir",
  "wasm-bindgen",
