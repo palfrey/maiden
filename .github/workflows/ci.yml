@@ -31,6 +31,8 @@ jobs:
       - name: Clippy
         run: cargo clippy -- -W clippy::all
         if: matrix.rust == 'stable'
+        env:
+          RUST_BACKTRACE: 1
       - name: Build and test
         run: cargo test
         env:
@@ -50,6 +52,8 @@ jobs:
       - name: Remove lock
         run: rm Cargo.lock
       - run: cargo build -Z minimal-versions
+        env:
+          RUST_BACKTRACE: 1      
 
   web:
     name: web build
