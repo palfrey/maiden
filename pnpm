@@ -1,0 +1,15 @@
+#!/bin/bash
+set -eu -o pipefail
+
+SCRIPT_FOLDER=$(dirname $(realpath $0))
+
+VERSION=8.12.1
+PNPM=${SCRIPT_FOLDER}/.downloads/pnpm-${VERSION}
+
+if [ ! -f $PNPM ]; then
+    mkdir -p ${SCRIPT_FOLDER}/.downloads
+    wget https://github.com/pnpm/pnpm/releases/download/v${VERSION}/pnpm-linuxstatic-x64 --output-document=${PNPM}
+    chmod +x $PNPM
+fi
+
+$PNPM $*

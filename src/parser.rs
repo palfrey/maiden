@@ -2,7 +2,7 @@ use crate::common::{
     Block, Command, CommandLine, Expression, MaidenError, Program, Result, SymbolType,
 };
 use crate::peg::{Rockstar, Rule};
-use log::debug;
+use log::{debug, warn};
 use pest::iterators::Pair;
 use pest::Parser;
 use std::collections::HashMap;
@@ -112,7 +112,7 @@ where
                 });
             }
             item => {
-                println!("Something else {:?}", item);
+                warn!("Something else {:?}", item);
             }
         }
     }
@@ -323,6 +323,23 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
                 Err(_) => variable,
             }
         }
+        Rule::lookup => {
+            debug!("{}Depairing lookup", level_string);
+            let mut items = depair_seq(&mut pair.into_inner(), level + 1)?;
+            let variable = remove(&mut items, 0, line)?;
+            if items.is_empty() {
+                variable
+            } else if items.len() == 1 {
+                let index = remove(&mut items, 0, line)?;
+                Expression::ArrayRef {
+                    name: Box::new(variable.expr()?),
+                    index: Box::new(index.expr()?),
+                }
+                .into()
+            } else {
+                panic!("More than 1/2 item for lookup {:#?} {:#?}", variable, items);
+            }
+        }
         Rule::join => SymbolType::Join.into(),
         Rule::split => SymbolType::Split.into(),
         Rule::cast => SymbolType::Cast.into(),
@@ -332,6 +349,13 @@ fn depair_core(pair: Pair<'_, Rule>, level: usize) -> Result<Item> {
             if items.is_empty() {
                 panic!("Empty assignment!");
             }
+
+            if items.len() == 1 {
+                if let Item::Command(_) = items[0] {
+                    return remove(&mut items, 0, line);
+                }
+            }
+
             let target = remove(&mut items, 0, line)?.expr()?;
             match items.len() {
                 1 => CommandLine {
