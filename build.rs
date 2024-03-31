@@ -253,7 +253,7 @@ struct Ast {
 
 fn make_peg() -> Result<(), Error> {
     if !Path::new("node_modules/.bin/peggy").exists() {
-        Command::new("pnpm")
+        Command::new("./pnpm")
             .args(["install"])
             .output()
             .context("pnpm install")?;

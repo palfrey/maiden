@@ -32,12 +32,12 @@ jobs:
         run: cargo clippy -- -W clippy::all
         if: matrix.rust == 'stable'
         env:
-          RUST_BACKTRACE: 1
-          CARGO_PROFILE_DEV_BUILD_OVERRIDE_DEBUG: true
+          RUST_BACKTRACE: full
       - name: Build and test
         run: cargo test
         env:
           RUST_MIN_STACK: 8388608
+          RUST_BACKTRACE: full
 
   minimal-versions:
     name: minimal versions check
@@ -54,8 +54,7 @@ jobs:
         run: rm Cargo.lock
       - run: cargo build -Z minimal-versions
         env:
-          RUST_BACKTRACE: 1      
-          CARGO_PROFILE_DEV_BUILD_OVERRIDE_DEBUG: true
+          RUST_BACKTRACE: full
 
   web:
     name: web build
